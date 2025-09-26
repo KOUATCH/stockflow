@@ -1,0 +1,24 @@
+"use server";
+
+import { db } from "@/prisma/db";
+
+
+export async function getRoleById(id: string) {
+  try {
+    const role = await db.role.findUnique({
+      where: { id },
+    });
+
+    if (!role) {
+      throw new Error("Role not found");
+    }
+
+    return { success: true, data: role };
+  } catch (error) {
+    console.error("Error fetching role:", error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Failed to fetch role",
+    };
+  }
+}

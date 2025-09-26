@@ -1,0 +1,271 @@
+'use client'
+
+import { useState, useEffect } from 'react';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { AlertTriangle, Package, TrendingUp, RefreshCw } from 'lucide-react';
+import { getInventoryLevels, getLowStockItems } from '@/actions/inventory/get-inventory-data';
+
+interface InventoryLevel {
+  id: string;
+  itemId: string;
+  locationId: string;
+  quantityOnHand: number;
+  quantityReserved: number;
+  quantityAvailable: number;
+  totalValue: number;
+  item?: {
+    id: string;
+    name: string;
+    sku: string;
+    imageUrls: string;
+  };
+  location?: {
+    id: string;
+    name: string;
+  };
+}
+
+export function SimpleInventoryDashboard() {
+  const [levels, setLevels] = useState<InventoryLevel[]>([]);
+  const [lowStockItems, setLowStockItems] = useState<InventoryLevel[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  const fetchData = async () => {
+    setLoading(true);
+    setError(null);
+    
+    try {
+      const [levelsResult, lowStockResult] = await Promise.all([
+        getInventoryLevels(),
+        getLowStockItems(10)
+      ]);
+
+      if (levelsResult.success && levelsResult.data) {
+        setLevels(levelsResult.data);
+      } else {
+        setError(levelsResult.error || 'Failed to fetch inventory levels');
+      }
+
+      if (lowStockResult.success && lowStockResult.data) {
+        setLowStockItems(lowStockResult.data);
+      }
+    } catch (err) {
+      setError('An unexpected error occurred');
+      console.error('Error fetching inventory data:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchData();
+  }, []);
+
+  const totalItems = levels.length;
+  const totalValue = levels.reduce((sum, level) => sum + level.totalValue, 0);
+  const lowStockCount = lowStockItems.length;
+  const totalQuantity = levels.reduce((sum, level) => sum + level.quantityOnHand, 0);
+
+  if (loading) {
+    return (
+      <div className="space-y-6">
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+          {[...Array(4)].map((_, i) => (
+            <Card key={i}>
+              <CardContent className="p-6">
+                <div className="animate-pulse">
+                  <div className="h-4 bg-gray-200 rounded w-3/4 mb-2"></div>
+                  <div className="h-8 bg-gray-200 rounded w-1/2"></div>
+                </div>
+              </CardContent>
+            </Card>
+          ))}
+        </div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div className="space-y-6">
+        <Card className="border-destructive">
+          <CardHeader>
+            <CardTitle className="text-destructive">Error Loading Inventory</CardTitle>
+            <CardDescription>{error}</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button onClick={fetchData} variant="outline">
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Try Again
+            </Button>
+          </CardContent>
+        </Card>
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      {/* Overview Cards */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Items</CardTitle>
+            <Package className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{totalItems}</div>
+            <p className="text-xs text-muted-foreground">
+              Active inventory items
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Value</CardTitle>
+            <TrendingUp className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">${totalValue.toFixed(2)}</div>
+            <p className="text-xs text-muted-foreground">
+              Current inventory value
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Quantity</CardTitle>
+            <Package className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">{totalQuantity}</div>
+            <p className="text-xs text-muted-foreground">
+              Units in stock
+            </p>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Low Stock Items</CardTitle>
+            <AlertTriangle className="h-4 w-4 text-destructive" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold text-destructive">{lowStockCount}</div>
+            <p className="text-xs text-muted-foreground">
+              Items below threshold
+            </p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Low Stock Alert */}
+      {lowStockCount > 0 && (
+        <Card className="border-destructive">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-destructive">
+              <AlertTriangle className="h-5 w-5" />
+              Low Stock Alert
+            </CardTitle>
+            <CardDescription>
+              {lowStockCount} items are running low on stock
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="space-y-2">
+              {lowStockItems.slice(0, 5).map((item) => (
+                <div key={`${item.itemId}-${item.locationId}`} className="flex items-center justify-between">
+                  <div>
+                    <span className="font-medium">{item.item?.name}</span>
+                    <span className="text-sm text-muted-foreground ml-2">
+                      at {item.location?.name}
+                    </span>
+                  </div>
+                  <Badge variant="destructive">
+                    {item.quantityAvailable} left
+                  </Badge>
+                </div>
+              ))}
+              {lowStockCount > 5 && (
+                <p className="text-sm text-muted-foreground">
+                  And {lowStockCount - 5} more items...
+                </p>
+              )}
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Recent Inventory Levels */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle>Inventory Levels</CardTitle>
+              <CardDescription>
+                Current stock levels across all locations
+              </CardDescription>
+            </div>
+            <Button onClick={fetchData} variant="outline" size="sm">
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Refresh
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {levels.length === 0 ? (
+            <div className="text-center py-8">
+              <Package className="h-12 w-12 text-muted-foreground mx-auto mb-4" />
+              <h3 className="text-lg font-medium mb-2">No Inventory Items</h3>
+              <p className="text-muted-foreground">
+                Start by creating your first item with initial inventory.
+              </p>
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {levels.slice(0, 10).map((level) => (
+                <div key={`${level.itemId}-${level.locationId}`} className="flex items-center justify-between p-4 border rounded-lg">
+                  <div className="flex items-center space-x-4">
+                    <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center">
+                      {level.item?.imageUrls ? (
+                        <img
+                          src={level.item.imageUrls || "/placeholder.svg"}
+                          alt={level.item.name}
+                          className="w-10 h-10 object-cover rounded"
+                        />
+                      ) : (
+                        <Package className="h-6 w-6 text-muted-foreground" />
+                      )}
+                    </div>
+                    <div>
+                      <h4 className="font-medium">{level.item?.name}</h4>
+                      <p className="text-sm text-muted-foreground">
+                        SKU: {level.item?.sku} • {level.location?.name}
+                      </p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <div className="font-medium">{level.quantityOnHand} units</div>
+                    <div className="text-sm text-muted-foreground">
+                      ${level.totalValue.toFixed(2)} value
+                    </div>
+                  </div>
+                </div>
+              ))}
+              {levels.length > 10 && (
+                <p className="text-center text-sm text-muted-foreground">
+                  And {levels.length - 10} more items...
+                </p>
+              )}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    </div>
+  );
+}

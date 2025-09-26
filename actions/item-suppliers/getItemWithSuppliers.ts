@@ -1,0 +1,118 @@
+"use server"
+
+import { db } from "@/prisma/db"
+import type { ItemWithSupplierDTO, SupplierItemResponse } from "@/types/itemTypes"
+import { Prisma } from "@prisma/client"
+
+/**
+ * Retrieves an item with its associated suppliers via ItemSupplier (supplierItems)
+ * Maps Prisma fields to UI-friendly names:
+ *   - leadTimeDays -> leadTime
+ *   - minOrderQuantity -> minOrderQty
+ */
+export default async function getItemWithSuppliersById(id: string): Promise<SupplierItemResponse> {
+  if (!id || typeof id !== "string") {
+    return {
+      success: false,
+      data: [],
+      error: "Invalid item ID provided"
+
+    }
+  }
+
+  try {
+    const item = await db.item.findUnique({
+      where: { id },
+      select: {
+        id: true,
+        name: true,
+        // supplierId:true,
+        supplierItems: {
+          select: {
+            id: true,
+            itemId: true,
+            supplierId: true,
+            isPreferred: true,
+            supplierSku: true,
+            supplierName: true, // available if you want to show supplier's alias for this item
+            leadTimeDays: true,
+            minOrderQuantity: true,
+            unitCost: true,
+            lastPurchaseDate: true,
+            notes: true,
+            createdAt: true,
+            updatedAt: true,
+            supplier: {
+              select: {
+                id: true,
+                name: true,
+                email: true,
+              },
+            },
+          },
+          orderBy: { createdAt: "desc" },
+        },
+      },
+    })
+
+    if (!item) {
+      return {
+         success: false,
+         data: [], 
+        error: `Item with ID ${id} not found` 
+    }
+    }
+
+    const itemSuppliers: ItemWithSupplierDTO[] = (item.supplierItems ?? []).map((rel: any) => ({
+      id: rel.id,
+      itemId: rel.itemId,
+      supplierId: rel.supplierId,
+      isPreferred: rel.isPreferred,
+      supplierSku: rel.supplierSku ?? null,
+      leadTime: rel.leadTimeDays ?? null,
+      minOrderQty: rel.minOrderQuantity ?? null,
+      unitCost: rel.unitCost ?? null,
+      lastPurchaseDate: rel.lastPurchaseDate ?? null,
+      notes: rel.notes ?? null,
+      createdAt: rel.createdAt,
+      updatedAt: rel.updatedAt,
+      supplier: {
+        id: rel.supplier?.id,
+        name: rel.supplier?.name ?? rel.supplierName ?? "Unknown",
+        email: rel.supplier?.email ?? null,
+      },
+    }))
+
+    return {
+      success: true,
+      data: itemSuppliers,
+      error: null
+
+    }
+  } catch (error) {
+    console.error(`Error fetching item suppliers for item ${id}:`, error)
+    let errorMessage = "Failed to fetch item suppliers"
+    if (error instanceof Prisma.PrismaClientKnownRequestError) {
+      switch (error.code) {
+        case "P2025":
+          errorMessage = "Item not found"
+          break
+        case "P2002":
+          errorMessage = "Database constraint violation"
+          break
+        default:
+          errorMessage = `Database error: ${error.message}`
+      }
+    } else if (error instanceof Prisma.PrismaClientValidationError) {
+      errorMessage = "Invalid query parameters"
+    } else if (error instanceof Error) {
+      errorMessage = error.message
+    }
+    return {
+      success: false,
+      data: [],
+      error: errorMessage
+
+    }
+  }
+}

@@ -1,0 +1,222 @@
+
+{
+   
+  "workbench.colorCustomizations": {
+    "activityBarBadge.Background": "#abe7e7",
+    "statusBar.noFolderBackground": "#212121",
+    "editorCursor.background": "#000",
+    "editorCursor.foreground": "#d17f05",
+    "tab.activeBackground": "#013161",
+    "tab.inactiveBackground": "#025249",
+    "tab.inactiveForeground": "#ffc",
+    "tab.hoverBackground": "#b41",
+    "tab.activeBorderBottom": "#ccbbff",
+    "terminal.background": "#1a2a3a",
+    "terminalCursor.foreground": "#ff7b00a1",
+    "terminal.border": "#ff0000",
+    "terminal.ansiBrightCyan": "#ff0000",
+    "list.activeSelectionBackground": "#CCCC7C",
+    "list.hoverBackground": "#6fc52e7b",
+    "editor.lineHighlightBackground": "#000",
+    "list.activeSelectionForeground": "#000",
+    "editor.findMatchHighlightBorder": "#caca8b",
+    "editor.selectionBackground": "#1aaa64",
+    "editor.selectionForeground": "#2aa707cf",
+    "editor.selectionHighlightBackground": "#80b5b890",
+    "editor.findMatchBackground": "#00cc44a8",
+    "editor.findMatchHighlightBackground": "#ff7b00a1",
+    "tab.activeForeground": "#fff",
+    "editor.hoverHighlightBackground": "#ff6b00a1"
+  },
+  // "java.compile.nullAnalysis.mode": "automatic",
+  // "java.configuration.updateBuildConfiguration": "automatic",
+  "editor.codeActionsOnSave": {
+    "source.organizeImports": "explicit"
+  },
+  "editor.quickSuggestions": {
+    "other": true, 
+    "comments": true,
+    "strings": true
+    // "terminal.integrated.shell.windows": "C:\\Windows\\sys32\\bash.exe",
+    // "terminal.integrated.shellArgs.windows": ["-c", "zsh"],
+  },
+  // "terminal.integrated.shell.linux": "/user/bin/zsh",
+  "terminal.integrated.defaultProfile.windows": "PowerShell",
+  "terminal.integrated.defaultProfile.linux": "/user/bin/zsh",
+  // "terminal.integrated.fontFamily": "'FiraCode Nerd Font','JetBrainsMono Nerd Font Mono','MesloLGM Nerd Font', monospace",
+  "terminal.integrated.fontLigatures.enabled": true,
+  "terminal.integrated.fontFamily":"'FantastiqueSansMono', 'FiraCode Nerd Font', 'JetBrainsMono Nerd Font Mono', 'MesloLGM Nerd Font', monospace",
+  // "terminal.integrated.defaultProfile.windows": "Git Bash",
+  // "editor.fontFamily": "'FiraCode Nerd Font', 'JetBrains Mono NL', 'Cascadia Code NF', Consolas, 'Courier New', monospace",
+  // "terminal.integrated.fontFamily": "'FiraCode Nerd Font', 'JetBrains Mono NL', 'Cascadia Code NF'",
+// "editor.fontLigatures": true,
+ "editor.fontLigatures": "'calt', 'liga', 'clig', 'kern'",
+  "editor.minimap.enabled": true,
+  "editor.minimap.renderCharacters": false,
+  "editor.minimap.showSlider": "mouseover",
+  "editor.minimap.size": "fill",
+  "editor.minimap.scale": 3,
+  "terminal.integrated.fontSize":13,
+"terminal.integrated.fontWeight": "bold",
+  "editor.minimap.side": "right",
+  "editor.tabSize": 2,
+  "editor.insertSpaces": true,
+  
+  "editor.detectIndentation": false,
+  "editor.wordWrap": "on",
+  "editor.wordWrapColumn": 80,
+  "editor.wrappingIndent": "same",
+  // "window.titleBarStyle": "custom",
+  "editor.suggestSelection": "first",
+  "editor.formatOnSave": true,
+  "editor.autoClosingQuotes": "always",
+  "editor.formatOnPaste": true,  
+  "explorer.openEditors.visible": 1,
+  "explorer.sortOrder": "default",
+  "git.enableSmartCommit": true,
+  "prettier.enable": true,
+  "typescript.suggest.paths": false,
+  "files.exclude": {
+    "**/node_modules": true,
+    "**/bin": true,
+    "**/.install": true,
+    "**/.next": true,
+    "**/.vscode": true
+  },
+  "prettier.bracketSpacing": true,
+  "prettier.requireConfig": true,
+
+  "editor.defaultFormatter": "esbenp.prettier-vscode",
+  "javascript.updateImportsOnFileMove.enabled": "always",
+ 
+  "diffEditor.renderSideBySide": false,
+  "editor.cursorBlinking": "expand",
+  "terminal.integrated.cursorBlinking": true,
+  "editor.cursorSmoothCaretAnimation": "on",
+  "editor.cursorStyle": "block",
+  "editor.fontSize": 15,
+  "window.zoomLevel":1,
+  "workbench.iconTheme": "a-file-icon-vscode",
+  "editor.bracketPairColorization.enabled": true,
+  "editor.guides.bracketPairs": true,
+  "editor.guides.bracketPairsHorizontal": true,
+  "editor.guides.highlightActiveBracketPair": true,
+  "workbench.colorTheme": "Retreon",
+  
+  "tailwindCSS.includeLanguages": {
+    "html": "html",
+    "javascript": "javascript",
+    "typescript": "typescript",
+    "javascriptreact": "javascriptreact",
+    "typescriptreact": "typescriptreact"
+  },
+  "tailwindCSS.emmetCompletions": true,
+  "tailwindCSS.experimental.classAttributes": [
+    "class",
+    "className",
+    "ngClass",
+    "tw",
+    "twClass",
+    "twClasses"
+  ],    
+  "tailwindCSS.experimental.classRegex": [
+    "tw`([^`]*)",
+    "tw\\(([^)]*)\\)",
+    "tw\\s*[:=]\\s*['\"`]([^'\"`]*)['\"`]",
+    "twClass\\s*[:=]\\s*['\"`]([^'\"`]*)['\"`]",
+    "twClasses\\s*[:=]\\s*['\"`]([^'\"`]*)['\"`]"
+  ],
+
+  "css.validate": false,
+  "scss.validate": false,
+  "less.validate": false,
+  // "tailwindCSS.experimental.classRegex": [
+  //   "class[Name]*\\s*[:=]\\s*['\"`]([^'\"`]*)['\"`]",
+  //   "className\\s*[:=]\\s*['\"`]([^'\"`]*)['\"`]",
+  //   "\\bclass:\\s*['\"`]([^'\"`]*)['\"`]"
+  // ],
+  "emmet.includeLanguages": {
+    "javascript": "javascriptreact",
+    "typescript": "typescriptreact"
+  },
+  "tailwindCSS.classAttributes": [
+    "class",
+    "className",
+    "ngClass",
+    "class:list"
+  ],
+  "tailwindCSS.suggestions": true,
+  "tailwindCSS.validate": true,
+  "tailwindCSS.lint.cssConflict": "warning",
+  "tailwindCSS.lint.invalidApply": "error",
+  "tailwindCSS.lint.invalidScreen": "error",
+  "tailwindCSS.lint.invalidTailwindDirective": "error",
+  "tailwindCSS.lint.invalidVariant": "error",
+  "tailwindCSS.lint.recommendedVariantOrder": "warning",
+  // "terminal.integrated.fontFamily": "Delugia Book",
+  // "editor.fontFamily": "'Fira Code'", 
+  "terminal.integrated.gpuAcceleration": "on",
+  // "editor.fontFamily": "'FiraCode Nerd Font','JetBrainsMono Nerd Font Mono','MesloLGM Nerd Font' monospace",
+  "editor.fontFamily": "'FantastiqueSansMono', 'FiraCode Nerd Font', 'JetBrainsMono Nerd Font Mono', 'MesloLGM Nerd Font', monospace",
+  "editor.fontWeight": "500",
+  "explorer.decorations.colors": true,
+  // "colorTabs.config": [
+  //   {
+  //     "regex": ".*/mobile/.*",
+  //     "color": "#dd3161",
+  //     "label": "MOBILE"
+  //   },
+  //   {
+  //     "regex": ".*/web/.*",
+  //     "color": "#231aaa"
+  //   },
+  //   {
+  //     "regex": ".*/desktop/.*"
+  //   }
+  // ],
+  // "colorTabs.titleBackground": true,
+  "colorTabs.ignoreCase": true,
+  "editor.tokenColorCustomizations": {
+    "textMateRules": [
+      {
+        "scope": "comment",
+        "settings": {
+          "fontStyle": "italic",
+          "foreground": "#C69650"
+        }
+      }
+    ]
+  },
+  "[prisma]": {
+    "editor.defaultFormatter": "Prisma.prisma"
+  },
+  "WillLuke.nextjs.addTypesOnSave": true,
+  "WillLuke.nextjs.hasPrompted": true,
+  "cSpell.words": ["Sygefex"],
+  "[typescript]": {
+    "editor.formatOnSave": true,
+    "editor.formatOnPaste": true
+  },
+  "[typescriptreact]": {
+    "editor.defaultFormatter": "vscode.typescript-language-features"
+  },
+  "workbench.productIconTheme": "a-file-icon-vscode-product-icon-theme",
+  "github.copilot.enable": {
+    "*": true,
+    "plaintext": false,
+    "markdown": false,
+    "scminput": false,
+    "typescriptreact": true
+  },
+  "github.copilot.nextEditSuggestions.enabled": true,
+  "github.copilot.chat.agent.autoFix": false,
+  "github.copilot.chat.agent.runTasks": false,
+  "github.copilot.chat.codeGeneration.useInstructionFiles": false,
+  "github.copilot.chat.terminalChatLocation": "terminal",
+  "github.copilot.chat.useProjectTemplates": false,
+  "github.copilot.editor.enableCodeActions": false,
+  "github.copilot.nextEditSuggestions.fixes": false,
+  "github.copilot.renameSuggestions.triggerAutomatically": false,
+  "github.copilot.chat.reviewSelection.enabled": false,
+}
+  
