@@ -1,8 +1,8 @@
-// lib/auth.ts
+// config/useAuth.ts - Custom authentication utilities
+import { getUserWithRoles } from "@/lib/auth-helpers";
+import { verifySession } from "@/lib/session-auth";
 import { Role } from "@prisma/client";
-import { getServerSession } from "next-auth/next";
 import { redirect } from "next/navigation";
-import { authOptions } from "./auth";
 
 // Type for authenticated user with permissions
 export interface AuthenticatedUser {
@@ -22,13 +22,19 @@ export interface AuthenticatedUser {
 
 // Function to check authorization and return NotAuthorized component if needed
 export async function checkPermission(requiredPermission: string) {
-  const session = await getServerSession(authOptions);
+  const session = await verifySession();
 
   if (!session) {
     redirect("/login");
   }
 
-  const userPermissions = session.user.permissions || [];
+  // Get user with roles and permissions
+  const userWithRoles = await getUserWithRoles(session.userId);
+  if (!userWithRoles) {
+    redirect("/login");
+  }
+
+  const userPermissions = userWithRoles?.roles?.map(role => role.permissions).flat() || [];
 
   if (!userPermissions.includes(requiredPermission)) {
     // Redirect to unauthorized page or return unauthorized component
@@ -40,24 +46,48 @@ export async function checkPermission(requiredPermission: string) {
 
 // Function to get authenticated user or redirect
 export async function getAuthenticatedUser(): Promise<AuthenticatedUser> {
-  const session = await getServerSession(authOptions);
-
-  if (!session || !session.user) {  
-    redirect("/login");
-  }
-
-  return session.user as unknown as AuthenticatedUser;
-}
-
-// Function to check multiple permissions (any)
-export async function checkAnyPermission(permissions: string[]) {
-  const session = await getServerSession(authOptions);
+  const session = await verifySession();
 
   if (!session) {
     redirect("/login");
   }
 
-  const userPermissions = session.user.permissions || [];
+  // Get user with roles and permissions from database
+  const userWithRoles = await getUserWithRoles(session.userId);
+  if (!userWithRoles) {
+    redirect("/login");
+  }
+
+  return {
+    id: userWithRoles.id,
+    firstName: userWithRoles.firstName || '',
+    lastName: userWithRoles.lastName || '',
+    phone: userWithRoles.phone || '',
+    roles: userWithRoles.roles,
+    permissions: userWithRoles?.roles?.map(role => role.permissions).flat() || [],
+    name: userWithRoles.name,
+    email: userWithRoles.email,
+    image: userWithRoles.image,
+    organizationId: userWithRoles.organizationId,
+    organizationName: userWithRoles.organization?.name || null,
+  } as AuthenticatedUser;
+}
+
+// Function to check multiple permissions (any)
+export async function checkAnyPermission(permissions: string[]) {
+  const session = await verifySession();
+
+  if (!session) {
+    redirect("/login");
+  }
+
+  // Get user with roles and permissions
+  const userWithRoles = await getUserWithRoles(session.userId);
+  if (!userWithRoles) {
+    redirect("/login");
+  }
+
+  const userPermissions = userWithRoles?.roles?.map(role => role.permissions ?? []).flat() || [];
 
   const hasAnyPermission = permissions.some((permission) =>
     userPermissions.includes(permission)
@@ -72,13 +102,19 @@ export async function checkAnyPermission(permissions: string[]) {
 
 // Function to check multiple permissions (all)
 export async function checkAllPermissions(permissions: string[]) {
-  const session = await getServerSession(authOptions);
+  const session = await verifySession();
 
   if (!session) {
     redirect("/login");
   }
 
-  const userPermissions = session.user.permissions || [];
+  // Get user with roles and permissions
+  const userWithRoles = await getUserWithRoles(session.userId);
+  if (!userWithRoles) {
+    redirect("/login");
+  }
+
+  const userPermissions = userWithRoles?.roles?.map(role => role.permissions).flat() || [];
 
   const hasAllPermissions = permissions.every((permission) =>
     userPermissions.includes(permission)

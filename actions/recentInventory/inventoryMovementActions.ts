@@ -1,6 +1,6 @@
 "use server"
 
-import { getAuthenticatedUser } from "@/config/useAuth"
+import { getAuthenticatedUser } from "@/lib/auth-server"
 import { db } from "@/prisma/db"
 import type { CreateTransferPayload, TransactionType, TransferStatus } from "@/types/inventoryMovementTypes"
 import type { Prisma } from "@prisma/client"

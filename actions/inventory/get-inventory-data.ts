@@ -1,6 +1,6 @@
 'use server'
 
-import { getAuthenticatedUser } from "@/config/useAuth";
+import { getAuthenticatedUser } from "@/lib/auth-server";
 import { db } from "@/prisma/db";
 import { InventoryLevelResponse, InventoryTransactionResponse } from "@/types/inventory";
 
@@ -8,7 +8,7 @@ export async function getInventoryLevels(locationId?: string): Promise<Inventory
   try {
     const user = await getAuthenticatedUser();
 
-    if (!user?.organizationId) {
+    if (!user.organizationId) {
       return { success: false, error: "Not authenticated", data: undefined };
     }
 
@@ -72,7 +72,7 @@ export async function getInventoryTransactions(
   try {
     const user = await getAuthenticatedUser();
 
-    if (!user?.organizationId) {
+    if (!user.organizationId) {
       return { success: false, error: "Not authenticated", data: undefined };
     }
 
@@ -125,7 +125,7 @@ export async function getLowStockItems(threshold: number = 10) {
   try {
     const user = await getAuthenticatedUser();
 
-    if (!user?.organizationId) {
+    if (!user.organizationId) {
       return { success: false, error: "Not authenticated", data: undefined };
     }
 
@@ -185,7 +185,7 @@ export async function getLocations() {
   try {
     const user = await getAuthenticatedUser();
 
-    if (!user?.organizationId) {
+    if (!user.organizationId) {
       return { success: false, error: "Not authenticated", data: undefined };
     }
 

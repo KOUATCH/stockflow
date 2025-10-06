@@ -41,7 +41,7 @@ import {
   Users,
   Zap,
 } from "lucide-react"
-import { useSession } from "next-auth/react"
+import { useClientAuth } from "@/hooks/useClientAuth"
 import { useEffect, useMemo, useState } from "react"
 
 
@@ -52,7 +52,7 @@ export default function HomePage() {
   const [selectedTerminalId, setSelectedTerminalId] = useState<string>()
 
 
-  const currentlySession = useSession()
+  const { session, user, organizationId } = useClientAuth()
   const user = currentlySession?.data?.user
   const orgId = user?.organizationId || ""
   console.log("User Organization ID:", orgId)

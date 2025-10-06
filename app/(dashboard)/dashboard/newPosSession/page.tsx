@@ -41,7 +41,7 @@ import {
 
 import { usePosStations } from "@/hooks/posStation/use-pos-terminals"
 import { useOrgLocationsNew } from "@/hooks/useAllLocationsQueries"
-import { useSession } from "next-auth/react"
+import { useClientAuth } from "@/hooks/useClientAuth"
 import { useEffect, useMemo, useState } from "react"
 
 export default function HomePage() {
@@ -49,7 +49,7 @@ export default function HomePage() {
 
   const [selectedLocation, setSelectedLocation] = useState<string>("loc_1")
   const [selectedTerminal, setSelectedTerminal] = useState<string>("terminal_1")
-  const AuthSession = useSession()
+  const { session, user, organizationId } = useClientAuth()
   const user = AuthSession.data?.user
   console.log("User from session:", user)
   const orgId = user?.organizationId || "org_1"

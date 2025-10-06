@@ -12,8 +12,7 @@ import {
   ExternalLink,
   Plus
 } from "lucide-react";
-import { Session } from "next-auth";
-import { signOut } from "next-auth/react";
+import { signOut } from "@/lib/auth-client";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
@@ -24,7 +23,7 @@ import UserDropdownMenu from "../UserDropdownMenu";
 // import { Notification } from "@prisma/client";
 
 interface SidebarProps {
-  session: Session;
+  session: any;
   notifications?: Notification[];
 }
 
@@ -38,6 +37,10 @@ const Sidebar=({ session, notifications = [] }: SidebarProps)=> {
 
   // Helper function to check if user has permission
   const hasPermission = (permission: string): boolean => {
+    // Check for wildcard permission (superadmin access)
+    if (user.permissions?.includes('*')) {
+      return true;
+    }
     return user.permissions?.includes(permission) ?? false;
   };
 

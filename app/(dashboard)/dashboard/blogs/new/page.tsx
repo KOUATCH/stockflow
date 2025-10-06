@@ -1,7 +1,6 @@
 import { getBlogCategories } from "@/actions/blogs";
 // import BlogForm from "@/components/Forms/BlogForm";
-import { authOptions } from "@/config/auth";
-import { getServerSession } from "next-auth";
+import { auth } from "@/lib/auth";
 import React from "react";
 
 export default async function page() {
@@ -12,7 +11,9 @@ export default async function page() {
       value: item.id,
     };
   });
-  const session = await getServerSession(authOptions);
+  const session = await auth.api.getSession({
+    headers: await import("next/headers").then(m => m.headers())
+  });
   const userId = session?.user.id ?? "";
   return (
     <div>

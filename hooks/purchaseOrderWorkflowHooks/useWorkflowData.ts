@@ -1,17 +1,25 @@
 "use client"
 
 import {
-  getOrgPurchaseOrderBYLocationId,
-  getOrgPurchaseOrders,
-} from "@/actions/purchaseOrderWorkflow/purchaseOrderWorkflowActions"
+  getOrgPurchaseOrdersClientSafe,
+  getOrgPurchaseOrdersByLocationClientSafe,
+} from "@/actions/purchaseOrderWorkflow/clientSafePurchaseOrderActions"
 import type { PurchaseOrderStatus, PurchaseOrderWithRelations } from "@/types/purchase-orders-system-types"
 import { useCallback, useEffect, useState } from "react"
 // Mock server actions - replace with real implementations
 
-const mockGetPurchaseOrders = async (OrganizationId: string) => {
-  const purchaseOrders = await getOrgPurchaseOrders(OrganizationId)
-  console.log({ purchaseOrders })
-  return purchaseOrders.data
+const mockGetPurchaseOrders = async (OrganizationId: string, locationId?: string) => {
+  const result = locationId
+    ? await getOrgPurchaseOrdersByLocationClientSafe(OrganizationId, locationId)
+    : await getOrgPurchaseOrdersClientSafe(OrganizationId)
+
+  console.log({ purchaseOrders: result })
+
+  if (!result.success) {
+    throw new Error(result.error || "Failed to fetch purchase orders")
+  }
+
+  return result.data
 }
 //  const getUserID = async()=>{
 
@@ -54,24 +62,16 @@ export function useWorkflowData(organizationId: string, locationId: string | nul
         hasLocationId: !!locationId,
       })
 
-      let response
-      
-      if (locationId) {
-        response = await getOrgPurchaseOrderBYLocationId(organizationId, locationId)
-      } else {
-        response = await getOrgPurchaseOrders(organizationId)
-      }
+      const orders = await mockGetPurchaseOrders(organizationId, locationId || undefined)
 
       console.log("[DEBUG] API Response:", {
-        response,
-        success: response?.success,
-        dataLength: response?.data?.length || 0,
-        hasData: !!response?.data,
-        isArray: Array.isArray(response?.data),
+        dataLength: orders?.length || 0,
+        hasData: !!orders,
+        isArray: Array.isArray(orders),
       })
 
-      if (response?.success && Array.isArray(response.data)) {
-        const validOrders = response.data.filter((order: PurchaseOrderWithRelations) => {
+      if (Array.isArray(orders)) {
+        const validOrders = orders.filter((order: PurchaseOrderWithRelations) => {
           const isValid = order && order.id && order.orderNumber
           if (!isValid) {
             console.warn("[DEBUG] Invalid order filtered out:", order)
@@ -80,17 +80,14 @@ export function useWorkflowData(organizationId: string, locationId: string | nul
         })
 
         console.log("[DEBUG] Processed orders:", {
-          originalCount: response.data.length,
+          originalCount: orders.length,
           validCount: validOrders.length,
         })
 
         setPurchaseOrders(validOrders)
       } else {
-        console.warn("[DEBUG] No valid data received:", response)
+        console.warn("[DEBUG] No valid data received:", orders)
         setPurchaseOrders([])
-        if (response?.error) {
-          setError(response.error)
-        }
       }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : "Failed to fetch purchase orders"

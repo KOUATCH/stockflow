@@ -21,7 +21,7 @@ import {
   Options,
   SelectValue,
 } from "react-tailwindcss-select/dist/components/type";
-import { toast } from "sonner";
+import { useNotifications } from "@/components/notifications/NotificationProvider";
 import FormSelectInput from "../FormInputs/FormSelectInput";
 import ImageInput from "../FormInputs/ImageInput";
 import PasswordInput from "../FormInputs/PasswordInput";
@@ -49,16 +49,17 @@ export default function UserForm({
       lastName: initialData?.lastName,
       phone: initialData?.phone,
       email: initialData?.email,
-      // organizationName:initialData?.organizationName, 
+      // organizationName:initialData?.organizationName,
     },
   });
   const router = useRouter();
+  const { formSuccess, formError } = useNotifications();
 
   const [loading, setLoading] = useState(false);
   const initialImage = initialData?.image || "/placeholder.svg";
   const [imageUrl, setImageUrl] = useState(initialImage);
   const initialStatus = {
-    value: initialData?. == true ? "true" : "false",
+    value: initialData?.status == true ? "true" : "false",
     label: initialData?.status == true ? "Active" : "Disabled",
   };
   const initialRoleId = initialData?.roleId;
@@ -92,7 +93,7 @@ export default function UserForm({
         // await updateUserById(editingId, data);
         setLoading(false);
         // Toast
-        toast.success("Updated Successfully!", { description: "User Info updated successfully" });
+        formSuccess("User Update", "User Info updated successfully");
         //reset
         reset();
         //route
@@ -111,7 +112,7 @@ export default function UserForm({
         await createUser(data, orgData);
         setLoading(false);
         // Toast
-        toast.success("Successfully Created!", { description: "User Created successfully" });
+        formSuccess("User Creation", "User Created successfully");
         //reset
         reset();
       }

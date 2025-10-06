@@ -9,7 +9,7 @@ import {
   updateInventoryLevels,
 } from "@/actions/pos/posActions"
 
-import { useToast } from "@/hooks/use-toast"
+import { useNotifications } from "@/components/notifications/NotificationProvider"
 import type { Customer } from "@/lib/cashSystem/db"
 import type { CartItem } from "@/lib/cashSystem/types"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
@@ -79,7 +79,7 @@ import {
   Zap,
   ZapIcon,
 } from "lucide-react"
-import { useSession } from "next-auth/react"
+import { useAuth } from "@/hooks/useAuth"
 import { NotificationSystem } from "./NotificationSystem"
 
 // import { NotificationSystem } from "@/components/synchro/NotificationSystem"
@@ -205,7 +205,7 @@ export function POSTerminalFinal({ organizationId, locationId, terminalId, userI
     avgTransaction: 136.15,
   })
 
-  const { toast } = useToast()
+  const { error, success, warning, info, operationStart, operationComplete } = useNotifications()
   const queryClient = useQueryClient()
 
   const notification = useNotification()
@@ -219,8 +219,8 @@ export function POSTerminalFinal({ organizationId, locationId, terminalId, userI
     }
   }, [locationId, selectedLocationId])
 
-  const { data: sessionData } = useSession()
-  if (!sessionData?.user?.organizationId) {
+  const { user: sessionData } = useAuth()
+  if (!sessionData?.organizationId) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 p-6 flex items-center justify-center">
         <div className="text-center">
@@ -246,11 +246,7 @@ export function POSTerminalFinal({ organizationId, locationId, terminalId, userI
   console.log({ itemsData })
   useEffect(() => {
     if (error && organizationId) {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: itemsData?.message || "Failed to load items.",
-      })
+      error("Loading Error", itemsData?.message || "Failed to load items.")
     }
   }, [error, itemsData?.message, toast, organizationId])
 
@@ -287,10 +283,7 @@ export function POSTerminalFinal({ organizationId, locationId, terminalId, userI
     if (selectedLocationId && cart.length > 0 && organizationId) {
       console.log(`Clearing cart due to location change from ${locationId} to ${selectedLocationId}`)
       clearCart()
-      toast({
-        title: "Location Changed",
-        description: "Cart cleared due to location change. Items are now filtered for the new location.",
-      })
+      info("Location Changed", "Cart cleared due to location change. Items are now filtered for the new location.")
     }
   }, [selectedLocationId, organizationId]) // Removed cart dependency to prevent infinite loops
 
@@ -330,11 +323,7 @@ export function POSTerminalFinal({ organizationId, locationId, terminalId, userI
     },
     onError: (error) => {
       console.error("Sale creation failed:", error)
-      toast({
-        variant: "destructive",
-        title: "Sale Failed",
-        description: "Failed to create sale. Please try again.",
-      })
+      error("Sale Failed", "Failed to create sale. Please try again.")
     },
   })
 
@@ -345,11 +334,7 @@ export function POSTerminalFinal({ organizationId, locationId, terminalId, userI
     },
     onError: (error) => {
       console.error("Payment creation failed:", error)
-      toast({
-        variant: "destructive",
-        title: "Payment Failed",
-        description: "Failed to process payment. Please try again.",
-      })
+      error("Payment Failed", "Failed to process payment. Please try again.")
     },
   })
 
@@ -917,11 +902,7 @@ export function POSTerminalFinal({ organizationId, locationId, terminalId, userI
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     if (cart.length === 0) {
-      toast({
-        variant: "destructive",
-        title: "Empty Cart",
-        description: "Please add items to cart before processing payment.",
-      })
+      error("Empty Cart", "Please add items to cart before processing payment.")
       return
     }
     setIsPaymentDialogOpen(true)
@@ -958,10 +939,7 @@ export function POSTerminalFinal({ organizationId, locationId, terminalId, userI
             })
           }
 
-          toast({
-            title: "Session Restored",
-            description: `Continuing session ${session.sessionNumber}`,
-          })
+          success("Session Restored", `Continuing session ${session.sessionNumber}`)
         } else {
           const newSessionResult = await createPOSSession({
             terminalId: selectedTerminalId,
@@ -981,25 +959,14 @@ export function POSTerminalFinal({ organizationId, locationId, terminalId, userI
               lastActivity: new Date(),
             })
 
-            toast({
-              title: "New Session Started",
-              description: `Session ${session.sessionNumber} created successfully`,
-            })
+            success("New Session Started", `Session ${session.sessionNumber} created successfully`)
           } else {
-            toast({
-              variant: "destructive",
-              title: "Session Error",
-              description: newSessionResult.error || "Failed to create POS session",
-            })
+            error("Session Error", newSessionResult.error || "Failed to create POS session")
           }
         }
       } catch (error) {
         console.error("Failed to initialize session:", error)
-        toast({
-          variant: "destructive",
-          title: "Session Error",
-          description: "Failed to initialize POS session",
-        })
+        error("Session Error", "Failed to initialize POS session")
       }
     }
 
@@ -1029,11 +996,7 @@ export function POSTerminalFinal({ organizationId, locationId, terminalId, userI
     },
     onError: (error) => {
       console.error("Session creation failed:", error)
-      toast({
-        variant: "destructive",
-        title: "Session Failed",
-        description: "Failed to create POS session",
-      })
+      error("Session Failed", "Failed to create POS session")
     },
   })
 

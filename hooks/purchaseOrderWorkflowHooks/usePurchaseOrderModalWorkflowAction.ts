@@ -11,8 +11,8 @@ import {
 } from "@/actions/purchaseOrderWorkflow/purchaseOrderSystemAction"
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { useSession } from "next-auth/react"
-import { toast } from "sonner"
+import { useAuth } from "@/hooks/useAuth"
+import { useNotifications } from "@/components/notifications/NotificationProvider"
 export type PurchaseOrderStatus =
   | "DRAFT"
   | "SUBMITTED"
@@ -79,10 +79,11 @@ const WORKFLOW_ACTIONS: Record<PurchaseOrderStatus, WorkflowAction[]> = {
 
 export function usePurchaseOrderModalWorkflowAction(id: string, organizationId?: string) {
   const queryClient = useQueryClient()
-  const { data: session } = useSession()
+  const { user: session } = useAuth()
+  const { formSuccess, formError, operationStart, operationComplete } = useNotifications()
 
   // Mock user data if no session (for development)
-  const user = session?.user || {
+  const user = session || {
     id: "system-user-001",
     name: "System User",
     email: "system@example.com",
@@ -116,11 +117,11 @@ export function usePurchaseOrderModalWorkflowAction(id: string, organizationId?:
       return res.data!
     },
     onSuccess: () => {
-      toast.success("Purchase order submitted successfully")
+      formSuccess("Submit Purchase Order", "Purchase order has been submitted for approval")
       invalidateQueries()
     },
     onError: (error) => {
-      toast.error(`Failed to submit: ${error.message}`)
+      formError("Submit Purchase Order", error.message)
     },
   })
 
@@ -132,11 +133,11 @@ export function usePurchaseOrderModalWorkflowAction(id: string, organizationId?:
       return res.data!
     },
     onSuccess: () => {
-      toast.success("Purchase order approved successfully")
+      formSuccess("Approve Purchase Order", "Purchase order has been approved and is ready for receiving")
       invalidateQueries()
     },
     onError: (error) => {
-      toast.error(`Failed to approve: ${error.message}`)
+      formError("Approve Purchase Order", error.message)
     },
   })
 
@@ -148,11 +149,11 @@ export function usePurchaseOrderModalWorkflowAction(id: string, organizationId?:
       return res.data!
     },
     onSuccess: () => {
-      toast.success("Purchase order cancelled successfully")
+      formSuccess("Cancel Purchase Order", "Purchase order has been cancelled")
       invalidateQueries()
     },
     onError: (error) => {
-      toast.error(`Failed to cancel: ${error.message}`)
+      formError("Cancel Purchase Order", error.message)
     },
   })
 
@@ -164,11 +165,11 @@ export function usePurchaseOrderModalWorkflowAction(id: string, organizationId?:
       return res.data!
     },
     onSuccess: () => {
-      toast.success("Purchase order closed successfully")
+      formSuccess("Close Purchase Order", "Purchase order has been closed and marked as completed")
       invalidateQueries()
     },
     onError: (error) => {
-      toast.error(`Failed to close: ${error.message}`)
+      formError("Close Purchase Order", error.message)
     },
   })
 
@@ -191,11 +192,11 @@ export function usePurchaseOrderModalWorkflowAction(id: string, organizationId?:
     },
     onSuccess: (data) => {
       const receivedCount = data.lines?.filter((line: any) => line.receivedQuantity > 0).length || 0
-      toast.success(`Successfully received ${receivedCount} item(s) and updated inventory`)
+      formSuccess("Receive Items", `Successfully received ${receivedCount} item(s) and updated inventory`)
       invalidateQueries()
     },
     onError: (error) => {
-      toast.error(`Failed to receive items: ${error.message}`)
+      formError("Receive Items", error.message)
     },
   })
 
@@ -215,16 +216,16 @@ export function usePurchaseOrderModalWorkflowAction(id: string, organizationId?:
       const failedCount = data.failed?.length || 0
 
       if (successCount > 0) {
-        toast.success(`Successfully updated ${successCount} purchase order(s)`)
+        formSuccess("Bulk Update", `Successfully updated ${successCount} purchase order(s)`)
       }
       if (failedCount > 0) {
-        toast.error(`Failed to update ${failedCount} purchase order(s)`)
+        formError("Bulk Update", `Failed to update ${failedCount} purchase order(s)`)
       }
 
       invalidateQueries()
     },
     onError: (error) => {
-      toast.error(`Bulk update failed: ${error.message}`)
+      formError("Bulk Update", error.message)
     },
   })
 

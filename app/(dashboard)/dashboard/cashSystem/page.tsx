@@ -37,7 +37,7 @@ import {
   Users,
   Zap,
 } from "lucide-react"
-import { useSession } from "next-auth/react"
+import { useClientAuth } from "@/hooks/useClientAuth"
 
 export default function HomePage() {
   const [selectedLocation, setSelectedLocation] = useState<string>("1")
@@ -45,10 +45,9 @@ export default function HomePage() {
   const [selectedTerminal, setSelectedTerminal] = useState<string>("")
 
   const [activeTab, setActiveTab] = useState("overview")
-  const acessSession = useSession()
-  const user = acessSession?.data?.user
+  const { user, organizationId, isLoading, isAuthenticated } = useClientAuth()
   // Get organization ID from session or props
-  const orgId = user?.organizationId || ""
+  const orgId = organizationId || ""
   console.log("User Organization ID:", orgId)
   const customers = useCustomers()
   const customersData = customers?.data || []

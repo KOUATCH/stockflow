@@ -5,11 +5,11 @@ import { CashDrawerDashboard } from "@/components/cashDrawer/cashDrawerDashboard
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useOrgLocationsNew } from "@/hooks/useAllLocationsQueries"
-import { useSession } from "next-auth/react"
+import { useClientAuth } from "@/hooks/useClientAuth"
 import { useState } from "react"
 
 export default function CashDrawerPage() {
-  const { data: session, status } = useSession()
+  const { session, status, user, organizationId, isAuthenticated, isLoading } = useClientAuth()
   const [selectedLocationId, setSelectedLocationId] = useState<string>("")
 
   const user = session?.user

@@ -13,7 +13,7 @@ import { useOrgLocationsNew } from "@/hooks/useAllLocationsQueries"
 import { formatCurrency } from "@/lib/utils"
 import type { TransferStatus, TransferPriority } from "@/types/inventoryMovementTypes"
 import { ArrowRight, Clock, Package, Plus, Search, Truck, CheckCircle, XCircle, AlertTriangle, MapPin, Calendar, User } from 'lucide-react'
-import { useSession } from "next-auth/react"
+import { useAuth } from "@/hooks/useAuth"
 import { useState } from "react"
 import { format } from "date-fns"
 import { CreateTransferModal } from "./CreateTransferModal"
@@ -90,8 +90,8 @@ const priorityConfig = {
 }
 
 export function TransferDashboard() {
-  const { data: session } = useSession()
-  const orgId = session?.user?.organizationId || ""
+  const { user: session } = useAuth()
+  const orgId = session?.organizationId || ""
 
   const [selectedStatus, setSelectedStatus] = useState<TransferStatus | "all">("all")
   const [selectedFromLocation, setSelectedFromLocation] = useState<string>("all")

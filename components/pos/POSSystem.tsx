@@ -27,7 +27,7 @@ import {
   User,
   X,
 } from "lucide-react"
-import { useSession } from "next-auth/react"
+import { useClientAuth } from "@/hooks/useClientAuth"
 import { useCallback, useState } from "react"
 import { toast } from "sonner"
 
@@ -50,8 +50,8 @@ interface CartSummary {
 }
 
 export function POSSystem() {
-  const { data: session } = useSession()
-  const orgId = session?.user?.organizationId || ""
+  const { user, organizationId } = useClientAuth()
+  const orgId = organizationId || ""
 
   const [cart, setCart] = useState<CartItem[]>([])
   const [selectedCustomer, setSelectedCustomer] = useState<CustomerDTO | null>(null)
@@ -202,7 +202,7 @@ export function POSSystem() {
         paymentMethod,
         notes: `POS Sale - ${new Date().toLocaleString()}`,
         organizationId: orgId,
-        createdById: session?.user?.id || "",
+        createdById: user || "",
         orderLines,
       },
       {
@@ -213,7 +213,7 @@ export function POSSystem() {
         },
       },
     )
-  }, [cart, selectedLocation, selectedCustomer, paymentMethod, orgId, session?.user?.id, createSalesOrder, clearCart])
+  }, [cart, selectedLocation, selectedCustomer, paymentMethod, orgId, user, createSalesOrder, clearCart])
 
   return (
     <div className="h-screen flex bg-gray-50">

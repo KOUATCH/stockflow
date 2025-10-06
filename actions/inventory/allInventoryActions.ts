@@ -1,5 +1,5 @@
 "use server";
-import { getAuthenticatedUser } from "@/config/useAuth";
+import { getAuthenticatedUser } from "@/lib/auth-server";
 import { db } from "@/prisma/db";
 import { InventoryAlerts, InventoryLevelResponse, InventoryStats, InventoryStatsResponse, ItemCategory, LocationType, TransactionType } from "@/types/inventory";
 import { revalidatePath } from "next/cache";
@@ -146,7 +146,7 @@ export interface LocalInventoryStatsResponse {
 export async function getInventoryLevels(locationId?: string): Promise<InventoryLevelResponse> {
   try {
     const user = await getAuthenticatedUser();
-    if (!user?.organizationId) {
+    if (!user.organizationId) {
       return {
         success: false,
         error: 'User not authenticated or missing organization'
@@ -215,7 +215,7 @@ export async function getInventoryLevels(locationId?: string): Promise<Inventory
 export async function getInventoryStats(): Promise<InventoryStatsResponse> {
   try {
     const user = await getAuthenticatedUser();
-    if (!user?.organizationId) {
+    if (!user.organizationId) {
       return {
         success: false,
         error: 'User not authenticated'
@@ -306,7 +306,7 @@ export async function getInventoryTransactions(
 ): Promise<InventoryTransactionResponse> {
   try {
     const user = await getAuthenticatedUser();
-    if (!user?.organizationId) {
+    if (!user.organizationId) {
       return {
         success: false,
         error: 'User not authenticated'
@@ -460,7 +460,7 @@ export async function createInventoryTransaction(
 ): Promise<{ success: boolean; data?: LocalInventoryTransaction; error?: string }> {
   try {
     const user = await getAuthenticatedUser();
-    if (!user?.organizationId) {
+    if (!user.organizationId) {
       return {
         success: false,
         error: 'User not authenticated'
@@ -529,7 +529,7 @@ export async function createInventoryTransaction(
 export async function getLowStockItems(threshold = 10): Promise<InventoryLevelsResponse> {
   try {
     const user = await getAuthenticatedUser();
-    if (!user?.organizationId) {
+    if (!user.organizationId) {
       return {
         success: false,
         error: 'User not authenticated'
@@ -572,7 +572,7 @@ export async function bulkUpdateInventoryLevels(
 ): Promise<{ success: boolean; data?: LocalInventoryLevel[]; error?: string }> {
   try {
     const user = await getAuthenticatedUser();
-    if (!user?.organizationId) {
+    if (!user.organizationId) {
       return {
         success: false,
         error: 'User not authenticated'
@@ -609,7 +609,7 @@ export async function bulkUpdateInventoryLevels(
 export async function getInventoryAlerts(): Promise<{ success: boolean; data?: InventoryAlerts; error?: string }> {
   try {
     const user = await getAuthenticatedUser();
-    if (!user?.organizationId) {
+    if (!user.organizationId) {
       return {
         success: false,
         error: 'User not authenticated'

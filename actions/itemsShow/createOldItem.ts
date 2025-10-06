@@ -1,4 +1,4 @@
-import { getAuthenticatedUser } from "@/config/useAuth";
+import { getAuthenticatedUser } from "@/lib/auth-server";
 import { db } from "@/prisma/db";
 import { ItemCreateDTO } from "@/types/item";
 import { revalidatePath } from "next/cache";
@@ -18,7 +18,7 @@ const createOldItem = async (data: ItemCreateDTO, organizationId:string) => {
   try {
     const user = await getAuthenticatedUser();
 
-    if (!user?.organizationId) {
+    if (!user.organizationId) {
       return {
         success: false,
         error: "User not found or not associated with an organization",

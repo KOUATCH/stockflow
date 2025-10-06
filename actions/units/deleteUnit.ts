@@ -2,7 +2,7 @@
 
 "use server";
 
-import { getAuthenticatedUser } from "@/config/useAuth";
+import { getAuthenticatedUser } from "@/lib/auth-server";
 import { db } from "@/prisma/db";
 
 const deleteUnit = async (id: string) => {

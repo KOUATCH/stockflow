@@ -15,7 +15,7 @@ import { useUpdateReorderLevels } from "@/hooks/useInventoryQueries"
 import type { InventoryWithRelations } from "@/actions/inventory/inventoryActions"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { AlertTriangle, Settings } from "lucide-react"
-import { useSession } from "next-auth/react"
+import { useClientAuth } from "@/hooks/useClientAuth"
 import { useForm } from "react-hook-form"
 import * as z from "zod"
 
@@ -54,7 +54,7 @@ export function ReorderLevelModal({ open, onOpenChange, inventory, onSuccess }: 
   const maxLevel = form.watch("maxLevel")
 
   const handleSubmit = (data: ReorderFormData) => {
-    if (!session?.user?.organizationId) return
+    if (!user) return
 
     updateLevels(
       {

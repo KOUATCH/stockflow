@@ -22,7 +22,7 @@ import { cn } from "@/lib/utils"
 import type { ItemDTO } from "@/types/item"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { ArrowRight, MapPin, Minus, Package, Plus, Search, Trash2, Truck } from "lucide-react"
-import { useSession } from "next-auth/react"
+import { useClientAuth } from "@/hooks/useClientAuth"
 import { useCallback, useState } from "react"
 import { useForm } from "react-hook-form"
 import * as z from "zod"
@@ -51,7 +51,7 @@ interface CreateTransferModalProps {
 
 export function CreateTransferModal({ open, onOpenChange, onSuccess }: CreateTransferModalProps) {
   const { data: session } = useSession()
-  const orgId = session?.user?.organizationId || ""
+  const orgId = user || ""
 
   const [transferLines, setTransferLines] = useState<TransferLine[]>([])
   const [searchTerm, setSearchTerm] = useState("")
@@ -141,7 +141,7 @@ export function CreateTransferModal({ open, onOpenChange, onSuccess }: CreateTra
         toLocationId: data.toLocationId,
         notes: data.notes,
         organizationId: orgId,
-        createdById: session?.user?.id || "",
+        createdById: user || "",
         lines,
       },
       {

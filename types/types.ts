@@ -58,16 +58,16 @@ export type SavingProps = {
   userId: string;
   paymentDate: any;
 };
-export type UserProps = {
-  name: string;
-  firstName: string;
-  lastName: string;
-  phone: string;
-  image: string;
-  email: string;
-  organizationName: string;
-  password: string;
-};
+// export type UserProps = {
+//   name: string;
+//   firstName: string;
+//   lastName: string;
+//   phone: string;
+//   image: string;
+//   email: string;
+//   organizationName: string;
+//   password: string;
+// };
 export type UnitProps = {
   name: string;
   symbol: string;
@@ -85,17 +85,17 @@ export interface UnitResponse {
 
 };
 
-export type InvitedUserProps = {
-  name: string;
+export type CreateUserProps = {
   firstName: string;
   lastName: string;
-  phone: string;
-  image: string;
+  phone?: string;
+  image?: string;
   email: string;
   organizationId: string;
   roleId: string;
   password: string;
-  organizationName: string;
+  jobTitle?: string;
+  isActive?: boolean;
 };
 
 export type OrgIDProps = {
@@ -103,10 +103,23 @@ export type OrgIDProps = {
 }
 
 
-export type LoginProps = {
-  email: string;
-  password: string;
-};
+// export type LoginProps = {
+//   email: string;
+//   password: string;
+// };
+
+// export type RegisterUserProps = {
+//   firstName: string;
+//   lastName: string;
+//   email: string;
+//   phone: string;
+//   companyName: string;
+//   companySize: string;
+//   password: string;
+//   confirmPassword: string;
+//   termsAccepted: boolean;
+// };
+
 export type ForgotPasswordProps = {
   email: string;
 };
@@ -143,6 +156,51 @@ export interface RoleResponse {
   createdAt: Date;
   updatedAt: Date;
 }
-//   previousCategoryDetail?: Category;
-//   previousCategorysList?: Category[];
-// };
+/// User and Authentication Types
+export interface LoginProps {
+  email: string
+  password: string
+}
+
+export interface RegisterUserProps {
+  // Personal Information
+  firstName: string
+  lastName: string
+  email: string
+  phone: string
+
+  // Company Information
+  companyName: string
+  companySize: string
+
+  // Security
+  password: string
+  confirmPassword: string
+  termsAccepted: boolean
+}
+
+export interface UserProps {
+  email: string
+  password: string
+  firstName: string
+  lastName: string
+  name: string
+  phone: string
+  image?: string
+}
+
+export interface OrgDataProps {
+  name: string
+  slug: string
+  email: string
+  phone: string
+  address?: string
+  logo?: string
+}
+
+export interface AuthResponse {
+  success: boolean
+  error?: string
+  message?: string
+  data?: any
+}

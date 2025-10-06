@@ -1,6 +1,5 @@
 
 
-"use server"
 import { getOrgLocations } from "@/actions/locations/getOrgLocations";
 import LocationFormWithEditing from "@/components/ui/groups/LocationFormWithEditing";
 import { getAuthenticatedUser } from "@/config/useAuth";

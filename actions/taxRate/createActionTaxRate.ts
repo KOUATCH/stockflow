@@ -1,29 +1,17 @@
 // app/actions/createTaxRate.ts
 "use server";
 
-import { authOptions } from "@/config/auth";
 import { db } from "@/prisma/db";
 import { TaxRateCreateDTO } from "@/types/taxRates";
-import { getServerSession } from "next-auth";
 import { revalidatePath } from "next/cache";
 
 const DEFAULT_IMAGE_URL =
   "https://14J7oh8kso.ufs.sh/f/HLxTbDBCDLwfAXaapcezIN7vwylKf1PXSCqAuseUG0gx8mhd";
 
-const createActionTaxRate = async (data: TaxRateCreateDTO) => {
-  const session = await getServerSession(authOptions);
-
-  if (!session?.user?.organizationId) {
-    return {
-      success: false,
-      error: "User not authenticated or missing organization",
-      data: null,
-    };
-  }
-
+const createActionTaxRate = async (data: TaxRateCreateDTO & { organizationId: string }) => {
   const formattedData = {
     ...data,
-    organizationId: session.user.organizationId,
+    organizationId: data.organizationId,
   };
 
   try {
@@ -32,7 +20,7 @@ const createActionTaxRate = async (data: TaxRateCreateDTO) => {
          where: {
           organizationId_taxRateName: {
             taxRateName: data.taxRateName,
-            organizationId: session?.user.organizationId,
+            organizationId: data.organizationId,
           }
         },
       });

@@ -6,8 +6,7 @@ import { sidebarLinks } from "@/config/sidebar";
 import { usePermission } from "@/hooks/usePermissions";
 import { cn } from "@/lib/utils";
 import { Menu } from "lucide-react";
-import { Session } from "next-auth";
-import { signOut } from "next-auth/react";
+import { signOut } from "@/lib/auth-client";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import Logo from "../global/Logo";
@@ -38,7 +37,7 @@ const OrganizationBanner = ({
 }
 
 
-const Navbar = ({ session }: { session: Session }) => {
+const Navbar = ({ session }: { session: any }) => {
   const router = useRouter();
   const pathname = usePathname();
   const { hasPermission } = usePermission();

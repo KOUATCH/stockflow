@@ -1,5 +1,5 @@
 "use server";
-import { getAuthenticatedUser } from "@/config/useAuth";
+import { getAuthenticatedUser } from "@/lib/auth-server";
 import { db } from "@/prisma/db";
 import { BrandCreateDTO } from "@/types/brand";
 import { Brand } from "@prisma/client";
@@ -40,7 +40,7 @@ const createBrand = async (data: BrandCreateDTO) => {
       const newBrand:Brand = await tx.brand.create({
         data: {
           ...data,
-          organizationId: user?.organizationId,
+          organizationId: user.organizationId,
           slug: data.brandName, // Ensure 'slug' is provided in BrandCreateDTO
         },
       });

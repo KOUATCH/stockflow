@@ -1,7 +1,7 @@
 "use server";
 import { db } from "@/prisma/db";
 import { InvitedUserProps } from "@/types/types";
-import bcrypt from "bcryptjs";
+import { hashPassword } from "@/lib/argon2-server";
 // import { Resend } from "resend";
 
 // // import { generateNumericToken } from "@/lib/token";
@@ -18,7 +18,7 @@ export async function createInvitedUser(data: InvitedUserProps) {
     return await db.$transaction(async (tx) => {
      
       // Hash password
-      const hashedPassword = await bcrypt.hash(password, 10);
+      const hashedPassword = await hashPassword(password);
 
       // Invited User registers with role
       const newUser = await tx.user.create({

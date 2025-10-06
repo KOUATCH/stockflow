@@ -22,7 +22,7 @@ import { useOrgItemsNew } from "@/hooks/useAllItemQueries"
 import { useInventory } from "@/hooks/useInventoryQueries"
 import type { CreateTransferPayload, TransferPriority } from "@/types/inventoryMovementTypes"
 import { ArrowRight, MapPin, Package, Plus, Search, Trash2, AlertTriangle, CheckCircle, X } from 'lucide-react'
-import { useSession } from "next-auth/react"
+import { useClientAuth } from "@/hooks/useClientAuth"
 import { useState, useMemo } from "react"
 import { toast } from "sonner"
 
@@ -44,7 +44,7 @@ interface TransferLineItem {
 
 export function CreateTransferModal({ open, onOpenChange, organizationId }: CreateTransferModalProps) {
   const { data: session } = useSession()
-  const userId = session?.user?.id || ""
+  const userId = user || ""
 
   const [fromLocationId, setFromLocationId] = useState("")
   const [toLocationId, setToLocationId] = useState("")

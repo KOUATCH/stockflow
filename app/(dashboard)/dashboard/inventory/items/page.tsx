@@ -1,4 +1,3 @@
-"use server"
 
 import getOrgBrands from "@/actions/brands/getOrgBrands"
 import getOrgCategories from "@/actions/categories/getOrgCategories"

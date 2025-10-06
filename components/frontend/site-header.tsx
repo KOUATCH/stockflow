@@ -34,7 +34,7 @@ import { cn } from "@/lib/utils";
 import { ChevronDown } from "lucide-react";
 
 import Logo from "../global/Logo";
-import { Session } from "next-auth";
+// Removed NextAuth Session import - using Better-Auth session type
 import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar";
 import { getInitials } from "@/lib/generateInitials";
 
@@ -104,7 +104,7 @@ const features = [
   },
 ];
 
-export default function SiteHeader({ session }: { session: Session | null }) {
+export default function SiteHeader({ session }: { session: any | null }) {
   const [open, setOpen] = React.useState(false);
   const [showFeatures, setShowFeatures] = React.useState(false);
 

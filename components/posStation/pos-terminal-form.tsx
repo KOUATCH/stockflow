@@ -14,7 +14,7 @@ import {
 } from "@/hooks/posStation/use-pos-terminals"
 import { pOSStationSchema, type CreatePosStationInput } from "@/validations/pos-terminal"
 import { zodResolver } from "@hookform/resolvers/zod"
-import { useSession } from "next-auth/react"
+import { useClientAuth } from "@/hooks/useClientAuth"
 import { useEffect } from "react"
 import { useForm } from "react-hook-form"
 interface POSStationFormProps {
@@ -28,7 +28,7 @@ export function POSStationForm({ terminal, onSuccess }: POSStationFormProps) {
 
 
 
-  const authSession = useSession()
+  const { session, user, organizationId } = useClientAuth()
   const userOrganizationId = authSession.data?.user?.organizationId || ""
 
   const form = useForm<CreatePosStationInput>({

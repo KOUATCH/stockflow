@@ -7,7 +7,7 @@ import {
 } from "@/actions/inventory/inventoryMovementActions"
 import type { CreateTransferPayload, TransferStatus } from "@/types/inventoryMovementTypes"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { toast } from "sonner"
+import { useNotifications } from "@/components/notifications/NotificationProvider"
 
 // ============================================================================
 // QUERY KEYS
@@ -69,16 +69,17 @@ export function useTransfer(transferId: string | undefined, organizationId: stri
  */
 export function useCreateTransfer() {
   const queryClient = useQueryClient()
+  const { formSuccess, formError } = useNotifications()
 
   return useMutation({
     mutationFn: (data: CreateTransferPayload) => createLocationTransfer(data),
     onSuccess: (response, variables) => {
-      toast.success(response.message || "Transfer created successfully")
+      formSuccess("Create Transfer", response.message || "Transfer created and is ready for approval")
       queryClient.invalidateQueries({ queryKey: TransferKeys.all })
       queryClient.invalidateQueries({ queryKey: ["inventory"] })
     },
     onError: (error: Error) => {
-      toast.error(error.message || "Failed to create transfer")
+      formError("Create Transfer", error.message || "Failed to create transfer")
     },
   })
 }
@@ -88,6 +89,7 @@ export function useCreateTransfer() {
  */
 export function useApproveTransfer() {
   const queryClient = useQueryClient()
+  const { formSuccess, formError } = useNotifications()
 
   return useMutation({
     mutationFn: ({
@@ -100,13 +102,13 @@ export function useApproveTransfer() {
       approvedById: string
     }) => approveTransfer(transferId, organizationId, approvedById),
     onSuccess: (response, variables) => {
-      toast.success(response.message || "Transfer approved successfully")
+      formSuccess("Approve Transfer", response.message || "Transfer approved and is ready for execution")
       queryClient.invalidateQueries({ queryKey: TransferKeys.all })
       queryClient.invalidateQueries({ queryKey: TransferKeys.detail(variables.transferId, variables.organizationId) })
       queryClient.invalidateQueries({ queryKey: ["inventory"] })
     },
     onError: (error: Error) => {
-      toast.error(error.message || "Failed to approve transfer")
+      formError("Approve Transfer", error.message || "Failed to approve transfer")
     },
   })
 }

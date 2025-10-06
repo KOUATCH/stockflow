@@ -10,16 +10,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useEffect, useMemo, useState } from "react"
 
-import {
-  useLowStockMonitoring,
-  useRealTimeBalanceTracking,
-  useSystemMonitoring,
-} from "@/hooks/cashDrawer/useRealTimeBalanceTracking"
 import { useCustomers } from "@/hooks/newPOSSession/useCustomerQueries"
 import { usePosStations } from "@/hooks/posStation/use-pos-station-management"
 import { useOrgLocationsNew } from "@/hooks/useAllLocationsQueries"
 // import { useSessionManagement } from "@/hooks/cashDrawer/useSessionManagement"
 import { useSessionManagement } from "@/hooks/cashDrawer/useSessionManagement"
+import { useClientAuth } from "@/hooks/useClientAuth"
 import {
   Activity,
   AlertTriangle,
@@ -42,7 +38,6 @@ import {
   Users,
   Zap,
 } from "lucide-react"
-import { useSession } from "next-auth/react"
 
 
 export default function HomePage() {
@@ -52,19 +47,20 @@ export default function HomePage() {
   const [sessionStartTime, setSessionStartTime] = useState<Date | null>(null)
   const [selectedCategory, setSelectedCategory] = useState<string>("all")
   const [showOpeningBalanceDialog, setShowOpeningBalanceDialog] = useState(false)
-
   const { currentSession, sessionLoading, startSession, endSession } = useSessionManagement(selectedTerminalId)
 
-  const authSession = useSession()
-  const user = authSession?.data?.user
-
-  const orgId = user?.organizationId || ""
+  const { session: authSession, user, organizationId } = useClientAuth()
+  const orgId = organizationId || ""
   const userId = user?.id || ""
+
+  const isSessionActive = currentSession?.status === "active"
+
+
+
+  // // Real-time monitoring hooks
   // const { realTimeState, session, summary } = useRealTimeBalanceTracking(selectedTerminalId, currentSession?.id || "")
   // const { lowStockCount, criticalStockCount, lowStockItems } = useLowStockMonitoring(selectedLocationId, orgId)
   // const { systemMetrics, systemHealth } = useSystemMonitoring(orgId, selectedLocationId)
-
-  const isSessionActive = currentSession?.status === "active"
 
 
 
@@ -120,12 +116,6 @@ export default function HomePage() {
   }, [availableTerminals, selectedLocationId, selectedTerminalId])
   // const { currentSession, sessionLoading } = useSessionManagement(selectedTerminal)
 
-  // Real-time monitoring hooks
-  const { realTimeState, session, summary } = useRealTimeBalanceTracking(selectedTerminalId, currentSession?.id || "")
-  const { lowStockCount, criticalStockCount, lowStockItems } = useLowStockMonitoring(selectedLocationId, orgId)
-  const { systemMetrics, systemHealth } = useSystemMonitoring(orgId, selectedLocationId)
-
-
 
 
 
@@ -159,7 +149,7 @@ export default function HomePage() {
   const handleOpeningBalanceConfirm = async (balance: number) => {
     try {
       console.log("[v0] Starting session with opening balance:", balance)
-      await startSession(balance.toString(), userId)
+      await startSession(balance, userId)
       setSessionStartTime(new Date())
 
       const currentTerminal = availableTerminals.find((t) => t.id === selectedTerminalId)

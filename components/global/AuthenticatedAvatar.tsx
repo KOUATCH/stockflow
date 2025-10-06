@@ -9,14 +9,14 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { getInitials } from "@/lib/generateInitials";
-import { Session } from "next-auth";
+// Removed NextAuth Session import - using Better-Auth session type
 import Link from "next/link";
 import LogoutBtn from "@/components/global/LogoutBtn";
 
 export default function AuthenticatedAvatar({
   session,
 }: {
-  session: Session | null;
+  session: any | null;
 }) {
   return (
     <DropdownMenu>

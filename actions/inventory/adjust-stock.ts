@@ -2,24 +2,9 @@
 
 import { db } from "@/prisma/db";
 import { StockAdjustmentData, TransactionType } from "@/types/inventory";
-import { getServerSession } from "next-auth";
 import { revalidatePath } from "next/cache";
 
-async function getAuthSession() {
-  const session = await getServerSession();
-  return session;
-}
-
-export async function adjustStock(adjustments: StockAdjustmentData[]) {
-  const session = await getAuthSession();
-  
-  if (!session?.user?.organizationId) {
-    return {
-      success: false,
-      error: "User not authenticated",
-      data: null,
-    };
-  }
+export async function adjustStock(adjustments: StockAdjustmentData[], organizationId: string, userId: string) {
 
   try {
     const result = await db.$transaction(async (tx) => {
@@ -88,8 +73,8 @@ export async function adjustStock(adjustments: StockAdjustmentData[]) {
             notes: notes || `Stock adjustment`,
             itemId,
             locationId,
-            organizationId: session.user.organizationId,
-            createdById: session.user.id,
+            organizationId: organizationId,
+            createdById: userId,
             batchNumber,
             expiryDate,
             serialNumbers: [],

@@ -5,8 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { AlertTriangle, Package, RefreshCw, Store, TrendingUp, Warehouse } from 'lucide-react';
 import { useEffect, useState } from 'react';
-// import { getInventoryLevels, getLowStockItems, getLocations } from '@/actions/inventory/get-inventory-data';
-import { getInventoryLevels, getLocations, getLowStockItems } from '@/actions/inventory/get-inventory-data';
+import { getInventoryLevelsClientSafe, getLocationsClientSafe, getLowStockItemsClientSafe } from '@/actions/inventory/clientSafeInventoryData';
 import { InventoryLevel, Location, LocationType } from '@/types/inventory';
 
 export function EnhancedInventoryDashboard() {
@@ -23,9 +22,9 @@ export function EnhancedInventoryDashboard() {
 
     try {
       const [levelsResult, lowStockResult, locationsResult] = await Promise.all([
-        getInventoryLevels(selectedLocationId || undefined),
-        getLowStockItems(10),
-        getLocations()
+        getInventoryLevelsClientSafe(undefined, selectedLocationId || undefined),
+        getLowStockItemsClientSafe(undefined, 10),
+        getLocationsClientSafe()
       ]);
 
       if (levelsResult.success && levelsResult.data) {

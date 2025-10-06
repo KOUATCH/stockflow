@@ -23,15 +23,15 @@ import {
   TrendingUp,
   Warehouse,
 } from "lucide-react"
-import { useSession } from "next-auth/react"
+import { useClientAuth } from "@/hooks/useClientAuth"
 import { useState } from "react"
 import { InventoryAdjustmentModal } from "./InventoryAdjustmentModal"
 import { InventoryTransactionsTab } from "./InventoryTransactionsTab"
 import { ReorderLevelModal } from "./ReorderLevelModal"
 
 export function InventoryDashboard() {
-  const { data: session } = useSession()
-  const orgId = session?.user?.organizationId || ""
+  const { user, organizationId } = useClientAuth()
+  const orgId = organizationId || ""
 
   const [searchTerm, setSearchTerm] = useState("")
   const [selectedLocation, setSelectedLocation] = useState<string>("all") // Updated default value to "all"

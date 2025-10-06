@@ -1,5 +1,5 @@
 "use server";
-import { getAuthenticatedUser } from "@/config/useAuth";
+import { getAuthenticatedUser } from "@/lib/auth-server";
 import { db } from "@/prisma/db";
 import { ProductProps } from "@/types/types";
 import { revalidatePath } from "next/cache";
@@ -10,7 +10,7 @@ const createProduct=async(data: ProductProps)=> {
   try {
     // Use a transaction for atomic operations
     return await db.$transaction(async (tx) => {
-   const orgId= user?.organizationId;
+   const orgId= user.organizationId;
       //check if the product already exists for the Organization
      
       const existingOrgProduct = await tx.product.findUnique({

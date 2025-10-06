@@ -1,5 +1,5 @@
 "use server"
-import { getAuthenticatedUser } from "@/config/useAuth";
+import { getAuthenticatedUser } from "@/lib/auth-server";
 import { db } from "@/prisma/db";
 import { InventoryLevelResponse } from "@/types/inventory";
 import { revalidatePath } from "next/cache";
@@ -83,7 +83,7 @@ export interface InventoryStatsResponse {
 export async function getInventoryLevels(locationId?: string): Promise<InventoryLevelResponse> {
   try {
     // const user =await  getAuthenticatedUser()
-    // const userOrgId=user?.organizationId
+    // const userOrgId=user.organizationId
     const getOrgInventoryLevels = await db.inventoryLevel.findMany({
       where: {
         locationId: locationId
@@ -143,7 +143,7 @@ export async function getInventoryLevels(locationId?: string): Promise<Inventory
 export async function getInventoryStats(): Promise<InventoryStatsResponse> {
   try {
     const user = await getAuthenticatedUser()
-    const userOrgId = user?.organizationId
+    const userOrgId = user.organizationId
     console.log(`[v0] Getting inventory stats for org:", ${userOrgId}`)
 
     const inventoryLevels = await getInventoryLevels(userOrgId)
@@ -189,7 +189,7 @@ export async function getInventoryTransactions(
 ): Promise<InventoryTransaction[]> {
   try {
     const user = await getAuthenticatedUser()
-    const userOrgId = user?.organizationId
+    const userOrgId = user.organizationId
 
     console.log("[v0] Getting inventory transactions for org:", userOrgId, "with options:", options)
 

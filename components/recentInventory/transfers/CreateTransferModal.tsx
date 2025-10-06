@@ -22,9 +22,9 @@ import { useOrgItemsNew } from "@/hooks/useAllItemQueries"
 import { useInventory } from "@/hooks/useInventoryQueries"
 import type { CreateTransferPayload, TransferPriority } from "@/types/inventoryMovementTypes"
 import { ArrowRight, MapPin, Package, Plus, Search, Trash2, AlertTriangle, CheckCircle, X } from 'lucide-react'
-import { useSession } from "next-auth/react"
+import { useAuth } from "@/hooks/useAuth"
 import { useState, useMemo } from "react"
-import { toast } from "sonner"
+import { useNotifications } from "@/components/notifications/NotificationProvider"
 
 interface CreateTransferModalProps {
   open: boolean
@@ -43,8 +43,9 @@ interface TransferLineItem {
 }
 
 export function CreateTransferModal({ open, onOpenChange, organizationId }: CreateTransferModalProps) {
-  const { data: session } = useSession()
-  const userId = session?.user?.id || ""
+  const { user: session } = useAuth()
+  const userId = session?.id || ""
+  const { error, formSuccess, formError } = useNotifications()
 
   const [fromLocationId, setFromLocationId] = useState("")
   const [toLocationId, setToLocationId] = useState("")
@@ -95,7 +96,7 @@ export function CreateTransferModal({ open, onOpenChange, organizationId }: Crea
 
   const handleAddLine = () => {
     if (!selectedItemId || !quantity || Number(quantity) <= 0) {
-      toast.error("Please select an item and enter a valid quantity")
+      error("Invalid Input", "Please select an item and enter a valid quantity")
       return
     }
 
@@ -103,7 +104,7 @@ export function CreateTransferModal({ open, onOpenChange, organizationId }: Crea
     const availableQty = selectedItemInventory?.quantity || 0
 
     if (Number(quantity) > availableQty) {
-      toast.error(`Insufficient inventory. Available: ${availableQty}`)
+      error("Insufficient Inventory", `Only ${availableQty} units available`)
       return
     }
 
@@ -116,7 +117,7 @@ export function CreateTransferModal({ open, onOpenChange, organizationId }: Crea
       updatedLines[existingLineIndex].requestedQuantity += Number(quantity)
       
       if (updatedLines[existingLineIndex].requestedQuantity > availableQty) {
-        toast.error(`Total quantity exceeds available inventory. Available: ${availableQty}`)
+        error("Quantity Exceeded", `Total quantity exceeds available inventory. Available: ${availableQty}`)
         return
       }
       
@@ -149,7 +150,7 @@ export function CreateTransferModal({ open, onOpenChange, organizationId }: Crea
     if (!line) return
 
     if (newQuantity > line.availableQuantity) {
-      toast.error(`Quantity exceeds available inventory. Available: ${line.availableQuantity}`)
+      error("Quantity Exceeded", `Only ${line.availableQuantity} units available`)
       return
     }
 
@@ -162,12 +163,12 @@ export function CreateTransferModal({ open, onOpenChange, organizationId }: Crea
 
   const handleSubmit = async () => {
     if (!fromLocationId || !toLocationId) {
-      toast.error("Please select both source and destination locations")
+      error("Missing Locations", "Please select both source and destination locations")
       return
     }
 
     if (lines.length === 0) {
-      toast.error("Please add at least one item to transfer")
+      error("No Items", "Please add at least one item to transfer")
       return
     }
 

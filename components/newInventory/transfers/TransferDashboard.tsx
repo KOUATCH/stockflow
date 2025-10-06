@@ -24,7 +24,7 @@ import {
   AlertCircle,
   BarChart3,
 } from "lucide-react"
-import { useSession } from "next-auth/react"
+import { useClientAuth } from "@/hooks/useClientAuth"
 import { useState } from "react"
 import { format } from "date-fns"
 import { CreateTransferModal } from "./CreateTransferModal"
@@ -60,7 +60,7 @@ const statusConfig = {
 
 export function TransferDashboard() {
   const { data: session } = useSession()
-  const orgId = session?.user?.organizationId || ""
+  const orgId = user || ""
 
   const [searchTerm, setSearchTerm] = useState("")
   const [selectedStatus, setSelectedStatus] = useState<TransferStatus | "all">("all")
@@ -87,7 +87,7 @@ export function TransferDashboard() {
   const locations = locationsResponse?.data || []
 
   const handleApproveTransfer = (transfer: any) => {
-    if (!session?.user?.id) return
+    if (!user) return
 
     approveTransfer({
       transferId: transfer.id,

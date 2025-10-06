@@ -5,9 +5,9 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 
 import { LoginProps } from "@/types/types";
-import { signIn } from "next-auth/react";
+import { signInWithCredentials } from "@/actions/auth";
 import { useRouter, useSearchParams } from "next/navigation";
-import { toast } from "sonner";
+import { useNotifications } from "../notifications/NotificationProvider";
 import PasswordInput from "../FormInputs/PasswordInput";
 import SubmitButton from "../FormInputs/SubmitButton";
 import TextInput from "../FormInputs/TextInput";
@@ -26,36 +26,33 @@ export default function LoginForm() {
   const returnUrl = params.get("returnUrl") || "/dashboard";
   const [passErr, setPassErr] = useState("");
   const router = useRouter();
+  const { formError, formSuccess } = useNotifications();
   async function onSubmit(data: LoginProps) {
     try {
       setLoading(true);
       setPassErr("");
       console.log("Attempting to sign in with credentials:", data);
-      const loginData = await signIn("credentials", {
-        ...data,
-        redirect: false,
-      });
-      console.log("SignIn response:", loginData);
-      if (loginData?.error) {
+
+      const result = await signInWithCredentials(data);
+
+      console.log("SignIn response:", result);
+
+      if (result.error) {
         setLoading(false);
-        toast.error("Sign-in error",{
-          description: "Please Check your credentials or is your email verified?"
-        });
-        setPassErr("Wrong Credentials, Check again");
-        // setShowNotification(true);
-      } else {
+        formError("Login", result.error, "Authentication Failed");
+        setPassErr(result.error);
+      } else if (result.success) {
         // Sign-in was successful
-        // setShowNotification(false);
         reset();
         setLoading(false);
-        toast.success("Login Successful");
+        formSuccess("Login", result.message);
         setPassErr("");
         router.push(returnUrl);
       }
     } catch (error) {
       setLoading(false);
       console.error("Network Error:", error);
-      // toast.error("Its seems something is wrong with your Network");
+      formError("Login", "It seems something is wrong with your Network", "Network connection error occurred");
     }
   }
   return (

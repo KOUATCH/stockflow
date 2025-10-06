@@ -8,132 +8,107 @@ import type {
     ProcessPaymentPayload
 } from '@/types/posTypes'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import {
+  getPOSSessions,
+  getPOSSessionById,
+  startPOSSession,
+  closePOSSession,
+  getPOSTerminals,
+  getPOSTerminalById,
+  getCashDrawer,
+  processCashDrawerOperation,
+  processPayment,
+  getPayments,
+  getPOSSummary,
+  generateDailyReport,
+  getDailyReports
+} from "@/actions/pos"
+import { useNotifications } from "@/components/notifications/NotificationProvider"
 
-// API functions (these would typically be in a separate API service file)
+// Server action wrappers for POS API
 const posAPI = {
   // POS Sessions
   getSessions: async (filters: POSFilters) => {
-    const params = new URLSearchParams()
-    Object.entries(filters).forEach(([key, value]) => {
-      if (value !== undefined && value !== null) {
-        if (Array.isArray(value)) {
-          value.forEach(v => params.append(key, v.toString()))
-        } else {
-          params.append(key, value.toString())
-        }
-      }
+    return await getPOSSessions({
+      locationId: filters.locationId,
+      status: filters.status,
+      startDate: filters.startDate,
+      endDate: filters.endDate
     })
-    
-    const response = await fetch(`/api/pos/sessions?${params}`)
-    if (!response.ok) throw new Error('Failed to fetch POS sessions')
-    return response.json()
   },
 
   getSession: async (id: string) => {
-    const response = await fetch(`/api/pos/sessions/${id}`)
-    if (!response.ok) throw new Error('Failed to fetch POS session')
-    return response.json()
+    return await getPOSSessionById(id)
   },
 
   startSession: async (data: CreatePOSSessionPayload) => {
-    const response = await fetch('/api/pos/sessions/start', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
+    return await startPOSSession({
+      locationId: data.locationId,
+      initialCash: data.initialCash,
+      notes: data.notes
     })
-    if (!response.ok) throw new Error('Failed to start POS session')
-    return response.json()
   },
 
   closeSession: async (data: ClosePOSSessionPayload) => {
-    const response = await fetch('/api/pos/sessions/close', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
+    return await closePOSSession({
+      sessionId: data.sessionId,
+      finalCash: data.finalCash,
+      notes: data.notes
     })
-    if (!response.ok) throw new Error('Failed to close POS session')
-    return response.json()
   },
 
   // Terminals
   getTerminals: async (organizationId: string, locationId?: string) => {
-    const params = new URLSearchParams({ organizationId })
-    if (locationId) params.append('locationId', locationId)
-    
-    const response = await fetch(`/api/pos/terminals?${params}`)
-    if (!response.ok) throw new Error('Failed to fetch POS terminals')
-    return response.json()
+    return await getPOSTerminals({
+      locationId: locationId,
+      status: 'ACTIVE'
+    })
   },
 
   getTerminal: async (id: string) => {
-    const response = await fetch(`/api/pos/terminals/${id}`)
-    if (!response.ok) throw new Error('Failed to fetch POS terminal')
-    return response.json()
+    return await getPOSTerminalById(id)
   },
 
   // Cash Drawer
   getCashDrawer: async (locationId: string) => {
-    const response = await fetch(`/api/pos/cash-drawer/${locationId}`)
-    if (!response.ok) throw new Error('Failed to fetch cash drawer')
-    return response.json()
+    return await getCashDrawer(locationId)
   },
 
   performCashDrawerOperation: async (data: CashDrawerOperationPayload) => {
-    const response = await fetch('/api/pos/cash-drawer/operation', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
+    return await processCashDrawerOperation({
+      sessionId: data.sessionId,
+      type: data.type,
+      amount: data.amount,
+      reason: data.reason,
+      notes: data.notes
     })
-    if (!response.ok) throw new Error('Failed to perform cash drawer operation')
-    return response.json()
   },
 
   // Payments
   processPayment: async (data: ProcessPaymentPayload) => {
-    const response = await fetch('/api/pos/payments/process', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(data),
+    return await processPayment({
+      salesOrderId: data.salesOrderId,
+      amount: data.amount,
+      paymentMethod: data.paymentMethod,
+      notes: data.notes
     })
-    if (!response.ok) throw new Error('Failed to process payment')
-    return response.json()
   },
 
   getPayments: async (salesOrderId: string) => {
-    const response = await fetch(`/api/pos/payments?salesOrderId=${salesOrderId}`)
-    if (!response.ok) throw new Error('Failed to fetch payments')
-    return response.json()
+    return await getPayments(salesOrderId)
   },
 
   // Summary and Reports
   getSummary: async (organizationId: string, locationId?: string) => {
-    const params = new URLSearchParams({ organizationId })
-    if (locationId) params.append('locationId', locationId)
-    
-    const response = await fetch(`/api/pos/summary?${params}`)
-    if (!response.ok) throw new Error('Failed to fetch POS summary')
-    return response.json()
+    return await getPOSSummary(organizationId, locationId)
   },
 
   generateDailyReport: async (locationId: string, date: string) => {
-    const response = await fetch('/api/pos/reports/daily', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ locationId, date }),
-    })
-    if (!response.ok) throw new Error('Failed to generate daily report')
-    return response.json()
+    return await generateDailyReport(locationId, date)
   },
 
   getDailyReports: async (organizationId: string, locationId?: string, dateFrom?: string, dateTo?: string) => {
-    const params = new URLSearchParams({ organizationId })
-    if (locationId) params.append('locationId', locationId)
-    if (dateFrom) params.append('dateFrom', dateFrom)
-    if (dateTo) params.append('dateTo', dateTo)
-    
-    const response = await fetch(`/api/pos/reports/daily?${params}`)
-    if (!response.ok) throw new Error('Failed to fetch daily reports')
-    return response.json()
+    return await getDailyReports(organizationId, locationId, dateFrom, dateTo)
   },
 }
 

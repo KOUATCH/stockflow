@@ -8,7 +8,7 @@ import { useForm } from "react-hook-form";
 
 import { updateUserPassword } from "@/actions/users/updateUserPassword";
 import { Lock, LockOpen } from "lucide-react";
-import { signOut } from "next-auth/react";
+import { signOut } from "@/lib/auth-client";
 import { toast } from "sonner";
 import PasswordInput from "../FormInputs/PasswordInput";
 import TextInput from "../FormInputs/TextInput";

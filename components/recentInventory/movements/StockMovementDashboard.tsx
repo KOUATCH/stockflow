@@ -13,7 +13,7 @@ import { useOrgItemsNew } from "@/hooks/useAllItemQueries"
 import { formatCurrency } from "@/lib/utils"
 import type { TransactionType } from "@/types/inventoryMovementTypes"
 import { Activity, ArrowDown, ArrowUp, BarChart3, RefreshCw, TrendingDown, TrendingUp } from "lucide-react"
-import { useSession } from "next-auth/react"
+import { useAuth } from "@/hooks/useAuth"
 import { useState } from "react"
 import { format } from "date-fns"
 
@@ -93,8 +93,8 @@ const transactionTypeConfig = {
 }
 
 export function StockMovementDashboard() {
-  const { data: session } = useSession()
-  const orgId = session?.user?.organizationId || ""
+  const { user: session } = useAuth()
+  const orgId = session?.organizationId || ""
 
   const [selectedItem, setSelectedItem] = useState<string>("all")
   const [selectedLocation, setSelectedLocation] = useState<string>("all")

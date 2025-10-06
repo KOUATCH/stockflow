@@ -75,7 +75,7 @@ import {
   Zap,
   ZapIcon,
 } from "lucide-react"
-import { useSession } from "next-auth/react"
+import { useAuth } from "@/hooks/useAuth"
 
 
 import { cn } from "@/lib/utils"
@@ -229,9 +229,9 @@ export function POSTerminalFinal({ organizationId, locationId, terminalId, userI
     }
   }, [locationId, selectedLocationId])
 
-  const { data: sessionData } = useSession()
+  const { user: sessionData } = useAuth()
 
-  if (!sessionData?.user?.organizationId) {
+  if (!sessionData?.organizationId) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 p-6 flex items-center justify-center">
         <div className="text-center">

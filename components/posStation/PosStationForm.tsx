@@ -11,12 +11,12 @@ import { useCreatePosStation, useLocationsByOrganization } from "@/hooks/posStat
 import { posStationSchema, type CreatePosStationInput } from "@/validations/posStationTypes"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { Loader2, Plus, Terminal } from "lucide-react"
-import { useSession } from "next-auth/react"
+import { useClientAuth } from "@/hooks/useClientAuth"
 import { useForm } from "react-hook-form"
 
 
 export function PosStationForm() {
-  const authSession = useSession()
+  const { session, user, organizationId } = useClientAuth()
   const userOrganizationId = authSession?.data?.user?.organizationId || ""
 
   const form = useForm<CreatePosStationInput>({

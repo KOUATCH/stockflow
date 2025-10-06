@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { AlertTriangle, Package, TrendingUp, RefreshCw, Plus } from 'lucide-react';
-import { getInventoryLevels, getLowStockItems, getBasicItems } from '@/actions/inventory/get-inventory-data';
+import { getInventoryLevelsClientSafe, getLowStockItemsClientSafe } from '@/actions/inventory/clientSafeInventoryData';
 
 interface InventoryLevel {
   id: string;
@@ -52,8 +52,8 @@ export function FallbackInventoryDashboard() {
     try {
       // Try to fetch inventory data first
       const [levelsResult, lowStockResult] = await Promise.all([
-        getInventoryLevels(),
-        getLowStockItems(10)
+        getInventoryLevelsClientSafe(),
+        getLowStockItemsClientSafe(undefined, 10)
       ]);
 
       if (levelsResult.success) {
@@ -64,10 +64,8 @@ export function FallbackInventoryDashboard() {
         console.log("Inventory tables not available, falling back to basic items");
         setHasInventoryTables(false);
         
-        const basicItemsResult = await getBasicItems();
-        if (basicItemsResult.success && basicItemsResult.data) {
-          setBasicItems(basicItemsResult.data);
-        }
+        // TODO: Implement getBasicItemsClientSafe if needed
+        console.log("Basic items fallback not yet implemented with client-safe actions");
       }
 
       if (lowStockResult.success && lowStockResult.data) {

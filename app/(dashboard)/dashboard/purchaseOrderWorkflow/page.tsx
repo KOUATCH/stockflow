@@ -11,11 +11,13 @@ import { useInventoryStats } from "@/hooks/inventoryHooks/useInventoryDataHooks"
 import { useInventoryLevels, useInventoryTransactions } from "@/hooks/inventoryHooks/useInventoryHooks"
 import { useWorkflowData } from "@/hooks/purchaseOrderWorkflowHooks/useWorkflowData"
 import { useOrgLocationsNew } from "@/hooks/useAllLocationsQueries"
+import { useClientAuth } from "@/hooks/useClientAuth"
 import type { PurchaseOrderWithRelations } from "@/types/purchase-orders-system-types"
 import { formatDate } from "date-fns"
 import {
   AlertTriangle,
   BarChart3,
+  Building2,
   CheckCircle,
   Clipboard,
   Clock,
@@ -30,10 +32,10 @@ import {
   Search,
   ShoppingBag,
   ShoppingCart,
+  Target,
   TrendingUp,
   Wallet,
 } from "lucide-react"
-import { useSession } from "next-auth/react"
 import Link from "next/link"
 import { useEffect, useState } from "react"
 
@@ -116,8 +118,8 @@ interface DashboardStatsProps {
 }
 
 function DashboardStats({ purchaseOrders, locationId }: DashboardStatsProps) {
-  const { data: session, status } = useSession()
-  const orgId = session?.user?.organizationId || ""
+  const { session, status, organizationId } = useClientAuth()
+  const orgId = organizationId || ""
   const { stats: inventoryStats, loading: inventoryLoading } = useInventoryStats(orgId)
 
   // Filter purchase orders by location if locationId is provided
@@ -302,13 +304,12 @@ function DashboardStats({ purchaseOrders, locationId }: DashboardStatsProps) {
 }
 
 function WorkflowDemo({ locationId }: { locationId?: string }) {
-  const { data: session, status } = useSession()
-  const user = session?.user
-  const orgId = user?.organizationId || ""
+  const { session, status, user, organizationId } = useClientAuth()
+  const orgId = organizationId || ""
   const [selectedPOId, setSelectedPOId] = useState<string>("")
   const [statusFilter, setStatusFilter] = useState<string>("all")
   const [searchTerm, setSearchTerm] = useState("")
-  const { purchaseOrders, loading, error, refetch, updateOrderStatus } = useWorkflowData(orgId, locationId)
+  const { purchaseOrders, loading, error, refetch, updateOrderStatus } = useWorkflowData(orgId, locationId ?? "")
 
   console.log({ purchaseOrders })
   // Debug logging
@@ -333,6 +334,7 @@ function WorkflowDemo({ locationId }: { locationId?: string }) {
 
   // Auto-select first order if none selected
   const selectedPO = selectedPOId ? purchaseOrders.find((po) => po.id === selectedPOId) : filteredOrders[0]
+  console.log({ filteredOrders })
 
   if (status === "loading" || loading) {
     return (
@@ -377,10 +379,12 @@ function WorkflowDemo({ locationId }: { locationId?: string }) {
             <RefreshCw className="h-4 w-4 mr-2" />
             Refresh
           </Button>
-          <Button size="sm">
-            <Plus className="h-4 w-4 mr-2" />
-            New Order
-          </Button>
+          <Link href="/dashboard/purchase-orders/new">
+            <Button size="sm">
+              <Plus className="h-4 w-4 mr-2" />
+              New Order
+            </Button>
+          </Link>
         </div>
       </div>
 
@@ -438,7 +442,7 @@ function WorkflowDemo({ locationId }: { locationId?: string }) {
                 </div>
               ) : (
                 <div className="space-y-4 max-h-96 overflow-y-auto">
-                  {filteredOrders.map((po) => (
+                  {purchaseOrders.map((po) => (
                     <PurchaseOrderCard
                       key={po.id}
                       po={po}
@@ -479,9 +483,10 @@ function WorkflowDemo({ locationId }: { locationId?: string }) {
 interface InventoryOverviewProps {
   organizationId: string
   locationId?: string | undefined
+  locationName?: string
 }
 
-function InventoryOverview({ organizationId, locationId }: InventoryOverviewProps) {
+function InventoryOverview({ organizationId, locationId, locationName }: InventoryOverviewProps) {
   const {
     data: inventoryLevels,
     isLoading: loading,
@@ -497,7 +502,10 @@ function InventoryOverview({ organizationId, locationId }: InventoryOverviewProp
             <Package className="h-5 w-5" />
             Inventory Overview
           </CardTitle>
-          <CardDescription>Current stock levels and availability</CardDescription>
+          <CardDescription className="font-sans font-extrabold">
+            ` Current stock levels and availability for ${locationName}`
+            {/* {selectedLocationId ? `for ${locations.find(l => l.id === selectedLocationId)?.name || 'selected location'}` : 'across all locations'} */}
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="flex items-center justify-center h-32">
@@ -517,7 +525,11 @@ function InventoryOverview({ organizationId, locationId }: InventoryOverviewProp
             <Package className="h-5 w-5" />
             Inventory Overview
           </CardTitle>
-          <CardDescription>Current stock levels and availability</CardDescription>
+          <CardDescription className="font-sans font-extrabold">
+
+            Current stock levels and availability
+            {locationName && ` for ${locationName}`}
+          </CardDescription>
         </CardHeader>
         <CardContent>
           <div className="flex items-center justify-center h-32 text-red-600">
@@ -530,13 +542,18 @@ function InventoryOverview({ organizationId, locationId }: InventoryOverviewProp
   }
 
   return (
-    <Card>
-      <CardHeader>
+
+    <Card className="bg-white/95 backdrop-blur-xl border-emerald-200/50 shadow-2xl ring-2 ring-teal-300/40">
+      <CardHeader className="bg-gradient-to-r from-amber-400/20 via-yellow-400/10 to-orange-400/20">
         <CardTitle className="flex items-center gap-2">
           <Package className="h-5 w-5" />
           Inventory Overview
         </CardTitle>
-        <CardDescription>Current stock levels and availability</CardDescription>
+        <CardDescription>
+          Current stock levels and availability
+          {locationName && ` for ${locationName}`}
+
+        </CardDescription>
       </CardHeader>
       <CardContent>
         <div className="space-y-4">
@@ -549,20 +566,19 @@ function InventoryOverview({ organizationId, locationId }: InventoryOverviewProp
 
               return (
                 <div key={level.id} className="flex items-center justify-between p-3 border rounded">
-                  <div className="flex-1">
-                    <p className="font-medium text-sm">{level?.item?.name}</p>
-                    <div className="flex gap-4 text-sm text-muted-foreground mt-1">
-                      <p className="font-medium text-sm text-blue-800">{level?.location?.name}</p>
-                      <span>On Hand: {level?.quantityOnHand}</span>
+                  <div className="flex-1 ">
+                    <div className="flex justify-between gap-4 text-sm text-muted-foreground mt-1">
+                      <p className="font-bold text-md ">{level?.item?.name}</p>
+                      {/* <p className="font-medium text-sm text-blue-800">{level?.location?.name}</p> */}
                       <span>Reserved: {level?.quantityReserved}</span>
+                      <span>On Hand: {level?.quantityOnHand}</span>
                       <span>Available: {level?.quantityAvailable}</span>
+                      <p className="font-medium">${level.totalValue?.toLocaleString()}</p>
+                      <Badge variant={statusVariant} className="text-xs">
+                        {status}
+                      </Badge>
                     </div>
-                  </div>
-                  <div className="text-right">
-                    <p className="font-medium">${level.totalValue?.toLocaleString()}</p>
-                    <Badge variant={statusVariant} className="text-xs">
-                      {status}
-                    </Badge>
+
                   </div>
                 </div>
               )
@@ -577,8 +593,8 @@ function InventoryOverview({ organizationId, locationId }: InventoryOverviewProp
 }
 
 function RecentTransactions({ locationId }: { locationId?: string }) {
-  const { data: session, status } = useSession()
-  const userOrgId = session?.user?.organizationId || ""
+  const { session, status, organizationId } = useClientAuth()
+  const userOrgId = organizationId || ""
   const {
     data: transactions,
     isLoading: loading,
@@ -697,9 +713,45 @@ function RecentTransactions({ locationId }: { locationId?: string }) {
 
 export default function PurchaseOrderDashboard() {
   const [selectedLocationId, setSelectedLocationId] = useState<string>("")
-  const { data: session, status } = useSession()
-  const user = session?.user
-  const orgId = user?.organizationId || ""
+  const [locationName, setLocationName] = useState<string>("")
+  const { session, status, user, organizationId, isAuthenticated, isLoading } = useClientAuth()
+  const orgId = organizationId || ""
+
+  // Handle authentication states properly
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="flex items-center space-x-2">
+          <RefreshCw className="h-6 w-6 animate-spin text-muted-foreground" />
+          <span className="text-muted-foreground">Authenticating...</span>
+        </div>
+      </div>
+    )
+  }
+
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <AlertTriangle className="h-12 w-12 mx-auto mb-4 text-amber-500" />
+          <h2 className="text-xl font-semibold mb-2">Authentication Required</h2>
+          <p className="text-muted-foreground">Please log in to access this page.</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (!organizationId) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center">
+        <div className="text-center">
+          <Building2 className="h-12 w-12 mx-auto mb-4 text-blue-500" />
+          <h2 className="text-xl font-semibold mb-2">Organization Required</h2>
+          <p className="text-muted-foreground">Please set up an organization to continue.</p>
+        </div>
+      </div>
+    )
+  }
   const { purchaseOrders, loading, error } = useWorkflowData(orgId, selectedLocationId)
 
   console.log({ purchaseOrders })
@@ -716,12 +768,17 @@ export default function PurchaseOrderDashboard() {
   // Get locations for the selector
   const { data: locationResponse, isLoading: locationsLoading } = useOrgLocationsNew(orgId, { enabled: !!orgId })
   const locations = locationResponse?.data || []
-
   // Auto-select first location if none selected
   useEffect(() => {
     if (!selectedLocationId && locations.length > 0 && !locationsLoading) {
       setSelectedLocationId(locations[0]?.id)
+      // setLocationName(locations[0]?.name)
     }
+  }, [selectedLocationId, locations, locationsLoading])
+
+
+  useEffect(() => {
+    setLocationName(locations[0]?.name)
   }, [selectedLocationId, locations, locationsLoading])
 
   // Prevent hydration mismatch by not rendering until session is loaded
@@ -750,7 +807,7 @@ export default function PurchaseOrderDashboard() {
             </p>
             {process.env.NODE_ENV === "development" && (
               <div className="text-xs text-slate-500 mt-2 font-mono">
-                Debug: {purchaseOrders?.length || 0} POs loaded | Location: {selectedLocationId || "All"} | Status:{" "}
+                Debug: {purchaseOrders?.length || 0} POs loaded | Location: {locationName || "All"} | Status:{" "}
                 {status}
               </div>
             )}
@@ -829,441 +886,216 @@ export default function PurchaseOrderDashboard() {
             >
               Analytics
             </TabsTrigger>
-          </TabsList>
+          </TabsList>P
 
           <TabsContent value="workflow">
             <WorkflowDemo locationId={selectedLocationId} />
           </TabsContent>
 
-          {/* <TabsContent value="overview" className="space-y-6">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <Card className="bg-white/95 backdrop-blur-xl border-emerald-200/50 shadow-2xl ring-2 ring-teal-300/40">
-                <CardHeader className="bg-gradient-to-r from-emerald-100 via-teal-100 to-cyan-100 border-b border-teal-200/50">
-                  <CardTitle className="flex items-center gap-2">
-                    <ShoppingCart className="h-5 w-5 text-emerald-700" />
-                    Recent Purchase Orders
-                  </CardTitle>
-                  <CardDescription>Latest orders  for selected Location</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  {loading ? (
-                    <div className="flex items-center justify-center h-32">
-                      <RefreshCw className="h-6 w-6 animate-spin text-muted-foreground" />
-                      <span className="ml-2 text-muted-foreground">Loading purchase orders...</span>
-                    </div>
-                  ) : error ? (
-                    <div className="text-center p-4 text-red-600">
-                      <AlertTriangle className="h-8 w-8 mx-auto mb-2" />
-                      <p className="font-medium">Error loading purchase orders</p>
-                      <p className="text-sm mt-1">{error}</p>
-                      <div className="text-xs text-slate-500 mt-2 font-mono">
-                        Debug: orgId={orgId} | locationId={selectedLocationId}
+          <TabsContent value="overview" className="space-y-6">
+            {/* <div className=" flex gap-6"> */}
+            <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
+              <div className="lg:col-span-1">
+
+                <Card className="bg-white/95 backdrop-blur-xl border-emerald-200/50 shadow-2xl ring-2 ring-teal-300/40">
+                  <CardHeader className="bg-gradient-to-r from-emerald-100 via-teal-100 to-cyan-100 border-b border-teal-200/50">
+                    <CardTitle className="flex items-center gap-2">
+                      <ShoppingCart className="h-5 w-5 text-emerald-700" />
+                      Recent Purchase Orders
+                    </CardTitle>
+                    <CardDescription>
+                      Latest orders {selectedLocationId ? `for ${locations.find(l => l.id === selectedLocationId)?.name || 'selected location'}` : 'across all locations'}
+                    </CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    {loading ? (
+                      <div className="flex items-center justify-center h-32">
+                        <RefreshCw className="h-6 w-6 animate-spin text-muted-foreground" />
+                        <span className="ml-2 text-muted-foreground">Loading purchase orders...</span>
                       </div>
-                      <button
-                        onClick={() => window.location.reload()}
-                        className="mt-2 px-3 py-1 bg-red-100 text-red-700 rounded-md text-xs hover:bg-red-200 transition-colors"
-                      >
-                        Retry
-                      </button>
-                    </div>
-                  ) : (
-                    <div className="space-y-4">
-                      {(() => {
-                        console.log("[v0] Overview Tab Rendering:", {
-                          allPurchaseOrders: purchaseOrders?.length || 0,
-                          selectedLocationId,
-                          isArray: Array.isArray(purchaseOrders),
-                          purchaseOrdersType: typeof purchaseOrders,
-                          firstPO: purchaseOrders?.[0],
-                        })
+                    ) : error ? (
+                      <div className="text-center p-4 text-red-600">
+                        <AlertTriangle className="h-8 w-8 mx-auto mb-2" />
+                        <p className="font-medium">Error loading purchase orders</p>
+                        <p className="text-sm mt-1">{error}</p>
+                        <Button
+                          variant="outline"
+                          size="sm"
+                          // onClick={() => fetchPurchaseOrders()}
+                          className="mt-2"
+                        >
+                          <RefreshCw className="h-4 w-4 mr-2" />
+                          Retry
+                        </Button>
+                      </div>
+                    ) : (
+                      <div className="space-y-4">
+                        {(() => {
+                          // Filter orders by location if selected
+                          const filteredOrders = selectedLocationId
+                            ? purchaseOrders.filter(po => po.locationId === selectedLocationId)
+                            : purchaseOrders
 
-                        if (!purchaseOrders) {
-                          console.error("[v0] purchaseOrders is null/undefined:", purchaseOrders)
-                          return (
-                            <div className="text-center p-4 text-amber-600">
-                              <AlertTriangle className="h-6 w-6 mx-auto mb-2" />
-                              <p className="text-sm">No purchase orders data available</p>
-                              <div className="text-xs text-slate-500 mt-1">
-                                Data status: {purchaseOrders === null ? "null" : "undefined"}
-                              </div>
-                            </div>
-                          )
-                        }
-
-                        if (!Array.isArray(purchaseOrders)) {
-                          console.error("[v0] purchaseOrders is not an array:", typeof purchaseOrders, purchaseOrders)
-                          return (
-                            <div className="text-center p-4 text-red-600">
-                              <AlertTriangle className="h-6 w-6 mx-auto mb-2" />
-                              <p className="text-sm">Invalid data format received</p>
-                              <div className="text-xs text-slate-500 mt-1">
-                                Expected: Array, Got: {typeof purchaseOrders}
-                              </div>
-                            </div>
-                          )
-                        }
-
-                        const filteredOrders = selectedLocationId
-                          ? purchaseOrders.filter((po) => {
-                            console.log("[v0] Filtering PO:", {
-                              poId: po.id,
-                              poLocationId: po.locationId,
-                              selectedLocationId,
-                              matches: po.locationId === selectedLocationId,
-                            })
-                            return po.locationId === selectedLocationId
+                          console.log("[DEBUG] Overview Tab Filtering:", {
+                            totalOrders: purchaseOrders.length,
+                            filteredOrders: purchaseOrders.length,
+                            selectedLocationId,
+                            hasLocationFilter: !!selectedLocationId,
+                            sampleOrders: purchaseOrders.slice(0, 2).map(po => ({
+                              id: po.id,
+                              orderNumber: po.orderNumber,
+                              locationId: po.locationId,
+                              status: po.status
+                            }))
                           })
-                          : purchaseOrders
 
-                        console.log("[v0] Filtered Orders Result:", {
-                          originalCount: purchaseOrders.length,
-                          filteredCount: filteredOrders.length,
-                          selectedLocationId,
-                          sampleFiltered: filteredOrders.slice(0, 2).map((po) => ({
-                            id: po.id,
-                            orderNumber: po.orderNumber,
-                            locationId: po.locationId,
-                          })),
-                        })
-
-                        if (filteredOrders.length === 0) {
-                          return (
-                            <div className="text-center p-4 text-muted-foreground">
-                              <div className="space-y-3">
-                                <div className="w-12 h-12 mx-auto bg-slate-100 rounded-full flex items-center justify-center">
-                                  <ShoppingCart className="w-6 h-6 text-slate-400" />
-                                </div>
-                                <div>
-                                  <p className="font-medium">
-                                    {selectedLocationId
-                                      ? "No purchase orders for this location"
-                                      : "No purchase orders found"}
-                                  </p>
-                                  <p className="text-xs text-slate-500 mt-1">
-                                    Total POs: {purchaseOrders.length} | Location:{" "}
-                                    {selectedLocationId || "All locations"}
-                                  </p>
-                                  <div className="text-xs text-slate-400 mt-2 font-mono">
-                                    Debug: orgId={orgId?.slice(0, 8)}... | loading={loading.toString()}
-                                  </div>
-                                </div>
-                                {!selectedLocationId && purchaseOrders.length === 0 && (
-                                  <div className="text-xs text-emerald-600">
-                                    <Link href="/dashboard/purchase-orders/new" className="hover:underline">
-                                      Create your first purchase order →
-                                    </Link>
-                                  </div>
-                                )}
-                              </div>
-                            </div>
-                          )
-                        }
-
-                        const recentOrders = filteredOrders
-                          .sort((a, b) => {
-                            const dateA = new Date(a.createdAt || a.orderDate || 0).getTime()
-                            const dateB = new Date(b.createdAt || b.orderDate || 0).getTime()
-                            return dateB - dateA
-                          })
-                          .slice(0, 5) // Show top 5 instead of 3
-
-                        console.log("[v0] Rendering Recent Orders:", {
-                          count: recentOrders.length,
-                          orders: recentOrders.map((po) => ({
-                            id: po.id,
-                            orderNumber: po.orderNumber,
-                            status: po.status,
-                            supplier: po.supplier?.name,
-                            total: po.total,
-                          })),
-                        })
-
-                        return recentOrders.map((po, index) => {
-                          if (!po || !po.id || !po.orderNumber) {
-                            console.error(`[v0] Invalid PO at index ${index}:`, po)
+                          if (purchaseOrders.length === 0) {
                             return (
-                              <div key={`invalid-${index}`} className="p-3 border border-red-200 bg-red-50 rounded-lg">
-                                <div className="text-red-600 text-sm">Invalid purchase order data (#{index + 1})</div>
+                              <div className="text-center p-8 text-muted-foreground">
+                                <div className="w-16 h-16 mx-auto bg-slate-100 rounded-full flex items-center justify-center mb-4">
+                                  <ShoppingCart className="w-8 h-8 text-slate-400" />
+                                </div>
+                                <p className="font-medium mb-2">
+                                  {selectedLocationId ? "No purchase orders for this location" : "No purchase orders found"}
+                                </p>
+                                <p className="text-sm text-slate-500">
+                                  {selectedLocationId
+                                    ? "Try selecting a different location or create a new purchase order."
+                                    : "Create your first purchase order to get started."
+                                  }
+                                </p>
+                                {purchaseOrders.length > 0 && purchaseOrders.length === 0 && selectedLocationId && (
+                                  <p className="text-xs text-amber-600 mt-2">
+                                    Note: There are {purchaseOrders.length} orders in other locations
+                                  </p>
+                                )}
+                                <Link href="/dashboard/purchase-orders/new">
+                                  <Button size="sm" className="mt-4">
+                                    <Plus className="h-4 w-4 mr-2" />
+                                    Create Purchase Order
+                                  </Button>
+                                </Link>
                               </div>
                             )
                           }
 
-                          console.log(`[v0] Rendering PO ${index + 1}:`, {
-                            id: po.id,
-                            orderNumber: po.orderNumber,
-                            hasSupplier: !!po.supplier,
-                            hasLocation: !!po.location,
-                            hasLines: po.lines?.length > 0,
-                            status: po.status,
-                            total: po.total,
-                          })
-
+                          // Get recent orders (latest first)
+                          const recentOrders = purchaseOrders
+                            .sort(
+                              (a, b) =>
+                                new Date(b?.createdAt ?? 0).getTime() - new Date(a?.createdAt ?? 0).getTime()
+                            )
+                            .slice(0, 5)
+                          console.log({ recentOrders })
                           return (
-                            <PurchaseOrderCard
-                              key={po.id}
-                              po={po}
-                              isSelected={false}
-                              onSelect={() => {
-                                console.log("[v0] Selected PO:", po.orderNumber)
-                                // Could add navigation logic here
-                              }}
-                            />
+                            <>
+                              {recentOrders.map((po) => (
+                                <PurchaseOrderCard
+                                  key={po.id}
+                                  po={po}
+                                  isSelected={false}
+                                  onSelect={() => {
+                                    console.log("Selected PO:", po.orderNumber)
+                                    // You can add navigation logic here if needed
+                                  }}
+                                />
+                              ))}
+
+                              {purchaseOrders.length > 5 && (
+                                <div className="text-center pt-4 border-t">
+                                  <Link href="/dashboard/purchase-orders">
+                                    <Button variant="outline" size="sm">
+                                      View All Orders ({purchaseOrders.length})
+                                    </Button>
+                                  </Link>
+                                </div>
+                              )}
+                            </>
                           )
-                        })
-                      })()}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-
-              <div className="space-y-6">
-                <InventoryOverview locationId={selectedLocationId} organizationId={orgId} />
-
-                <Card className="bg-white/95 backdrop-blur-xl border-emerald-200/50 shadow-2xl ring-2 ring-teal-300/40">
-                  <CardHeader className="bg-gradient-to-r from-emerald-100 via-teal-100 to-cyan-100 border-b border-teal-200/50">
-                    <CardTitle className="flex items-center gap-2">
-                      <AlertTriangle className="h-5 w-5 text-amber-600" />
-                      Attention Required
-                    </CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-3">
-                      {(() => {
-                        const attentionOrders = (
-                          selectedLocationId
-                            ? purchaseOrders.filter((po) => po.locationId === selectedLocationId)
-                            : purchaseOrders
-                        ).filter((po) => po.status === "SUBMITTED")
-
-                        if (attentionOrders.length === 0) {
-                          return (
-                            <p className="text-sm text-muted-foreground text-center py-4">
-                              {selectedLocationId
-                                ? "No items requiring attention for selected location"
-                                : "No items requiring attention"}
-                            </p>
-                          )
-                        }
-
-                        return attentionOrders.map((po) => (
-                          <div
-                            key={po.id}
-                            className="flex items-center justify-between p-3 border rounded-lg bg-amber-50/50 border-amber-200/50"
-                          >
-                            <div>
-                              <p className="font-medium text-slate-800">{po.orderNumber}</p>
-                              <p className="text-sm text-amber-700">Pending approval</p>
-                            </div>
-                            <Badge variant="secondary" className="bg-amber-100 text-amber-800 border-amber-300">
-                              Pending
-                            </Badge>
-                          </div>
-                        ))
-                      })()}
-                    </div>
+                        })()}
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               </div>
-            </div>
-          </TabsContent> */}
-// In your PurchaseOrderDashboard component, replace the Overview tab content:
+              {/* </div> */}
+              {/* <div className="grid grid-cols-1 lg:grid-cols-4 gap-2"> */}
+              <div className="lg:col-span-3">
 
-          <TabsContent value="overview" className="space-y-6">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <Card className="bg-white/95 backdrop-blur-xl border-emerald-200/50 shadow-2xl ring-2 ring-teal-300/40">
-                <CardHeader className="bg-gradient-to-r from-emerald-100 via-teal-100 to-cyan-100 border-b border-teal-200/50">
-                  <CardTitle className="flex items-center gap-2">
-                    <ShoppingCart className="h-5 w-5 text-emerald-700" />
-                    Recent Purchase Orders
-                  </CardTitle>
-                  <CardDescription>
-                    Latest orders {selectedLocationId ? `for ${locations.find(l => l.id === selectedLocationId)?.name || 'selected location'}` : 'across all locations'}
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  {loading ? (
-                    <div className="flex items-center justify-center h-32">
-                      <RefreshCw className="h-6 w-6 animate-spin text-muted-foreground" />
-                      <span className="ml-2 text-muted-foreground">Loading purchase orders...</span>
-                    </div>
-                  ) : error ? (
-                    <div className="text-center p-4 text-red-600">
-                      <AlertTriangle className="h-8 w-8 mx-auto mb-2" />
-                      <p className="font-medium">Error loading purchase orders</p>
-                      <p className="text-sm mt-1">{error}</p>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        // onClick={() => fetchPurchaseOrders()}
-                        className="mt-2"
-                      >
-                        <RefreshCw className="h-4 w-4 mr-2" />
-                        Retry
-                      </Button>
-                    </div>
-                  ) : (
-                    <div className="space-y-4">
-                      {(() => {
-                        // Filter orders by location if selected
-                        const filteredOrders = selectedLocationId
-                          ? purchaseOrders.filter(po => po.locationId === selectedLocationId)
-                          : purchaseOrders
+                <div className="space-y-6">
+                  <InventoryOverview locationId={selectedLocationId} organizationId={orgId} locationName={locationName} />
 
-                        console.log("[DEBUG] Overview Tab Filtering:", {
-                          totalOrders: purchaseOrders.length,
-                          filteredOrders: filteredOrders.length,
-                          selectedLocationId,
-                          hasLocationFilter: !!selectedLocationId,
-                          sampleOrders: filteredOrders.slice(0, 2).map(po => ({
-                            id: po.id,
-                            orderNumber: po.orderNumber,
-                            locationId: po.locationId,
-                            status: po.status
-                          }))
-                        })
-
-                        if (filteredOrders.length === 0) {
-                          return (
-                            <div className="text-center p-8 text-muted-foreground">
-                              <div className="w-16 h-16 mx-auto bg-slate-100 rounded-full flex items-center justify-center mb-4">
-                                <ShoppingCart className="w-8 h-8 text-slate-400" />
+                  {/* Attention Required Card */}
+                  <Card className="bg-white/95 backdrop-blur-xl border-emerald-200/50 shadow-2xl ring-2 ring-teal-300/40">
+                    <CardHeader className="bg-gradient-to-r from-emerald-100 via-teal-100 to-cyan-100 border-b border-teal-200/50">
+                      <CardTitle className="flex items-center gap-2">
+                        <AlertTriangle className="h-5 w-5 text-amber-600" />
+                        Attention Required
+                      </CardTitle>
+                      <CardDescription>Orders needing your action</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-3">
+                        {(() => {
+                          if (loading) {
+                            return (
+                              <div className="flex items-center justify-center h-20">
+                                <RefreshCw className="h-4 w-4 animate-spin text-muted-foreground mr-2" />
+                                <span className="text-sm text-muted-foreground">Loading...</span>
                               </div>
-                              <p className="font-medium mb-2">
-                                {selectedLocationId ? "No purchase orders for this location" : "No purchase orders found"}
-                              </p>
-                              <p className="text-sm text-slate-500">
-                                {selectedLocationId
-                                  ? "Try selecting a different location or create a new purchase order."
-                                  : "Create your first purchase order to get started."
-                                }
-                              </p>
-                              {purchaseOrders.length > 0 && filteredOrders.length === 0 && selectedLocationId && (
-                                <p className="text-xs text-amber-600 mt-2">
-                                  Note: There are {purchaseOrders.length} orders in other locations
+                            )
+                          }
+
+                          if (error) {
+                            return (
+                              <div className="text-center text-red-600 py-4">
+                                <AlertTriangle className="h-6 w-6 mx-auto mb-2" />
+                                <p className="text-sm">Error loading data</p>
+                              </div>
+                            )
+                          }
+
+                          const attentionOrders = purchaseOrders.filter(po =>
+                            ["SUBMITTED", "DRAFT"].includes(po.status)
+                          ).slice(0, 3) // Limit to 3 items
+
+                          if (attentionOrders.length === 0) {
+                            return (
+                              <div className="text-center py-6 text-muted-foreground">
+                                <CheckCircle className="h-8 w-8 mx-auto mb-2 text-green-500" />
+                                <p className="text-sm">All caught up! No actions required.</p>
+                              </div>
+                            )
+                          }
+
+                          return attentionOrders.map((po) => (
+                            <div
+                              key={po.id}
+                              className="flex items-center justify-between p-3 border rounded-lg bg-amber-50/50 border-amber-200/50"
+                            >
+                              <div className="flex-1">
+                                <p className="font-medium text-slate-800">{po.orderNumber}</p>
+                                <p className="text-sm text-amber-700 capitalize">{po.status.toLowerCase()} • {po.supplier?.name}</p>
+                                <p className="text-xs text-slate-500 mt-1">
+                                  ${po.total.toLocaleString()} • {po.location?.name}
                                 </p>
-                              )}
-                              <Link href="/dashboard/purchase-orders/new">
-                                <Button size="sm" className="mt-4">
-                                  <Plus className="h-4 w-4 mr-2" />
-                                  Create Purchase Order
-                                </Button>
-                              </Link>
-                            </div>
-                          )
-                        }
-
-                        // Get recent orders (latest first)
-                        const recentOrders = filteredOrders
-                          .sort(
-                            (a, b) =>
-                              new Date(b?.createdAt ?? 0).getTime() - new Date(a?.createdAt ?? 0).getTime()
-                          )
-                          .slice(0, 5)
-
-                        return (
-                          <>
-                            {recentOrders.map((po) => (
-                              <PurchaseOrderCard
-                                key={po.id}
-                                po={po}
-                                isSelected={false}
-                                onSelect={() => {
-                                  console.log("Selected PO:", po.orderNumber)
-                                  // You can add navigation logic here if needed
-                                }}
-                              />
-                            ))}
-
-                            {filteredOrders.length > 5 && (
-                              <div className="text-center pt-4 border-t">
-                                <Link href="/dashboard/purchase-orders">
-                                  <Button variant="outline" size="sm">
-                                    View All Orders ({filteredOrders.length})
-                                  </Button>
-                                </Link>
                               </div>
-                            )}
-                          </>
-                        )
-                      })()}
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-
-              <div className="space-y-6">
-                <InventoryOverview locationId={selectedLocationId} organizationId={orgId} />
-
-                {/* Attention Required Card */}
-                <Card className="bg-white/95 backdrop-blur-xl border-emerald-200/50 shadow-2xl ring-2 ring-teal-300/40">
-                  <CardHeader className="bg-gradient-to-r from-emerald-100 via-teal-100 to-cyan-100 border-b border-teal-200/50">
-                    <CardTitle className="flex items-center gap-2">
-                      <AlertTriangle className="h-5 w-5 text-amber-600" />
-                      Attention Required
-                    </CardTitle>
-                    <CardDescription>Orders needing your action</CardDescription>
-                  </CardHeader>
-                  <CardContent>
-                    <div className="space-y-3">
-                      {(() => {
-                        if (loading) {
-                          return (
-                            <div className="flex items-center justify-center h-20">
-                              <RefreshCw className="h-4 w-4 animate-spin text-muted-foreground mr-2" />
-                              <span className="text-sm text-muted-foreground">Loading...</span>
+                              <Badge variant="secondary" className="bg-amber-100 text-amber-800 border-amber-300">
+                                {po.status === "SUBMITTED" ? "Pending Approval" : "Draft"}
+                              </Badge>
                             </div>
-                          )
-                        }
-
-                        if (error) {
-                          return (
-                            <div className="text-center text-red-600 py-4">
-                              <AlertTriangle className="h-6 w-6 mx-auto mb-2" />
-                              <p className="text-sm">Error loading data</p>
-                            </div>
-                          )
-                        }
-
-                        const attentionOrders = purchaseOrders.filter(po =>
-                          ["SUBMITTED", "DRAFT"].includes(po.status)
-                        ).slice(0, 3) // Limit to 3 items
-
-                        if (attentionOrders.length === 0) {
-                          return (
-                            <div className="text-center py-6 text-muted-foreground">
-                              <CheckCircle className="h-8 w-8 mx-auto mb-2 text-green-500" />
-                              <p className="text-sm">All caught up! No actions required.</p>
-                            </div>
-                          )
-                        }
-
-                        return attentionOrders.map((po) => (
-                          <div
-                            key={po.id}
-                            className="flex items-center justify-between p-3 border rounded-lg bg-amber-50/50 border-amber-200/50"
-                          >
-                            <div className="flex-1">
-                              <p className="font-medium text-slate-800">{po.orderNumber}</p>
-                              <p className="text-sm text-amber-700 capitalize">{po.status.toLowerCase()} • {po.supplier?.name}</p>
-                              <p className="text-xs text-slate-500 mt-1">
-                                ${po.total.toLocaleString()} • {po.location?.name}
-                              </p>
-                            </div>
-                            <Badge variant="secondary" className="bg-amber-100 text-amber-800 border-amber-300">
-                              {po.status === "SUBMITTED" ? "Pending Approval" : "Draft"}
-                            </Badge>
-                          </div>
-                        ))
-                      })()}
-                    </div>
-                  </CardContent>
-                </Card>
+                          ))
+                        })()}
+                      </div>
+                    </CardContent>
+                  </Card>
+                </div>
               </div>
             </div>
           </TabsContent>
           <TabsContent value="inventory">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <InventoryOverview locationId={selectedLocationId} organizationId={orgId} />
+              <InventoryOverview locationId={selectedLocationId} organizationId={orgId} locationName={locationName} />
               <RecentTransactions locationId={selectedLocationId} />
             </div>
           </TabsContent>
@@ -1533,6 +1365,6 @@ export default function PurchaseOrderDashboard() {
           </TabsContent>
         </Tabs>
       </div>
-    </div>
+    </div >
   )
 }

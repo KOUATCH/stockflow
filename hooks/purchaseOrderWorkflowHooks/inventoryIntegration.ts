@@ -2,6 +2,12 @@
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { toast } from "sonner"
+import {
+  getInventoryLevels,
+  getInventoryTransactions,
+  reserveInventory,
+  releaseInventory
+} from "@/actions/inventory"
 
 export type InventoryLevel = {
   id: string
@@ -47,27 +53,28 @@ export function useInventoryIntegration(organizationId?: string) {
   const queryClient = useQueryClient()
 
   // Get inventory levels for organization
-  const { data: inventoryLevels, isLoading: isLoadingLevels } = useQuery({
+  const { data: inventoryLevelsResult, isLoading: isLoadingLevels } = useQuery({
     queryKey: ["inventory", "levels", organizationId],
     queryFn: async () => {
-      // This would call your inventory server action
-      const response = await fetch(`/api/inventory/levels?organizationId=${organizationId}`)
-      if (!response.ok) throw new Error("Failed to fetch inventory levels")
-      return response.json() as unknown as InventoryLevel[]
+      if (!organizationId) throw new Error("Organization ID is required")
+      return await getInventoryLevels(organizationId)
     },
     enabled: !!organizationId,
   })
 
+  const inventoryLevels = inventoryLevelsResult?.data
+
   // Get inventory transactions
-  const { data: transactions, isLoading: isLoadingTransactions } = useQuery({
+  const { data: transactionsResult, isLoading: isLoadingTransactions } = useQuery({
     queryKey: ["inventory", "transactions", organizationId],
     queryFn: async () => {
-      const response = await fetch(`/api/inventory/transactions?organizationId=${organizationId}`)
-      if (!response.ok) throw new Error("Failed to fetch inventory transactions")
-      return response.json() as unknown as InventoryTransaction[]
+      if (!organizationId) throw new Error("Organization ID is required")
+      return await getInventoryTransactions(organizationId)
     },
     enabled: !!organizationId,
   })
+
+  const transactions = transactionsResult?.data
 
   // Get inventory level for specific item/location
   const getInventoryLevel = (itemId: string, locationId: string): InventoryLevel | undefined => {
@@ -98,17 +105,15 @@ export function useInventoryIntegration(organizationId?: string) {
   // Reserve inventory for purchase order
   const reserveInventoryMutation = useMutation({
     mutationFn: async (reservations: { itemId: string; locationId: string; quantity: number }[]) => {
-      const response = await fetch("/api/inventory/reserve", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ reservations, organizationId }),
-      })
-      if (!response.ok) throw new Error("Failed to reserve inventory")
-      return response.json()
+      return await reserveInventory(reservations)
     },
-    onSuccess: () => {
-      toast.success("Inventory reserved successfully")
-      invalidateInventoryQueries()
+    onSuccess: (result) => {
+      if (result.success) {
+        toast.success("Inventory reserved successfully")
+        invalidateInventoryQueries()
+      } else {
+        toast.error(`Failed to reserve inventory: ${result.error}`)
+      }
     },
     onError: (error) => {
       toast.error(`Failed to reserve inventory: ${error.message}`)
@@ -118,17 +123,15 @@ export function useInventoryIntegration(organizationId?: string) {
   // Release inventory reservations
   const releaseInventoryMutation = useMutation({
     mutationFn: async (reservations: { itemId: string; locationId: string; quantity: number }[]) => {
-      const response = await fetch("/api/inventory/release", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ reservations, organizationId }),
-      })
-      if (!response.ok) throw new Error("Failed to release inventory")
-      return response.json()
+      return await releaseInventory(reservations)
     },
-    onSuccess: () => {
-      toast.success("Inventory reservations released")
-      invalidateInventoryQueries()
+    onSuccess: (result) => {
+      if (result.success) {
+        toast.success("Inventory reservations released")
+        invalidateInventoryQueries()
+      } else {
+        toast.error(`Failed to release inventory: ${result.error}`)
+      }
     },
     onError: (error) => {
       toast.error(`Failed to release inventory: ${error.message}`)

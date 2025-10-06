@@ -3,7 +3,7 @@
 import type { Prisma } from "@prisma/client"
 import { revalidatePath, revalidateTag } from "next/cache"
 
-import { getAuthenticatedUser } from "@/config/useAuth"
+import { getAuthenticatedUser } from "@/lib/auth-server"
 import { can, type Action } from "@/lib/permissions"
 import { db } from "@/prisma/db"
 import type {

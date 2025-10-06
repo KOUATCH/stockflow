@@ -13,7 +13,7 @@ const getBriefOrgItems = async (orgId:string) => {
     // if (!user) {
     //   throw new Error("User not authenticated");
     // }
-    // const userOrg = user?.organizationId || user?.organizationId;
+    // const userOrg = user.organizationId || user.organizationId;
     // if (!userOrg) {
     //   throw new Error("User does not belong to an organization");
     // }

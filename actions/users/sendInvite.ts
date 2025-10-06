@@ -2,7 +2,7 @@
 "use server";
 import UserInvitation from "@/components/email-templates/user-invite";
 import { InviteData } from "@/components/Forms/users/userInvitationForm";
-import { getAuthenticatedUser } from "@/config/useAuth";
+import { getAuthenticatedUser } from "@/lib/auth-server";
 import { db } from "@/prisma/db";
 import { Resend } from "resend";
 

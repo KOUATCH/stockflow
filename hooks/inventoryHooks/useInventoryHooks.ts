@@ -1,9 +1,9 @@
 "use client"
 
 import {
-  getInventoryLevels,
-  getInventoryTransactions,
-} from "@/actions/inventory/get-inventory-data"
+  getInventoryLevelsClientSafe,
+  getInventoryTransactionsClientSafe,
+} from "@/actions/inventory/clientSafeInventoryData"
 import {
   createItem,
   createStockAdjustment,
@@ -103,7 +103,7 @@ export function useInventoryLevels(organizationId?: string, locationId?: string)
   return useQuery({
     queryKey: inventoryKeys.levels(organizationId, { locationId }),
     queryFn: async () => {
-      const result = await getInventoryLevels(locationId)
+      const result = await getInventoryLevelsClientSafe(organizationId, locationId)
       if (!result.success) throw new Error(result.error || "Failed to fetch inventory levels")
       return result.data
     },
@@ -140,7 +140,7 @@ export function useInventoryTransactions(organizationId?: string, itemId?: strin
   return useQuery({
     queryKey: inventoryKeys.transactions(organizationId, { itemId, locationId }),
     queryFn: async () => {
-      const result = await getInventoryTransactions(itemId, locationId, 50)
+      const result = await getInventoryTransactionsClientSafe(organizationId, itemId, locationId, 50)
       if (!result.success) throw new Error(result.error || "Failed to fetch inventory transactions")
       return result.data
     },

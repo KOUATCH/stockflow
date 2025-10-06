@@ -1,26 +1,26 @@
-"use server";
-import VerifyEmail from "@/components/email-templates/verify-email";
-import { OrgDataProps } from "@/components/Forms/RegisterForm";
-import { adminPermissions } from "@/config/permissions";
-import { generateOtp } from "@/lib/generateOtp";
-import { db } from "@/prisma/db";
-import { UserProps } from "@/types/types";
-import bcrypt from "bcryptjs";
-import { Resend } from "resend";
+"use server"
 
-// import { generateNumericToken } from "@/lib/token";
-const resend = new Resend(process.env.RESEND_API_KEY);
-const baseUrl = process.env.NEXT_PUBLIC_BASE_URL;
+import VerifyEmail from "@/components/email-templates/verify-email"
+// import { adminPermissions } from "@/config/permissions"
+import { hashPassword } from "@/lib/argon2-server"
+import { generateOtp } from "@/lib/generateOtp"
+import { db } from "@/prisma/db"
+import type { OrgDataProps, UserProps } from "@/types/types"
+import { Resend } from "resend"
+
+const resend = new Resend(process.env.RESEND_API_KEY)
 
 const ADMIN_USER_ROLE = {
   name: "Admin",
   description: "Default Admin role with all permissions",
-  permissions: adminPermissions,
-  // organization:""
-};
+  permissions: [], // Provide an array of permission strings, e.g. ["read", "write", "delete"]
+}
 
+/**
+ * Creates a new user with organization and default admin role
+ */
 const createUser = async (data: UserProps, orgData: OrgDataProps) => {
-  const { email, password, firstName, lastName, name, phone, image } = data;
+  const { email, password, firstName, lastName, name, phone, image } = data
 
   try {
     // Use a transaction for atomic operations
@@ -28,64 +28,72 @@ const createUser = async (data: UserProps, orgData: OrgDataProps) => {
       // Check for existing users
       const existingUserByEmail = await tx.user.findUnique({
         where: { email },
-      });
-
-      const existingUserByPhone = await tx.user.findUnique({
-        where: { phone },
-      });
+      })
 
       if (existingUserByEmail) {
         return {
           error: `This email ${email} is already in use`,
           status: 409,
           data: null,
-        };
+        }
       }
+
+      const existingUserByPhone = await tx.user.findUnique({
+        where: { phone },
+      })
 
       if (existingUserByPhone) {
         return {
-          error: `This Phone number ${phone} is already in use`,
+          error: `This phone number ${phone} is already in use`,
           status: 409,
           data: null,
-        };
+        }
       }
 
-      // Create  an Organization
+      // Check for existing organization
       const existingOrg = await tx.organization.findUnique({
         where: { slug: orgData.slug },
-      });
+      })
+
       if (existingOrg) {
         return {
-          error: `This organization name ${orgData.slug} already exists, so it is not available`,
+          error: `This organization name is not available. Please choose a different name.`,
           status: 409,
           data: null,
-        };
+        }
       }
-      console.log("Creating an Organization...");
-      const org = await tx.organization.create({ data: orgData })
-      // Find or create default role
 
-      // Find or create default admin  role
+      // Create organization
+      console.log("Creating organization...")
+      const org = await tx.organization.create({
+        data: orgData,
+      })
+
+      // Find or create default admin role
       let defaultRole = await tx.role.findFirst({
-        where: { name: ADMIN_USER_ROLE.name },
-      });
+        where: {
+          name: ADMIN_USER_ROLE.name,
+          organizationId: org.id,
+        },
+      })
 
       // Create default role if it doesn't exist
       if (!defaultRole) {
         defaultRole = await tx.role.create({
           data: {
             ...ADMIN_USER_ROLE,
-            code:"",
-            organizationId: org.id
+            code: "ADMIN",
+            organizationId: org.id,
+            permissions: ADMIN_USER_ROLE.permissions, // Ensure this is a string array
           },
-        });
+        })
       }
 
       // Hash password
-      const hashedPassword = await bcrypt.hash(password, 10);
+      const hashedPassword = await hashPassword(password)
 
-      //  generate a 6-digit token for otp then add it to the User
-      const token = generateOtp();
+      // Generate OTP for email verification
+      const token = generateOtp()
 
       // Create user with role
       const newUser = await tx.user.create({
@@ -98,9 +106,8 @@ const createUser = async (data: UserProps, orgData: OrgDataProps) => {
           token,
           name,
           phone,
-          image,
-          isVerified: true,
-          // Add the default role to the user   
+          image: image || "",
+          isVerified: false, // Set to false to require email verification
           roles: {
             connect: {
               id: defaultRole.id,
@@ -108,38 +115,50 @@ const createUser = async (data: UserProps, orgData: OrgDataProps) => {
           },
         },
         include: {
-          roles: true, // Include roles in the response
+          roles: true,
         },
-      });
-      // send verification email
+      })
+
+      // Send verification email
       const verificationCode = newUser?.token ?? ""
 
-      const { data, error } = await resend.emails.send({
-        // from:"PosInvent <kouatch@posinvent.com>",
-        from: "onboarding@resend.dev",
-        to: email,
-        subject: "Verify your account.",
-        react: VerifyEmail({ verificationCode })
-      })
-      if (error) {
-        console.log({ error })
+      try {
+        const { data: emailData, error: emailError } = await resend.emails.send({
+          from: process.env.RESEND_FROM_EMAIL || "onboarding@resend.dev",
+          to: email,
+          subject: "Verify your StockFlow account",
+          react: VerifyEmail({ verificationCode }),
+        })
+
+        if (emailError) {
+          console.error("Email sending error:", emailError)
+          // Don't fail the registration if email fails
+        } else {
+          console.log("Verification email sent:", emailData)
+        }
+      } catch (emailError) {
+        console.error("Failed to send verification email:", emailError)
+        // Continue with registration even if email fails
       }
-      console.log({ data })
+
       return {
         error: null,
         status: 200,
-        data: { id: newUser?.id, email: newUser?.email },
-      };
-    });
+        data: {
+          id: newUser?.id,
+          email: newUser?.email,
+          organizationId: org.id,
+        },
+      }
+    })
   } catch (error) {
-    console.error("Error creating user:", error);
+    console.error("Error creating user:", error)
     return {
-      error: `Something went wrong, Please try again`,
+      error: `Something went wrong. Please try again.`,
       status: 500,
       data: null,
-    };
+    }
   }
 }
 
 export default createUser
-

@@ -14,7 +14,7 @@ import { usePosStations } from "@/hooks/posStation/use-pos-terminals"
 import { useOrgLocationsNew } from "@/hooks/useAllLocationsQueries"
 import { POSSessionStatus } from "@/lib/newPOSSession/types"
 import { Activity, Bug, Database, Monitor, Settings, Terminal } from "lucide-react"
-import { useSession } from "next-auth/react"
+import { useClientAuth } from "@/hooks/useClientAuth"
 import { useEffect, useMemo, useState } from "react"
 
 export default function HomePage() {
@@ -35,13 +35,12 @@ export default function HomePage() {
   } | null>(null)
 
 
-  const authSession = useSession()
-  const user = authSession?.data?.user
-  const mockOrganizationId = user?.organizationId || "org_123"
+  const { user, organizationId } = useClientAuth()
+  const mockOrganizationId = organizationId || "org_123"
 
   const mockUserId = user?.id || "user_123"
   const mockUserName = user?.name || "John Doe"
-  const orgId = user?.organizationId || "org_123"
+  const orgId = organizationId || "org_123"
 
   // const { data: locations, isLoading: locationsLoading } = useLocationsByOrganization(orgId)
   const userId = user?.id

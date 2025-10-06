@@ -1,6 +1,6 @@
 "use server"
 
-import { getAuthenticatedUser } from "@/config/useAuth"
+import { getAuthenticatedUser } from "@/lib/auth-server"
 import { db } from "@/prisma/db"
 import type { CreatePurchaseOrderPayload, OrderLineInput, PurchaseOrderResponse, PurchaseOrderWithRelations, UpdatePurchaseOrderDTO } from "@/types/purchase-orders-system-types"
 import { Prisma, type GoodsReceiptStatus, type PurchaseOrderStatus } from "@prisma/client"

@@ -1,8 +1,7 @@
 import { getBlogById, getBlogCategories } from "@/actions/blogs";
 import BlogEditForm from "@/components/dashboard/blogs/blog-edit-form";
 
-import { authOptions } from "@/config/auth";
-import { getServerSession } from "next-auth";
+import { auth } from "@/lib/auth";
 import React from "react";
 
 export default async function page({
@@ -13,7 +12,9 @@ export default async function page({
   const id = (await params).id;
   const blog = await getBlogById(id);
   const categories = (await getBlogCategories()) || [];
-  const session = await getServerSession(authOptions);
+  const session = await auth.api.getSession({
+    headers: await import("next/headers").then(m => m.headers())
+  });
   const userId = session?.user.id ?? "";
   const blogCategories = categories.map((item) => {
     return {

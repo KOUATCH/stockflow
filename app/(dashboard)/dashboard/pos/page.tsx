@@ -18,7 +18,7 @@ import {
   useStartPOSSession
 } from '@/hooks/usePOSQueries'
 import { Banknote, BarChart3, Calendar, Clock, CreditCard, DollarSign, Download, Monitor, Play, RefreshCw, ShoppingCart, Smartphone, Square, TrendingUp } from 'lucide-react'
-import { useSession } from 'next-auth/react'
+import { useSession } from '@/lib/auth-client'
 import { useEffect, useState } from 'react'
 
 import { useOrgLocationsNew } from "@/hooks/useAllLocationsQueries"
@@ -33,7 +33,7 @@ export default function POSPage() {
   const [activeView, setActiveView] = useState<'dashboard' | 'pos'>('dashboard')
   const [selectedLocationId, setSelectedLocationId] = useState<string>('')
 
-  const userSession = useSession()
+  const { session, user, organizationId } = useClientAuth()
   const user = userSession?.data?.user
   const ORGANIZATION_ID = user?.organizationId
 

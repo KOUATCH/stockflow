@@ -10,12 +10,12 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { AlertTriangle, BarChart3, CaseLower as CashRegister, DollarSign, TrendingUp, Users } from "lucide-react"
-import { useSession } from "next-auth/react"
+import { useClientAuth } from "@/hooks/useClientAuth"
 
 export default function HomePage() {
   // const { user, isAuthenticated } = useAuth()
   const [activeTab, setActiveTab] = useState("overview")
-  const session = useSession()
+  const { session, user, organizationId } = useClientAuth()
   const organizationId = session.data?.user?.organizationId ?? ""
   const user = session.data?.user
 

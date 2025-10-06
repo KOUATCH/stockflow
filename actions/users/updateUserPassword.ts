@@ -2,7 +2,7 @@
 import { PasswordProps } from "@/components/Forms/ChangePasswordForm";
 import { adminPermissions } from "@/config/permissions";
 import { db } from "@/prisma/db";
-import bcrypt, { compare } from "bcryptjs";
+import { hashPassword, verifyPassword } from "@/lib/argon2-server";
 import { revalidatePath } from "next/cache";
 import { Resend } from "resend";
 
@@ -40,12 +40,12 @@ export async function updateUserPassword(id: string, data: PasswordProps) {
   //Check if Password is correct
   if (existingUser && existingUser.password) {
     // if user exists and password exists
-    passwordMatch = await compare(data.oldPassword, existingUser.password);
+    passwordMatch = await verifyPassword(existingUser.password, data.oldPassword);
   }
   if (!passwordMatch) {
     return { error: "Old Password Incorrect", status: 403 };
   }
-  const hashedPassword = await bcrypt.hash(data.newPassword, 10);
+  const hashedPassword = await hashPassword(data.newPassword);
   try {
     const updatedUser = await db.user.update({
       where: {
@@ -79,7 +79,7 @@ export async function resetUserPassword(
       data: null,
     };
   }
-  const hashedPassword = await bcrypt.hash(newPassword, 10);
+  const hashedPassword = await hashPassword(newPassword);
   try {
     const updatedUser = await db.user.update({
       where: {

@@ -2,14 +2,14 @@
 
 "use server"
 
-import { getAuthenticatedUser } from "@/config/useAuth"
+import { getAuthenticatedUser } from "@/lib/auth-server"
 import { db } from "@/prisma/db"
 import type { Customer, CustomerWithStats } from "@/types/customerTypes"
 import type { CustomerEditFormData, CustomerFormData } from "@/validations/customer"
 
 export async function getCustomers(): Promise<CustomerWithStats[]> {
   const user = await getAuthenticatedUser()
-  const userOrgId = user?.organizationId
+  const userOrgId = user.organizationId
   const customers = await db.customer.findMany({
     where: {
       organizationId:userOrgId,
@@ -42,7 +42,7 @@ export async function getCustomers(): Promise<CustomerWithStats[]> {
 
 export async function getCustomer(id: string, organizationId?: string): Promise<Customer | null> {
   const user = await getAuthenticatedUser()
-  const userOrgId = organizationId || user?.organizationId
+  const userOrgId = organizationId || user.organizationId
 
   if (!userOrgId) {
     throw new Error("Organization ID is required")
@@ -66,7 +66,7 @@ export async function getCustomer(id: string, organizationId?: string): Promise<
 export async function createCustomer(data: CustomerFormData): Promise<Customer> {
 
   const user = await getAuthenticatedUser()
-  const userOrgId = user?.organizationId
+  const userOrgId = user.organizationId
   const customer = await db.customer.create({
     data: {
       ...data,
@@ -84,7 +84,7 @@ export async function createCustomer(data: CustomerFormData): Promise<Customer> 
 export async function updateCustomer(data: CustomerEditFormData): Promise<Customer> {
   
   const user = await getAuthenticatedUser()
-  const userOrgId = user?.organizationId
+  const userOrgId = user.organizationId
   const updated = await db.customer.updateMany({
     where: {
       id: data.id,
@@ -125,7 +125,7 @@ export async function updateCustomer(data: CustomerEditFormData): Promise<Custom
 
 export async function getCustomerOrders(customerId: string) {
   const user = await getAuthenticatedUser()
-  const userOrgId = user?.organizationId
+  const userOrgId = user.organizationId
 
   if (!userOrgId) {
     throw new Error("Organization ID is required")
@@ -181,7 +181,7 @@ export async function getCustomerOrders(customerId: string) {
 
 export async function deleteCustomer(id: string): Promise<void> {
   const user = await getAuthenticatedUser()
-  const userOrgId = user?.organizationId
+  const userOrgId = user.organizationId
 
   await db.customer.delete({
     where: {

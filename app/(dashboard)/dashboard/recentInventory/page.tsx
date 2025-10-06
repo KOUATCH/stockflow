@@ -1,6 +1,5 @@
 
 
-"use server"
 
 import getOrgItemsWithInventoryLevels from '@/actions/itemsShow/getOrgItemsWithInventoryLevels';
 import InventoryOverview from '@/components/recentInventory/InventoryOverview';

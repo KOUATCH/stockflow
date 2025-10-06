@@ -1,6 +1,6 @@
 "use server"
 
-import { getAuthenticatedUser } from "@/config/useAuth"
+import { getAuthenticatedUser } from "@/lib/auth-server"
 import { db } from "@/prisma/db"
 import type {
   CreatePurchaseOrderPayload,
@@ -560,7 +560,7 @@ function transformPurchaseOrder(po: any): PurchaseOrderWithRelations {
 export async function getOrgPurchaseOrders(organizationId: string) {
   try {
     const user = await getAuthenticatedUser()
-    if (!user?.organizationId) {
+    if (!user.organizationId) {
       throw new Error("User not authenticated or organization not found")
     }
 
@@ -598,7 +598,7 @@ export async function getOrgPurchaseOrders(organizationId: string) {
 export async function getOrgPurchaseOrderBYLocationId(organizationId: string, locationId: string) {
   try {
     const user = await getAuthenticatedUser()
-    if (!user?.organizationId) {
+    if (!user.organizationId) {
       throw new Error("User not authenticated or organization not found")
     }
 

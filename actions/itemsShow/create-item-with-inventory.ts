@@ -1,37 +1,12 @@
 'use server'
 
-import { getServerSession } from "next-auth";
 import { revalidatePath } from "next/cache";
 import { db } from "@/prisma/db";
 import { TransactionType, ItemCreateWithInventoryDTO } from "@/types/inventory";
 
-// Import your auth options - adjust this path based on your project structure
-// Try one of these imports based on where your auth config is located:
-// import { authOptions } from "@/lib/auth";
-// import { authOptions } from "@/config/auth";
-// import { authOptions } from "../../lib/auth";
-
-// For now, I'll create a function to get the session without importing authOptions
-// You can replace this with your actual authOptions import
-async function getAuthSession() {
-  // Replace this with: return await getServerSession(authOptions);
-  // For now, we'll use a basic session check
-  const session = await getServerSession();
-  return session;
-}
-
 const DEFAULT_IMAGE_URL = "https://14J7oh8kso.ufs.sh/f/HLxTbDBCDLwfAXaapcezIN7vwylKf1PXSCqAuseUG0gx8mhd";
 
-export async function createItemWithInventory(data: ItemCreateWithInventoryDTO) {
-  const session = await getAuthSession();
-  
-  if (!session?.user?.organizationId) {
-    return {
-      success: false,
-      error: "User not authenticated or missing organization",
-      data: null,
-    };
-  }
+export async function createItemWithInventory(data: ItemCreateWithInventoryDTO & { organizationId: string, userId: string }) {
 
   const {
     locationId,
@@ -51,7 +26,7 @@ export async function createItemWithInventory(data: ItemCreateWithInventoryDTO) 
     ...itemData,
     sku,
     slug,
-    organizationId: session.user.organizationId,
+    organizationId: data.organizationId,
     costPrice: Number(itemData.costPrice ?? 0),
     sellingPrice: Number(itemData.sellingPrice ?? 0),
     imageUrls: Array.isArray(itemData.imageUrls) ? itemData.imageUrls[0] || DEFAULT_IMAGE_URL : DEFAULT_IMAGE_URL,
@@ -63,7 +38,7 @@ export async function createItemWithInventory(data: ItemCreateWithInventoryDTO) 
       const existingItem = await tx.item.findUnique({
         where: {
           organizationId_sku: {
-            organizationId: session.user.organizationId,
+            organizationId: data.organizationId,
             sku: sku,
           },
         },
@@ -103,8 +78,8 @@ export async function createItemWithInventory(data: ItemCreateWithInventoryDTO) 
               notes: notes || `Initial stock for ${newItem.name}`,
               itemId: newItem.id,
               locationId,
-              organizationId: session.user.organizationId,
-              createdById: session.user.id,
+              organizationId: data.organizationId,
+              createdById: data.userId,
               batchNumber,
               expiryDate,
               serialNumbers: [],

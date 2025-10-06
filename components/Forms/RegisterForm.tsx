@@ -2,27 +2,19 @@
 import createUser from "@/actions/users/createUser";
 import countries from "@/contries";
 import { generateSlug } from "@/lib/generateSlug";
-import { UserProps } from "@/types/types";
+import { UserProps, OrgDataProps } from "@/types/types";
 import { Headset, Loader2, Lock, Mail, User, WarehouseIcon } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
-import { toast } from "sonner";
+import { useNotifications } from "../notifications/NotificationProvider";
 import FormSelectInput from "../FormInputs/FormSelectInput";
 import PasswordInput from "../FormInputs/PasswordInput";
 import SubmitButton from "../FormInputs/SubmitButton";
 import TextInput from "../FormInputs/TextInput";
 import CustomCarousel from "../frontend/custom-carousel";
 import Logo from "../global/Logo";
-
-export type OrgDataProps = {
-  name: string;
-  slug: string;
-  country: string;
-  currency: string | undefined;
-  timezone: string | undefined;
-}
 export default function RegisterForm() {
   const initialCountryCode = "CM";
   const initialCountry = countries.find((item) => item.code === initialCountryCode);
@@ -37,19 +29,18 @@ export default function RegisterForm() {
     reset,
   } = useForm<UserProps>();
   const router = useRouter();
+  const { formError, formSuccess } = useNotifications();
 
   async function onSubmit(data: UserProps) {
     setLoading(true);
     data.name = `${data.firstName} ${data.lastName}`;
     data.image =
       "https://utfs.io/f/59b606d1-9148-4f50-ae1c-e9d02322e834-2558r.png";
-    const country = countries.find((country) => country.value === selectedCountry.value)
     const orgData: OrgDataProps = {
       name: data.organizationName,
       slug: generateSlug(data.organizationName),
-      country: `${country?.label}-${country?.code}`,
-      currency: country?.value,
-      timezone: country?.timezone,
+      email: data.email,
+      phone: data.phone,
     }
     try {
       const res = await createUser(data, orgData);
@@ -57,19 +48,20 @@ export default function RegisterForm() {
       if (res.status === 409) {
         setLoading(false);
         setEmailErr(res.error);
+        formError("Registration", res.error, "Email address is already in use");
       } else if (res.status === 200) {
         setLoading(false);
-        toast.success("Account Created successfully", { description: "Your account has been created pending verification" });
+        formSuccess("Registration", "Your account has been created pending verification");
         router.push(`/verify/${res?.data?.id}?email=${res?.data?.email}`);
 
       } else {
         setLoading(false);
-        toast.error("Something went wrong", { description: "Error during Account creation, Please try again" });
+        formError("Registration", "Error during Account creation, Please try again", "Something went wrong during registration");
       }
     } catch (error) {
       setLoading(false);
       console.error("Network Error:", error);
-      toast.error("Its seems something is wrong, try again");
+      formError("Registration", "It seems something is wrong, try again", "Network connection error occurred");
     }
   }
   return (

@@ -1,35 +1,26 @@
 "use server";
 
-import { authOptions } from "@/lib/auth"; // Updated import path for authOptions
 import { db } from "@/prisma/db";
 import { ItemCreateDTO } from "@/types/item";
 import { TransactionType } from "@/types/inventory";
-import { getServerSession } from "next-auth";
 import { revalidatePath } from "next/cache";
 
 const DEFAULT_IMAGE_URL = "https://14J7oh8kso.ufs.sh/f/HLxTbDBCDLwfAXaapcezIN7vwylKf1PXSCqAuseUG0gx8mhd";
 
-const createActionItem = async (data: ItemCreateDTO & { 
+const createActionItem = async (data: ItemCreateDTO & {
   locationId?: string;
   initialQuantity?: number;
   unitCost?: number;
+  organizationId: string;
+  userId: string;
 }) => {
-  const session = await getServerSession(authOptions);
-  
-  if (!session?.user?.organizationId) {
-    return {
-      success: false,
-      error: "User not authenticated or missing organization",
-      data: null,
-    };
-  }
 
   // Remove quantity from the item data since it's not part of the Item model
   const { locationId, initialQuantity, unitCost, ...itemData } = data;
 
   const formattedData = {
     ...itemData,
-    organizationId: session.user.organizationId,
+    organizationId: data.organizationId,
     costPrice: Number(itemData.costPrice ?? 0),
     sellingPrice: Number(itemData.sellingPrice ?? 0),
     imageUrls: itemData.imageUrls?.[0] ?? DEFAULT_IMAGE_URL,
@@ -44,7 +35,7 @@ const createActionItem = async (data: ItemCreateDTO & {
       const existingItem = await tx.item.findUnique({
         where: {
           organizationId_sku: {
-            organizationId: session.user.organizationId,
+            organizationId: data.organizationId,
             sku: formattedData.sku,
           },
         },
@@ -88,8 +79,8 @@ const createActionItem = async (data: ItemCreateDTO & {
             notes: `Initial stock for ${newItem.name}`,
             itemId: newItem.id,
             locationId: locationId,
-            organizationId: session.user.organizationId,
-            createdById: session.user.id,
+            organizationId: data.organizationId,
+            createdById: data.userId,
             serialNumbers: [],
             balanceAfter: initialQuantity,
           },

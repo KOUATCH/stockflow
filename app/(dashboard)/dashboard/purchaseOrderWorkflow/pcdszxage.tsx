@@ -32,7 +32,7 @@ import {
   TrendingUp,
   Wallet
 } from "lucide-react"
-import { useSession } from "next-auth/react"
+import { useClientAuth } from "@/hooks/useClientAuth"
 import Link from "next/link"
 import { useEffect, useState } from "react"
 
@@ -122,8 +122,8 @@ interface DashboardStatsProps {
 }
 
 function DashboardStats({ purchaseOrders, locationId }: DashboardStatsProps) {
-  const { data: session, status } = useSession()
-  const orgId = session?.user?.organizationId || ""
+  const { session, status, user, organizationId, isAuthenticated, isLoading } = useClientAuth()
+  const orgId = user || ""
   const { stats: inventoryStats, loading: inventoryLoading } = useInventoryStats(orgId)
 
   // Filter purchase orders by location if locationId is provided
@@ -293,7 +293,7 @@ function DashboardStats({ purchaseOrders, locationId }: DashboardStatsProps) {
 }
 
 function WorkflowDemo({ locationId }: { locationId: string }) {
-  const { data: session, status } = useSession()
+  const { session, status, user, organizationId, isAuthenticated, isLoading } = useClientAuth()
   const user = session?.user
   const orgId = user?.organizationId || ""
   const [selectedPOId, setSelectedPOId] = useState<string>("")
@@ -567,8 +567,8 @@ function InventoryOverview({ organizationId, locationId }: InventoryOverviewProp
 }
 
 function RecentTransactions({ locationId }: { locationId?: string }) {
-  const { data: session, status } = useSession()
-  const userOrgId = session?.user?.organizationId || ""
+  const { session, status, user, organizationId, isAuthenticated, isLoading } = useClientAuth()
+  const userOrgId = user || ""
   const { data: transactions, isLoading: loading, error: queryError } = useInventoryTransactions(userOrgId, undefined, locationId)
   const error = queryError?.message || null
 
@@ -679,7 +679,7 @@ function RecentTransactions({ locationId }: { locationId?: string }) {
 
 export default function PurchaseOrderDashboard() {
   const [selectedLocationId, setSelectedLocationId] = useState<string>("")
-  const { data: session, status } = useSession()
+  const { session, status, user, organizationId, isAuthenticated, isLoading } = useClientAuth()
   const user = session?.user
   const orgId = user?.organizationId || ""
   const { purchaseOrders, loading, error } = useWorkflowData(orgId, selectedLocationId)

@@ -1,6 +1,6 @@
 'use client'
 
-import { getLocations } from '@/actions/inventory/get-inventory-data';
+import { getLocationsClientSafe } from '@/actions/inventory/clientSafeInventoryData';
 import { createItemWithInventory } from '@/actions/itemsShow/create-item-with-inventory';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -24,7 +24,7 @@ export function CreateItemForm({ onSuccess }: { onSuccess?: () => void }) {
   // Fetch locations on component mount
   useEffect(() => {
     const fetchLocations = async () => {
-      const result = await getLocations();
+      const result = await getLocationsClientSafe();
       if (result.success && result.data) {
         setLocations(result.data);
       }

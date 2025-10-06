@@ -5,7 +5,7 @@ import { db } from "@/prisma/db";
 const getOrgTaxRates=async(organizationId: string)=> {
   try {
   //   const user =  await getAuthenticatedUser()
-  //  const  userOrg= user?.organizationId
+  //  const  userOrg= user.organizationId
     const taxRates = await db.taxRate.findMany({
       where:{
         organizationId:organizationId

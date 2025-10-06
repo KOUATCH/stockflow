@@ -9,7 +9,7 @@ import {
   updateInventoryLevels,
 } from "@/actions/pos/POSActionFinal"
 
-import { useToast } from "@/hooks/use-toast"
+import { useNotifications } from "@/components/notifications/NotificationProvider"
 import { useOrgLocationsNew } from "@/hooks/useAllLocationsQueries"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { useEffect, useState } from "react"
@@ -66,7 +66,7 @@ import {
   Volume2,
   Zap,
 } from "lucide-react"
-import { useSession } from "next-auth/react"
+import { useAuth } from "@/hooks/useAuth"
 
 // Define the Customer type
 interface Customer {
@@ -118,11 +118,10 @@ export function pOSStation({ organizationId }: { organizationId?: string }) {
     transactionCount: 18,
     avgTransaction: 136.15,
   })
-  const { toast } = useToast()
+  const { error, success, warning, info, cashOperation } = useNotifications()
   const [isProcessingPayment, setIsProcessingPayment] = useState(false)
   const queryClient = useQueryClient()
-  const session = useSession()
-  const user = session?.data?.user
+  const { user } = useAuth()
   // Get organization ID from session or props
   const orgId = organizationId || user?.organizationId || ""
   console.log("User Organization ID:", orgId)
@@ -207,11 +206,7 @@ export function pOSStation({ organizationId }: { organizationId?: string }) {
     },
     onError: (error) => {
       console.error("Sales order creation failed:", error)
-      toast({
-        variant: "destructive",
-        title: "Sales Order Failed",
-        description: "Failed to create sales order. Please try again.",
-      })
+      error("Sales Order Failed", "Failed to create sales order. Please try again.")
     },
   })
 
@@ -440,23 +435,23 @@ export function pOSStation({ organizationId }: { organizationId?: string }) {
   // }
 
   const processPayment = async () => {
-    if (!currentSession) {
-      toast({
-        variant: "destructive",
-        title: "No Active Session",
-        description: "Please start a POS session before processing payments.",
-      })
-      return
-    }
+    // if (!currentSession) {
+    //   toast({
+    //     variant: "destructive",
+    //     title: "No Active Session",
+    //     description: "Please start a POS session before processing payments.",
+    //   })
+    //   return
+    // }
 
-    if (!cashDrawerStatus.isOpen && paymentMethod === PaymentMethod.CASH) {
-      toast({
-        variant: "destructive",
-        title: "Cash Drawer Closed",
-        description: "Please open the cash drawer before processing cash payments.",
-      })
-      return
-    }
+    // if (!cashDrawerStatus.isOpen && paymentMethod === PaymentMethod.CASH) {
+    //   toast({
+    //     variant: "destructive",
+    //     title: "Cash Drawer Closed",
+    //     description: "Please open the cash drawer before processing cash payments.",
+    //   })
+    //   return
+    // }
 
     setIsProcessing(true)
     setPaymentProgress(0)
@@ -464,19 +459,12 @@ export function pOSStation({ organizationId }: { organizationId?: string }) {
     try {
       const inventoryCheck = validateInventory()
       if (!inventoryCheck.valid) {
-        toast({
-          variant: "destructive",
-          title: "Inventory Error",
-          description: inventoryCheck.message,
-        })
+        error("Inventory Error", inventoryCheck.message)
         setIsProcessing(false)
         return
       }
 
-      toast({
-        title: "Processing Payment",
-        description: "Please wait while we process your transaction...",
-      })
+      info("Processing Payment", "Please wait while we process your transaction...")
 
       const progressInterval = setInterval(() => {
         setPaymentProgress((prev) => {
@@ -492,10 +480,10 @@ export function pOSStation({ organizationId }: { organizationId?: string }) {
       const salesOrderResult = await createSalesOrderMutation.mutateAsync({
         customerId: selectedCustomer?.id ?? "cust-1",
         locationId: selectedLocation,
-        organizationId,
-        userId,
-        terminalId,
-        sessionId: currentSession.id,
+        organizationId: orgId,
+        userId: user?.id || "",
+        terminalId: "terminal-1",
+        sessionId: "session-1",
         items: cart.map((item) => ({
           itemId: item.itemId,
           quantity: item.quantity,
@@ -524,18 +512,18 @@ export function pOSStation({ organizationId }: { organizationId?: string }) {
         amount: calculateTotal(),
         method: paymentMethod,
         salesOrderId: salesOrder,
-        processedById: userId,
+        processedById: user?.id || "",
       }
 
-      if (paymentMethod === PaymentMethod.CASH) {
+      if (paymentMethod === "CASH") {
         paymentData.cashTendered = Number.parseFloat(cashTendered) || calculateTotal()
         paymentData.changeGiven = calculateChange()
-      } else if (paymentMethod === PaymentMethod.CARD) {
+      } else if (paymentMethod === "CARD") {
         paymentData.cardType = "VISA"
         paymentData.cardLast4 = "1234"
         paymentData.transactionId = `TXN-${Date.now()}`
         paymentData.authorizationCode = `AUTH-${Date.now()}`
-      } else if (paymentMethod === PaymentMethod.DIGITAL) {
+      } else if (paymentMethod === "DIGITAL") {
         paymentData.digitalWalletType = "Apple Pay"
         paymentData.digitalTransactionId = `DIG-${Date.now()}`
       }
@@ -551,7 +539,7 @@ export function pOSStation({ organizationId }: { organizationId?: string }) {
         itemId: item.itemId,
         locationId: selectedLocation,
         quantityChange: item.quantity,
-        organizationId,
+        organizationId: orgId,
       }))
 
       const inventoryResult = await updateInventoryMutation.mutateAsync(inventoryUpdates)
@@ -573,8 +561,8 @@ export function pOSStation({ organizationId }: { organizationId?: string }) {
           totalCost: unitCost * item.quantity,
           referenceType: "SALES_ORDER",
           referenceId: salesOrder,
-          organizationId,
-          createdById: userId,
+          organizationId: orgId,
+          createdById: user?.id || "",
           serialNumbers: [],
         }
       })
@@ -585,38 +573,35 @@ export function pOSStation({ organizationId }: { organizationId?: string }) {
       }
 
       // Update session totals
-      const saleTotal = calculateTotal()
-      setCurrentSession((prev) =>
-        prev
-          ? {
-            ...prev,
-            totalSales: prev.totalSales + saleTotal,
-            transactionCount: prev.transactionCount + 1,
-            cashTotal: paymentMethod === PaymentMethod.CASH ? prev.cashTotal + saleTotal : prev.cashTotal,
-            cardTotal: paymentMethod === PaymentMethod.CARD ? prev.cardTotal + saleTotal : prev.cardTotal,
-            digitalTotal: paymentMethod === PaymentMethod.DIGITAL ? prev.digitalTotal + saleTotal : prev.digitalTotal,
-          }
-          : null,
-      )
+      // const saleTotal = calculateTotal()
+      // setCurrentSession((prev) =>
+      //   prev
+      //     ? {
+      //       ...prev,
+      //       totalSales: prev.totalSales + saleTotal,
+      //       transactionCount: prev.transactionCount + 1,
+      //       cashTotal: paymentMethod === "CASH" ? prev.cashTotal + saleTotal : prev.cashTotal,
+      //       cardTotal: paymentMethod === "CARD" ? prev.cardTotal + saleTotal : prev.cardTotal,
+      //       digitalTotal: paymentMethod === "DIGITAL" ? prev.digitalTotal + saleTotal : prev.digitalTotal,
+      //     }
+      //     : null,
+      // )
 
       // Update cash drawer balance for cash payments
-      if (paymentMethod === PaymentMethod.CASH) {
-        setCashDrawerStatus((prev) => ({
-          ...prev,
-          currentBalance: prev.currentBalance + saleTotal,
-          lastActivity: new Date(),
-        }))
-      }
+      // if (paymentMethod === "CASH") {
+      //   setCashDrawerStatus((prev) => ({
+      //     ...prev,
+      //     currentBalance: prev.currentBalance + saleTotal,
+      //     lastActivity: new Date(),
+      //   }))
+      // }
 
       // Clear cart and close dialog
       clearCart()
       setIsPaymentDialogOpen(false)
       setCashTendered("")
 
-      toast({
-        title: "Sale Completed Successfully!",
-        description: `Receipt #${salesOrderResult?.orderNumber} - Total: $${calculateTotal().toFixed(2)}`,
-      })
+      success("Sale Completed Successfully!", `Receipt #${salesOrderResult?.orderNumber} - Total: $${calculateTotal().toFixed(2)}`)
 
       // Check for low stock items
       const lowStockItems = items?.filter((item) => {
@@ -625,19 +610,11 @@ export function pOSStation({ organizationId }: { organizationId?: string }) {
       })
 
       if (lowStockItems && lowStockItems.length > 0) {
-        toast({
-          title: "Low Stock Alert",
-          description: `${lowStockItems.length} item(s) are running low on stock.`,
-          variant: "destructive",
-        })
+        warning("Low Stock Alert", `${lowStockItems.length} item(s) are running low on stock.`)
       }
     } catch (error) {
       console.error("Payment processing error:", error)
-      toast({
-        variant: "destructive",
-        title: "Payment Failed",
-        description: error instanceof Error ? error.message : "An unexpected error occurred",
-      })
+      error("Payment Failed", error instanceof Error ? error.message : "An unexpected error occurred")
     } finally {
       setIsProcessing(false)
       setPaymentProgress(0)
@@ -665,11 +642,7 @@ export function pOSStation({ organizationId }: { organizationId?: string }) {
         : 0
 
     if (currentQuantityInCart >= availableStock && availableStock > 0) {
-      toast({
-        variant: "destructive",
-        title: "Insufficient Stock",
-        description: `Cannot add more ${item.name}. Only ${availableStock} in stock.`,
-      })
+      error("Insufficient Stock", `Cannot add more ${item.name}. Only ${availableStock} in stock.`)
       return
     }
 
@@ -698,10 +671,7 @@ export function pOSStation({ organizationId }: { organizationId?: string }) {
       return [item.id, ...filtered].slice(0, 5)
     })
 
-    toast({
-      title: "Item Added",
-      description: `${item.name} added to cart`,
-    })
+    success("Item Added", `${item.name} added to cart`)
   }
 
   const updateQuantity = (id: string, quantity: number) => {
@@ -721,11 +691,7 @@ export function pOSStation({ organizationId }: { organizationId?: string }) {
     }
 
     if (item && quantity > availableStock && availableStock > 0) {
-      toast({
-        variant: "destructive",
-        title: "Insufficient Stock",
-        description: `Cannot set quantity to ${quantity}. Only ${availableStock} in stock.`,
-      })
+      error("Insufficient Stock", `Cannot set quantity to ${quantity}. Only ${availableStock} in stock.`)
       return
     }
 
@@ -795,22 +761,14 @@ export function pOSStation({ organizationId }: { organizationId?: string }) {
     e.preventDefault()
 
     if (cart.length === 0) {
-      toast({
-        variant: "destructive",
-        title: "Empty Cart",
-        description: "Please add items to cart before checkout.",
-      })
+      error("Empty Cart", "Please add items to cart before checkout.")
       return
     }
 
     // Validate inventory before opening payment dialog
     const inventoryCheck = validateInventory()
     if (!inventoryCheck.valid) {
-      toast({
-        variant: "destructive",
-        title: "Inventory Error",
-        description: inventoryCheck.message,
-      })
+      error("Inventory Error", inventoryCheck.message)
       return
     }
 

@@ -16,7 +16,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useTransfer, useApproveTransfer } from "@/hooks/useTransferQueries"
 import { formatCurrency } from "@/lib/utils"
 import { ArrowRight, Calendar, CheckCircle, Clock, MapPin, Package, Truck, User, XCircle, AlertTriangle, FileText, Activity } from 'lucide-react'
-import { useSession } from "next-auth/react"
+import { useAuth } from "@/hooks/useAuth"
 import { format } from "date-fns"
 
 interface TransferDetailsModalProps {
@@ -85,8 +85,8 @@ const priorityConfig = {
 }
 
 export function TransferDetailsModal({ transferId, open, onOpenChange, organizationId }: TransferDetailsModalProps) {
-  const { data: session } = useSession()
-  const userId = session?.user?.id || ""
+  const { user: session } = useAuth()
+  const userId = session?.id || ""
 
   const { data: transfer, isLoading } = useTransfer(transferId, organizationId)
   const approveTransferMutation = useApproveTransfer()

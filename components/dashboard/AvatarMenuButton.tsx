@@ -19,11 +19,10 @@ import {
     Settings,
     UserRound,
 } from "lucide-react";
-import { Session } from "next-auth";
-import { signOut } from "next-auth/react";
+import { signOut } from "@/lib/auth-client";
 import { useRouter } from "next/navigation";
 
-export function AvatarMenuButton({ session }: { session: Session }) {
+export function AvatarMenuButton({ session }: { session: any }) {
   const user = session.user;
   const initials = getInitials(user.name ?? "");
   const router = useRouter();

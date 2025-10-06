@@ -1,7 +1,7 @@
 "use server";
 
 import { getAllPermissions } from "@/config/permissions";
-import { getAuthenticatedUser } from "@/config/useAuth";
+import { getAuthenticatedUser } from "@/lib/auth-server";
 import { createRoleName } from "@/lib/createRoleName";
 import { db } from "@/prisma/db";
 import { RoleFormData } from "@/types/types";
@@ -26,7 +26,7 @@ const  createRole=async(data: RoleFormData)=> {
     const existingRole = await db.role.findFirst({
       where: {
         name: data.name,
-        organizationId:user?.organizationId
+        organizationId:user.organizationId
       },
     });
 
@@ -41,7 +41,7 @@ const  createRole=async(data: RoleFormData)=> {
         name: createRoleName(data.name),
         description: data.description,
         permissions: data.permissions,
-        organizationId:user?.organizationId
+        organizationId:user.organizationId
 
       },
     });

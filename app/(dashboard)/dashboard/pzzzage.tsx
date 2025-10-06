@@ -2,13 +2,15 @@ import { getDashboardOverview } from "@/actions/analytics";
 import DashboardMain from "@/components/dashboard/DashboardMain";
 import DefaultUserDashboard from "@/components/dashboard/DefaultUserDashboard";
 import OverViewCard from "@/components/OverViewCard";
-import { authOptions } from "@/config/auth";
+import { auth } from "@/lib/auth";
 import { getAuthenticatedUser } from "@/config/useAuth";
-import { getServerSession } from "next-auth";
+// Removed NextAuth getServerSession import - using Better-Auth
 
 export default async function Dashboard() {
   const analytics = (await getDashboardOverview()) || [];
-  const session = await getServerSession(authOptions)
+  const session = await auth.api.getSession({
+    headers: await import("next/headers").then(m => m.headers())
+  })
   const user = await getAuthenticatedUser();
   const userPermissions = user.permissions
   const hasPermission = userPermissions.includes('dashboard.read')

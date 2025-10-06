@@ -1,29 +1,17 @@
 // app/actions/createUnit.ts
 "use server";
 
-import { authOptions } from "@/config/auth";
 import { db } from "@/prisma/db";
 import { UnitCreateDTO } from "@/types/unit";
-import { getServerSession } from "next-auth";
 import { revalidatePath } from "next/cache";
 
 const DEFAULT_IMAGE_URL =
   "https://14J7oh8kso.ufs.sh/f/HLxTbDBCDLwfAXaapcezIN7vwylKf1PXSCqAuseUG0gx8mhd";
 
-const createActionUnit = async (data: UnitCreateDTO) => {
-  const session = await getServerSession(authOptions);
-
-  if (!session?.user?.organizationId) {
-    return {
-      success: false,
-      error: "User not authenticated or missing organization",
-      data: null,
-    };
-  }
-
+const createActionUnit = async (data: UnitCreateDTO & { organizationId: string }) => {
   const formattedData = {
     ...data,
-    organizationId: session.user.organizationId,
+    organizationId: data.organizationId,
   };
 
   try {
@@ -32,7 +20,7 @@ const createActionUnit = async (data: UnitCreateDTO) => {
         where: {
           organizationId_name: {
             name: data.name,
-            organizationId: session.user.organizationId,
+            organizationId: data.organizationId,
           }
         },
       });

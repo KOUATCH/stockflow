@@ -10,7 +10,7 @@ import {
   createSalesOrder,
   updateInventoryLevels,
 } from "@/actions/pos/POSActionFinal"
-import { useToast } from "@/hooks/use-toast"
+import { useNotifications } from "@/components/notifications/NotificationProvider"
 import { useOrgLocationsNew } from "@/hooks/useAllLocationsQueries"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
 import { useEffect, useState } from "react"
@@ -67,7 +67,7 @@ import {
   Volume2,
   Zap,
 } from "lucide-react"
-import { useSession } from "next-auth/react"
+import { useAuth } from "@/hooks/useAuth"
 
 // Define the Customer type
 interface Customer {
@@ -118,11 +118,10 @@ export function pOSStationRecent({ organizationId }: { organizationId?: string }
     transactionCount: 18,
     avgTransaction: 136.15,
   })
-  const { toast } = useToast()
+  const { success, error, warning, info } = useNotifications()
   const [isProcessingPayment, setIsProcessingPayment] = useState(false)
   const queryClient = useQueryClient()
-  const session = useSession()
-  const user = session?.data?.user
+  const { user } = useAuth()
   // Get organization ID from session or props
   const orgId = organizationId || user?.organizationId || ""
   console.log("User Organization ID:", orgId)
@@ -250,19 +249,12 @@ export function pOSStationRecent({ organizationId }: { organizationId?: string }
     try {
       const inventoryCheck = validateInventory()
       if (!inventoryCheck.valid) {
-        toast({
-          variant: "destructive",
-          title: "Inventory Error",
-          description: inventoryCheck.message,
-        })
+        error("Inventory Error", inventoryCheck.message)
         setIsProcessing(false)
         return
       }
 
-      toast({
-        title: "Processing Payment",
-        description: "Please wait while we process your transaction...",
-      })
+      info("Processing Payment", "Please wait while we process your transaction...")
 
       const progressInterval = setInterval(() => {
         setPaymentProgress((prev) => {
@@ -369,10 +361,7 @@ export function pOSStationRecent({ organizationId }: { organizationId?: string }
       setIsPaymentDialogOpen(false)
       setCashTendered("")
 
-      toast({
-        title: "Sale Completed Successfully!",
-        description: `Receipt #${salesOrder.orderNumber} - Total: $${calculateTotal().toFixed(2)}`,
-      })
+      success("Sale Completed Successfully!", `Receipt #${salesOrder.orderNumber} - Total: $${calculateTotal().toFixed(2)}`)
 
       // Check for low stock items
       const updatedItems = items
@@ -392,10 +381,7 @@ export function pOSStationRecent({ organizationId }: { organizationId?: string }
 
       if (lowStockItems && lowStockItems.length > 0) {
         setTimeout(() => {
-          toast({
-            title: "Low Stock Alert",
-            description: `${lowStockItems.length} item(s) are running low on stock`,
-          })
+          warning("Low Stock Alert", `${lowStockItems.length} item(s) are running low on stock`)
         }, 2000)
       }
 
@@ -404,11 +390,7 @@ export function pOSStationRecent({ organizationId }: { organizationId?: string }
       }, 1000)
     } catch (error) {
       console.error("Error processing payment:", error)
-      toast({
-        variant: "destructive",
-        title: "Payment Failed",
-        description: error instanceof Error ? error.message : "Error processing payment. Please try again.",
-      })
+      error("Payment Failed", error instanceof Error ? error.message : "Error processing payment. Please try again.")
     } finally {
       setIsProcessing(false)
       setPaymentProgress(0)
@@ -436,11 +418,7 @@ export function pOSStationRecent({ organizationId }: { organizationId?: string }
         : 0
 
     if (currentQuantityInCart >= availableStock && availableStock > 0) {
-      toast({
-        variant: "destructive",
-        title: "Insufficient Stock",
-        description: `Cannot add more ${item.name}. Only ${availableStock} in stock.`,
-      })
+      warning("Insufficient Stock", `Cannot add more ${item.name}. Only ${availableStock} in stock.`)
       return
     }
 
@@ -469,10 +447,7 @@ export function pOSStationRecent({ organizationId }: { organizationId?: string }
       return [item.id, ...filtered].slice(0, 5)
     })
 
-    toast({
-      title: "Item Added",
-      description: `${item.name} added to cart`,
-    })
+    success("Item Added", `${item.name} added to cart`)
   }
 
   const updateQuantity = (id: string, quantity: number) => {
@@ -492,11 +467,7 @@ export function pOSStationRecent({ organizationId }: { organizationId?: string }
     }
 
     if (item && quantity > availableStock && availableStock > 0) {
-      toast({
-        variant: "destructive",
-        title: "Insufficient Stock",
-        description: `Cannot set quantity to ${quantity}. Only ${availableStock} in stock.`,
-      })
+      warning("Insufficient Stock", `Cannot set quantity to ${quantity}. Only ${availableStock} in stock.`)
       return
     }
 
@@ -566,22 +537,14 @@ export function pOSStationRecent({ organizationId }: { organizationId?: string }
     e.preventDefault()
 
     if (cart.length === 0) {
-      toast({
-        variant: "destructive",
-        title: "Empty Cart",
-        description: "Please add items to cart before checkout.",
-      })
+      warning("Empty Cart", "Please add items to cart before checkout.")
       return
     }
 
     // Validate inventory before opening payment dialog
     const inventoryCheck = validateInventory()
     if (!inventoryCheck.valid) {
-      toast({
-        variant: "destructive",
-        title: "Inventory Error",
-        description: inventoryCheck.message,
-      })
+      error("Inventory Error", inventoryCheck.message)
       return
     }
 

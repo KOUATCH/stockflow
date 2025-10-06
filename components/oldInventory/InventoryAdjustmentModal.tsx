@@ -18,7 +18,7 @@ import { formatCurrency } from "@/lib/utils"
 import type { InventoryWithRelations } from "@/actions/inventory/inventoryActions"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { AlertTriangle, Package, Plus, Minus } from "lucide-react"
-import { useSession } from "next-auth/react"
+import { useClientAuth } from "@/hooks/useClientAuth"
 import { useForm } from "react-hook-form"
 import * as z from "zod"
 
@@ -54,7 +54,7 @@ export function InventoryAdjustmentModal({ open, onOpenChange, inventory, onSucc
   const quantity = form.watch("quantity")
 
   const handleSubmit = (data: AdjustmentFormData) => {
-    if (!session?.user?.organizationId || !session?.user?.id) return
+    if (!user || !user) return
 
     const adjustmentQuantity = data.adjustmentType === "increase" ? data.quantity : -data.quantity
 

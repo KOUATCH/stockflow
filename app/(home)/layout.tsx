@@ -1,7 +1,6 @@
 import Footer from "@/components/frontend/footer";
 import SiteHeader from "@/components/frontend/site-header";
-import { authOptions } from "@/config/auth";
-import { getServerSession } from "next-auth";
+import { auth } from "@/lib/auth";
 import { ReactNode } from "react";
 
 export default async function HomeLayout({
@@ -9,7 +8,9 @@ export default async function HomeLayout({
 }: {
   children: ReactNode;
 }) {
-  const session = await getServerSession(authOptions);
+  const session = await auth.api.getSession({
+    headers: await import("next/headers").then(m => m.headers())
+  });
   return (
     <div className="bg-white">
       {/* <PromoBanner /> */}

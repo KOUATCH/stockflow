@@ -1,5 +1,5 @@
 "use server"
-import { getAuthenticatedUser } from "@/config/useAuth"
+import { getAuthenticatedUser } from "@/lib/auth-server"
 import { db } from "@/prisma/db"
 import type { TaxRateCreateDTO } from "@/types/taxRates"
 import { revalidatePath } from "next/cache"

@@ -1,6 +1,6 @@
 "use server"
 
-import { getAuthenticatedUser } from "@/config/useAuth"
+import { getAuthenticatedUser } from "@/lib/auth-server"
 import {
   AdjustmentStatus,
   type CreateItemRequest,
@@ -322,7 +322,7 @@ export async function updateInventoryLevel(
   try {
 
     const user = await getAuthenticatedUser()
-    const userOrgId = user?.organizationId
+    const userOrgId = user.organizationId
 
     const transaction: InventoryTransaction = {
       id: `trans_${Date.now()}`,
@@ -535,7 +535,7 @@ export async function getInventoryTransactions(
 export async function getInventoryStats(): Promise<InventoryStatsResponse> {
   try {
     const user = await getAuthenticatedUser()
-    const userOrgId = user?.organizationId
+    const userOrgId = user.organizationId
     console.log(`[v0] Getting inventory stats for org:", ${userOrgId}`)
 
     const inventoryLevels = await getInventoryLevels(userOrgId)
@@ -578,7 +578,7 @@ export async function getInventoryStats(): Promise<InventoryStatsResponse> {
 // ): Promise<InventoryTransaction[]> {
 //   try {
 //     const user = await getAuthenticatedUser()
-//     const userOrgId = user?.organizationId
+//     const userOrgId = user.organizationId
 
 //     console.log("[v0] Getting inventory transactions for org:", userOrgId, "with options:", options)
 

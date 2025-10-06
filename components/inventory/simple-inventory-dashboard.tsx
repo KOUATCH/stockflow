@@ -5,7 +5,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { AlertTriangle, Package, TrendingUp, RefreshCw } from 'lucide-react';
-import { getInventoryLevels, getLowStockItems } from '@/actions/inventory/get-inventory-data';
+import { getInventoryLevelsClientSafe, getLowStockItemsClientSafe } from '@/actions/inventory/clientSafeInventoryData';
 
 interface InventoryLevel {
   id: string;
@@ -39,8 +39,8 @@ export function SimpleInventoryDashboard() {
     
     try {
       const [levelsResult, lowStockResult] = await Promise.all([
-        getInventoryLevels(),
-        getLowStockItems(10)
+        getInventoryLevelsClientSafe(),
+        getLowStockItemsClientSafe(undefined, 10)
       ]);
 
       if (levelsResult.success && levelsResult.data) {
