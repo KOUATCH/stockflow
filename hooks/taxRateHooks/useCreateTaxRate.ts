@@ -2,10 +2,11 @@ import createTaxRate from "@/actions/taxRate/createTaxRate"
 import { TaxRateKeys } from "@/types/queryKeys"
 import type { TaxRateCreateDTO } from "@/types/taxRates"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
-import { toast } from "sonner"
+import { useNotifications } from "@/components/notifications/NotificationProvider"
 
 export function useCreateTaxRate() {
   const queryClient = useQueryClient()
+  const { formSuccess, formError } = useNotifications();
 
   return useMutation({
     mutationFn: async (data: TaxRateCreateDTO) => {
@@ -18,7 +19,7 @@ export function useCreateTaxRate() {
       return result
     },
     onSuccess: (data) => {
-      toast.success("Tax rate created successfully")
+      formSuccess("Tax Rate Creation", "Tax rate has been created successfully");
 
       // Invalidate and refetch tax rates list
       queryClient.invalidateQueries({ queryKey: TaxRateKeys.lists() })
@@ -30,9 +31,11 @@ export function useCreateTaxRate() {
       }
     },
     onError: (error: Error) => {
-      toast.error("Failed to create tax rate", {
-        description: error.message || "Unknown error occurred",
-      })
+      formError(
+        "Tax Rate Creation",
+        error.message || "Unknown error occurred",
+        "Failed to create tax rate"
+      );
     },
   })
 }

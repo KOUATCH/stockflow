@@ -1,0 +1,523 @@
+import { PERMISSIONS } from "@/lib/permissions";
+import {
+  Activity,
+  Award,
+  BaggageClaim,
+  BarChart3,
+  Bell,
+  BookOpen,
+  Briefcase,
+  Building2,
+  CircleDollarSign,
+  Clock,
+  Cpu,
+  Crown,
+  Diamond,
+  DollarSign,
+  FileText,
+  Globe,
+  Hexagon,
+  Layers,
+  MapPin,
+  Orbit,
+  Package,
+  Package2,
+  Settings,
+  Shield,
+  ShoppingBag,
+  ShoppingCart,
+  Star,
+  Target,
+  TrendingUp,
+  Users,
+  Users2,
+  Wallet,
+  Zap
+} from "lucide-react";
+import type React from "react";
+
+export const navigationConfig = [
+  {
+    title: "Dashboard",
+    href: "/dashboard",
+    icon: Cpu,
+    permission: PERMISSIONS.DASHBOARD_READ,
+    gradient: "from-violet-600 via-indigo-600 to-blue-700",
+    glowColor: "shadow-violet-500/30",
+    badge: "Live",
+    description: "Real-time inventory overview",
+  },
+  {
+    title: "Inventory Control",
+    icon: Package2,
+    permission: PERMISSIONS.READ_ITEMS,
+    gradient: "from-emerald-600 via-teal-600 to-cyan-700",
+    glowColor: "shadow-emerald-500/30",
+    badge: "Core",
+    description: "Manage all inventory items",
+    children: [
+      { title: "All Items", href: "/dashboard/inventory/items", permission: PERMISSIONS.READ_ITEMS, icon: Package },
+      { title: "Categories", href: "/dashboard/inventory/categories", permission: PERMISSIONS.READ_CATEGORIES, icon: Layers },
+      { title: "Brands", href: "/dashboard/inventory/brands", permission: PERMISSIONS.BRANDS_READ, icon: Award },
+      { title: "Units", href: "/dashboard/inventory/units", permission: PERMISSIONS.UNITS_READ, icon: Target },
+      { title: "Locations", href: "/dashboard/inventory/locations", permission: PERMISSIONS.READ_LOCATIONS, icon: MapPin },
+    ],
+  },
+  {
+    title: "Inventory",
+    icon: BaggageClaim,
+    permission: PERMISSIONS.READ_ITEMS,
+    gradient: "from-green-600 via-emerald-600 to-teal-700",
+    glowColor: "shadow-green-500/30",
+    badge: "Core",
+    description: "Manage all inventory items",
+    children: [
+      {
+        title: "items",
+        href: "/dashboard/inventory/items",
+        permission: PERMISSIONS.READ_ITEMS,
+        icon: Package,
+      }, {
+        title: "Categories",
+        href: "/dashboard/inventory/categories",
+        permission: PERMISSIONS.READ_CATEGORIES,
+        icon: Layers,
+      },
+      {
+        title: "Brands",
+        href: "/dashboard/inventory/brands",
+        permission: PERMISSIONS.BRANDS_READ,
+        icon: Award,
+      },
+      {
+        title: "Units",
+        href: "/dashboard/inventory/units",
+        permission: PERMISSIONS.UNITS_READ,
+        icon: Target,
+      },
+
+      {
+        title: "Current Stock",
+        href: "/dashboard/inventory/stock",
+        permission: PERMISSIONS.STOCK_READ,
+        icon: Package,
+      },
+      {
+        title: "Low Stock Items",
+        href: "/dashboard/inventory/stock/low-stock",
+        permission: PERMISSIONS.STOCK_READ,
+        icon: Package,
+      },
+      {
+        title: "Serial Numbers",
+        href: "/dashboard/inventory/serial.numbers",
+        permission: PERMISSIONS.SERIAL_NUMBERS_READ,
+        icon: Package,
+      },
+      {
+        title: "Stock Transfers",
+        href: "/dashboard/inventory/transfers",
+        permission: PERMISSIONS.TRANSFERS_READ,
+        icon: Package,
+      },
+      {
+        title: "Create Transfers",
+        href: "/dashboard/inventory/transfers.create",
+        permission: PERMISSIONS.TRANSFERS_CREATE,
+        icon: Package,
+      },
+      {
+        title: "Stock Adjustments",
+        href: "/dashboard/inventory/adjustments",
+        permission: PERMISSIONS.ADJUSTMENTS_READ,
+        icon: Package,
+      },
+      {
+        title: "Create Adjustments",
+        href: "/dashboard/inventory/adjustments/create",
+        permission: PERMISSIONS.ADJUSTMENTS_CREATE,
+        icon: Package,
+
+      },
+
+
+    ],
+  },
+  {
+    title: "Sales",
+    icon: CircleDollarSign,
+    permission: PERMISSIONS.READ_SALES_ORDERS,
+    gradient: "from-rose-600 via-pink-600 to-purple-700",
+    glowColor: "shadow-rose-500/30",
+    badge: "Core",
+    description: "Manage all Sales",
+    // dropdown: true,
+    children: [
+      {
+        title: "Sales",
+        href: "/dashboard/sales",
+        permission: PERMISSIONS.READ_SALES_ORDERS,
+        icon: CircleDollarSign,
+      },
+      {
+        title: "Sales Orders",
+        href: "/dashboard/session-pos-sync",
+        permission: PERMISSIONS.READ_SALES_ORDERS,
+        icon: CircleDollarSign,
+      },
+      {
+        title: "Returns",
+        href: "/dashboard/returns",
+        permission: PERMISSIONS.RETURNS_READ,
+        icon: CircleDollarSign,
+
+      },
+      {
+        title: "Customers",
+        href: "/dashboard/sales/customers",
+        permission: PERMISSIONS.READ_CUSTOMERS,
+        icon: CircleDollarSign,
+
+      },
+      {
+        title: "POS",
+        href: "/dashboard/pos",
+        permission: PERMISSIONS.OPERATE_POS,
+        icon: CircleDollarSign,
+
+      },
+    ],
+  },
+  {
+    title: "Presence",
+    icon: Clock,
+    permission: PERMISSIONS.PRESENCE_READ,
+    gradient: "from-purple-600 via-violet-600 to-fuchsia-700",
+    glowColor: "shadow-purple-500/30",
+    badge: "Time",
+    description: "Employee presence tracking",
+    children: [
+      {
+        title: "Overview",
+        href: "/dashboard/presence",
+        permission: PERMISSIONS.PRESENCE_READ,
+        icon: Clock,
+      },
+      {
+        title: "Clock In/Out",
+        href: "/dashboard/presence/clock",
+        permission: PERMISSIONS.PRESENCE_CLOCK,
+        icon: Clock,
+      },
+      {
+        title: "My Reports",
+        href: "/dashboard/presence/reports",
+        permission: PERMISSIONS.PRESENCE_REPORTS_READ,
+        icon: Clock,
+      },
+      {
+        title: "My Alerts",
+        href: "/dashboard/presence/alerts",
+        permission: PERMISSIONS.PRESENCE_ALERTS_READ,
+        icon: Clock,
+      },
+      {
+        title: "Team Overview",
+        href: "/dashboard/presence/team",
+        permission: PERMISSIONS.PRESENCE_TEAM_READ,
+        icon: Clock,
+      },
+    ],
+  },
+  {
+    title: "Purchases",
+    icon: ShoppingCart,
+    permission: PERMISSIONS.READ_PURCHASE_ORDERS,
+    gradient: "from-sky-600 via-blue-600 to-indigo-700",
+    glowColor: "shadow-sky-500/30",
+    badge: "Buy",
+    description: "Purchase management",
+    children: [
+      {
+        title: "Purchase Orders",
+        href: "/dashboard/purchase-orders",
+        permission: PERMISSIONS.READ_PURCHASE_ORDERS,
+        icon: ShoppingCart,
+      },
+      {
+        title: "Goods Receipts",
+        href: "/dashboard/purchases/goods.receipts",
+        permission: PERMISSIONS.RECEIVE_GOODS,
+        icon: ShoppingCart,
+      },
+      {
+        title: "Suppliers",
+        href: "/dashboard/purchases/suppliers",
+        permission: PERMISSIONS.READ_SUPPLIERS,
+        icon: ShoppingCart,
+      },
+      {
+        title: "Supplier Items",
+        href: "/dashboard/purchases/supplierItems",
+        permission: PERMISSIONS.READ_SUPPLIERS,
+        icon: ShoppingCart,
+      },
+    ],
+  },
+  {
+    title: "Settings",
+    icon: Settings,
+    permission: PERMISSIONS.MANAGE_SYSTEM_SETTINGS,
+    gradient: "from-slate-600 via-gray-600 to-stone-700",
+    glowColor: "shadow-slate-500/30",
+    badge: "Config",
+    description: "System configuration",
+    children: [
+      {
+        title: "Locations",
+        href: "/dashboard/settings/locations",
+        permission: PERMISSIONS.READ_LOCATIONS,
+        icon: Settings,
+      },
+      {
+        title: "Tax Rates",
+        href: "/dashboard/settings/tax-rates",
+        permission: PERMISSIONS.TAX_RATES_READ,
+        icon: Settings,
+      },
+      {
+        title: "Roles & Permissions",
+        href: "/dashboard/settings/roles",
+        permission: PERMISSIONS.READ_ROLES,
+        icon: Settings,
+      },
+      {
+        title: "Users & Invites",
+        href: "/dashboard/settings/users",
+        permission: PERMISSIONS.READ_USERS,
+        icon: Settings,
+      },
+      {
+        title: "Profile",
+        href: "/dashboard/settings/profile",
+        permission: PERMISSIONS.PROFILE_READ,
+        icon: Settings,
+      },
+      {
+        title: "Company Settings",
+        href: "/dashboard/settings/company",
+        permission: PERMISSIONS.COMPANY_READ,
+        icon: Settings,
+      },
+      {
+        title: "Change Password",
+        href: "/dashboard/settings/change-password",
+        permission: PERMISSIONS.PASSWORD_READ,
+        icon: Settings,
+      },
+    ],
+  },
+  {
+    title: "Financial Reporting",
+    icon: DollarSign,
+    permission: PERMISSIONS.VIEW_FINANCIAL_DASHBOARD,
+    gradient: "from-yellow-600 via-amber-600 to-orange-700",
+    glowColor: "shadow-yellow-500/30",
+    badge: "Money",
+    description: "Financial analytics",
+    children: [
+      {
+        title: "Financial Dashboard",
+        href: "/dashboard/financial-reporting",
+        permission: PERMISSIONS.VIEW_FINANCIAL_DASHBOARD,
+        icon: DollarSign,
+      },
+      {
+        title: "Income Statement",
+        href: "/dashboard/financial-reporting/income-statement",
+        permission: PERMISSIONS.VIEW_INCOME_STATEMENT,
+        icon: DollarSign,
+      },
+      {
+        title: "Balance Sheet",
+        href: "/dashboard/financial-reporting/balance-sheet",
+        permission: PERMISSIONS.VIEW_BALANCE_SHEET,
+        icon: DollarSign,
+      },
+      {
+        title: "Cash Flow Statement",
+        href: "/dashboard/financial-reporting/cash-flow",
+        permission: PERMISSIONS.VIEW_CASH_FLOW_STATEMENT,
+        icon: DollarSign,
+      },
+      {
+        title: "General Ledger",
+        href: "/dashboard/financial-reporting/general-ledger",
+        permission: PERMISSIONS.VIEW_GENERAL_LEDGER,
+        icon: DollarSign,
+      },
+      {
+        title: "Journal Entries",
+        href: "/dashboard/financial-reporting/journal-entries",
+        permission: PERMISSIONS.VIEW_JOURNAL_ENTRIES,
+        icon: DollarSign,
+      },
+      {
+        title: "Chart of Accounts",
+        href: "/dashboard/financial-reporting/chart-of-accounts",
+        permission: PERMISSIONS.VIEW_CHART_OF_ACCOUNTS,
+        icon: DollarSign,
+      },
+      {
+        title: "Financial Analysis",
+        href: "/dashboard/financial-reporting/analysis",
+        permission: PERMISSIONS.VIEW_FINANCIAL_RATIOS,
+        icon: DollarSign,
+      },
+      {
+        title: "Budget Management",
+        href: "/dashboard/financial-reporting/budgets",
+        permission: PERMISSIONS.VIEW_BUDGETS,
+        icon: DollarSign,
+      },
+      {
+        title: "Audit & Compliance",
+        href: "/dashboard/financial-reporting/audit",
+        permission: PERMISSIONS.VIEW_FINANCIAL_AUDIT_TRAIL,
+        icon: DollarSign,
+      },
+      {
+        title: "Period Close",
+        href: "/dashboard/financial-reporting/period-close",
+        permission: PERMISSIONS.MANAGE_FINANCIAL_PERIODS,
+        icon: DollarSign,
+      },
+      {
+        title: "Cash Management",
+        href: "/dashboard/financial-reporting/cash-management",
+        permission: PERMISSIONS.VIEW_CASH_MANAGEMENT,
+        icon: DollarSign,
+      },
+    ],
+  },
+  {
+    title: "Team Universe",
+    icon: Users2,
+    permission: PERMISSIONS.READ_USERS,
+    gradient: "from-teal-600 via-cyan-600 to-blue-700",
+    glowColor: "shadow-teal-500/30",
+    badge: "Hot",
+    description: "Manage your dream team",
+    children: [
+      { title: "Elite Members", href: "/dashboard/users", permission: PERMISSIONS.READ_USERS, icon: Crown },
+      { title: "Power Roles", href: "/dashboard/settings/roles", permission: PERMISSIONS.READ_ROLES, icon: Shield },
+      { title: "My Profile", href: "/dashboard/profile", permission: PERMISSIONS.PROFILE_READ, icon: Star }
+    ]
+  },
+  {
+    title: "Inventory Galaxy",
+    icon: Hexagon,
+    permission: PERMISSIONS.READ_ITEMS,
+    gradient: "from-lime-600 via-green-600 to-emerald-700",
+    glowColor: "shadow-lime-500/30",
+    badge: "Pro",
+    description: "Your digital warehouse",
+    children: [
+      { title: "Product Arsenal", href: "/dashboard/inventory/items", permission: PERMISSIONS.READ_ITEMS, icon: Package2 },
+      { title: "Category Matrix", href: "/dashboard/inventory/categories", permission: PERMISSIONS.READ_CATEGORIES, icon: Layers },
+      { title: "Brand Empire", href: "/dashboard/inventory/brands", permission: PERMISSIONS.BRANDS_READ, icon: Award },
+      { title: "Stock Radar", href: "/dashboard/inventory/stock", permission: PERMISSIONS.STOCK_READ, icon: Target },
+      { title: "Alert System", href: "/dashboard/inventory/stock/low-stock", permission: PERMISSIONS.STOCK_READ, icon: Bell },
+      { title: "Transfer Hub", href: "/dashboard/inventory/transfers", permission: PERMISSIONS.TRANSFERS_READ, icon: Orbit }
+    ]
+  },
+  {
+    title: "Revenue Engine",
+    icon: Diamond,
+    permission: PERMISSIONS.READ_SALES_ORDERS,
+    gradient: "from-amber-500 via-orange-500 to-red-500",
+    glowColor: "shadow-amber-500/25",
+    badge: "$$",
+    description: "Money-making machine",
+    children: [
+      { title: "Sales Command", href: "/dashboard/sales", permission: PERMISSIONS.READ_SALES_ORDERS, icon: TrendingUp },
+      { title: "Order Matrix", href: "/dashboard/sales/orders", permission: PERMISSIONS.READ_SALES_ORDERS, icon: FileText },
+      { title: "POS Terminal", href: "/dashboard/pos", permission: PERMISSIONS.OPERATE_POS, icon: Zap },
+      { title: "Client Base", href: "/dashboard/sales/customers", permission: PERMISSIONS.READ_CUSTOMERS, icon: Users }
+    ]
+  },
+  {
+    title: "Supply Chain",
+    icon: ShoppingBag,
+    permission: PERMISSIONS.READ_PURCHASE_ORDERS,
+    gradient: "from-indigo-600 via-purple-600 to-violet-700",
+    glowColor: "shadow-indigo-500/30",
+    badge: "Elite",
+    description: "Procurement powerhouse",
+    children: [
+      { title: "Purchase Central", href: "/dashboard/purchase-orders", permission: PERMISSIONS.READ_PURCHASE_ORDERS, icon: Briefcase },
+      { title: "Vendor Network", href: "/dashboard/purchases/suppliers", permission: PERMISSIONS.READ_SUPPLIERS, icon: Globe },
+      { title: "Goods Portal", href: "/dashboard/purchases/goods.receipts", permission: PERMISSIONS.RECEIVE_GOODS, icon: Package }
+    ]
+  },
+  {
+    title: "Intelligence Hub",
+    icon: Activity,
+    permission: PERMISSIONS.VIEW_ANALYTICS,
+    gradient: "from-fuchsia-600 via-pink-600 to-rose-700",
+    glowColor: "shadow-fuchsia-500/30",
+    badge: "AI",
+    description: "Data-driven insights",
+    children: [
+      { title: "Product Intelligence", href: "/dashboard/reports/products", permission: PERMISSIONS.VIEW_ANALYTICS, icon: BarChart3 },
+      { title: "Inventory Analytics", href: "/dashboard/reports/inventory", permission: PERMISSIONS.VIEW_ANALYTICS, icon: TrendingUp },
+      { title: "Customer Insights", href: "/dashboard/reports/customers", permission: PERMISSIONS.VIEW_ANALYTICS, icon: Target }
+    ]
+  },
+  {
+    title: "Content Studio",
+    href: "/dashboard/blogs",
+    icon: BookOpen,
+    permission: PERMISSIONS.BLOGS_READ,
+    gradient: "from-red-600 via-rose-600 to-pink-700",
+    glowColor: "shadow-red-500/30",
+    badge: "Creative",
+    description: "Publishing powerhouse"
+  },
+  {
+    title: "Order Universe",
+    href: "/dashboard/orders",
+    icon: Wallet,
+    permission: PERMISSIONS.ORDERS_READ,
+    gradient: "from-cyan-600 via-teal-600 to-green-700",
+    glowColor: "shadow-cyan-500/30",
+    badge: "Live",
+    description: "Order management hub"
+  },
+  {
+    title: "Control Center",
+    icon: Settings,
+    permission: PERMISSIONS.MANAGE_SYSTEM_SETTINGS,
+    gradient: "from-neutral-600 via-zinc-600 to-gray-700",
+    glowColor: "shadow-neutral-500/30",
+    badge: "Admin",
+    description: "System configuration",
+    children: [
+      { title: "Location Grid", href: "/dashboard/settings/locations", permission: PERMISSIONS.READ_LOCATIONS, icon: Globe },
+      { title: "Tax Engine", href: "/dashboard/settings/tax-rates", permission: PERMISSIONS.TAX_RATES_READ, icon: DollarSign },
+      { title: "Company DNA", href: "/dashboard/settings/company", permission: PERMISSIONS.COMPANY_READ, icon: Building2 }
+    ]
+  }
+]
+
+export type NavigationItem = {
+  title: string
+  href?: string
+  icon?: React.ElementType
+  permission: string
+  gradient?: string
+  glowColor?: string
+  badge?: string
+  description?: string
+  children?: NavigationItem[]
+}

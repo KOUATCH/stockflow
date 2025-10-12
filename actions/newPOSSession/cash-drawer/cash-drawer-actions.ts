@@ -6,7 +6,7 @@ import { revalidatePath } from "next/cache"
 export interface CashDrawerSession {
   id: string
   sessionNumber: string
-  terminalId: string
+  stationId: string
   userId: string
   locationId: string
   organizationId: string
@@ -19,10 +19,10 @@ export interface CashDrawerSession {
   actualBalance?: number
   variance?: number
   notes?: string
-  terminal: {
+  station: {
     id: string
     name: string
-    terminalNumber: string
+    stationNumber: string
   }
   user: {
     id: string
@@ -70,23 +70,23 @@ export interface CashDrawerSummary {
 
 // Open a new POS session with cash drawer
 export async function openPosSession(
-  terminalId: string,
+  stationId: string,
   userId: string,
   locationId: string,
   organizationId: string,
   openingBalance: number,
 ): Promise<{ success: boolean; sessionId?: string; error?: string }> {
   try {
-    // Check if there's already an active session for this terminal
+    // Check if there's already an active session for this station
     const existingSession = await db.pOSSession.findFirst({
       where: {
-        terminalId,
+        stationId,
         status: "ACTIVE",
       },
     })
 
     if (existingSession) {
-      return { success: false, error: "Terminal already has an active session" }
+      return { success: false, error: "station already has an active session" }
     }
 
     // Generate session number
@@ -96,7 +96,7 @@ export async function openPosSession(
     const session = await db.pOSSession.create({
       data: {
         sessionNumber,
-        terminalId,
+        stationId,
         userId,
         locationId,
         status: "ACTIVE",
@@ -105,17 +105,17 @@ export async function openPosSession(
       },
     })
 
-    // Get or create cash drawer for this terminal
+    // Get or create cash drawer for this station
     let cashDrawer = await db.cashDrawer.findFirst({
-      where: { terminalId },
+      where: { stationId },
     })
 
     if (!cashDrawer) {
       cashDrawer = await db.cashDrawer.create({
         data: {
-          drawerNumber: `DRAWER-${terminalId}`,
-          name: `Drawer for Terminal ${terminalId}`,
-          terminalId,
+          drawerNumber: `DRAWER-${stationId}`,
+          name: `Drawer for station ${stationId}`,
+          stationId,
           locationId,
           currentBalance: openingBalance,
           expectedBalance: openingBalance,
@@ -384,19 +384,19 @@ export async function removeCashFromDrawer(
 }
 
 // Get current session
-export async function getCurrentSession(terminalId: string): Promise<CashDrawerSession | null> {
+export async function getCurrentSession(stationId: string): Promise<CashDrawerSession | null> {
   try {
     const session = await db.pOSSession.findFirst({
       where: {
-        terminalId,
+        stationId,
         status: "ACTIVE",
       },
       include: {
-        terminal: {
+        station: {
           select: {
             id: true,
             name: true,
-            terminalNumber: true,
+            stationNumber: true,
           },
         },
         user: {

@@ -1,7 +1,7 @@
 import { Category } from "@/types/category";
 import { CategoryKeys } from "@/types/queryKeys";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { toast } from "sonner";
+import { useNotifications } from "@/components/notifications/NotificationProvider";
 type CategoryMutationContext = {
   previousCategoryDetail?: Category;
   previousCategoriesList?: Category[];
@@ -12,6 +12,7 @@ function useCategoryMutation<T>(
   errorMessage: string,
 ) {
   const queryClient = useQueryClient()
+  const { formSuccess, formError } = useNotifications();
 
   return useMutation<Category | null, Error, { id: string; data: T }, CategoryMutationContext>({
     mutationFn,
@@ -24,24 +25,26 @@ function useCategoryMutation<T>(
       const previousCategoryDetail = queryClient.getQueryData<Category>(CategoryKeys.detail(variables.id))
       const previousCategoriesList = queryClient.getQueryData<Category[]>(CategoryKeys.lists())
 
-      // Optimistically update brand detail
+      // Optimistically update category detail
       queryClient.setQueryData(CategoryKeys.detail(variables.id), (oldData: Category | undefined) => {
         return oldData ? { ...oldData, ...variables.data } : undefined
       })
 
-      // Optimistically update brands list
+      // Optimistically update categories list
       queryClient.setQueryData(CategoryKeys.lists(), (oldData: Category[] | undefined) => {
         if (!oldData) return oldData
-        return oldData.map((brand) => (brand.id === variables.id ? { ...brand, ...variables.data } : brand))
+        return oldData.map((category) => (category.id === variables.id ? { ...category, ...variables.data } : category))
       })
 
       return { previousCategoryDetail, previousCategoriesList }
     },
 
     onError: (error: Error, variables, context) => {
-      toast.error(errorMessage, {
-        description: error.message || "Unknown error occurred",
-      })
+      formError(
+        "Category Operation",
+        error.message || "Unknown error occurred",
+        errorMessage
+      );
 
       // Rollback optimistic updates
       if (context?.previousCategoryDetail) {
@@ -53,7 +56,7 @@ function useCategoryMutation<T>(
     },
 
     onSuccess: (updatedCategory, variables) => {
-      toast.success(successMessage)
+      formSuccess("Category Operation", successMessage);
 
       if (!updatedCategory) return
 
@@ -61,7 +64,7 @@ function useCategoryMutation<T>(
       queryClient.setQueryData(CategoryKeys.detail(variables.id), updatedCategory)
       queryClient.setQueryData(CategoryKeys.lists(), (oldData: Category[] | undefined) => {
         if (!oldData) return [updatedCategory]
-        return oldData.map((brand) => (brand.id === variables.id ? updatedCategory : brand))
+        return oldData.map((category) => (category.id === variables.id ? updatedCategory : category))
       })
 
       // Invalidate related queries to ensure consistency

@@ -699,18 +699,28 @@ export function POSTerminalFinal({ organizationId, locationId, terminalId, userI
       warning("Empty Cart", "Please add items to cart before processing payment.")
       return
     }
+    if (!selectedCustomer) {
+      error("Customer Required", "Please select a customer before completing the sale.")
+      return
+    }
     setIsPaymentDialogOpen(true)
-  }, [cart.length, warning])
+  }, [cart.length, selectedCustomer, warning, error])
 
   useEffect(() => {
     const initializeSession = async () => {
-      if (!organizationId) return // Guard clause instead of early return
+      if (!organizationId || currentSession) {
+        console.log("Skipping session initialization:", { organizationId: !!organizationId, hasSession: !!currentSession })
+        return // Don't initialize if we already have a session or missing org ID
+      }
 
       try {
+        console.log("Attempting to get active session for terminal:", selectedTerminalId)
         const existingSessionResult = await getActivePOSSession(selectedTerminalId)
+        console.log("Session retrieval result:", existingSessionResult)
 
         if (existingSessionResult.success && existingSessionResult.data) {
           const session = existingSessionResult.data
+          console.log("Found existing session:", session)
           setCurrentSession({
             id: session.id,
             sessionNumber: session.sessionNumber,
@@ -735,6 +745,13 @@ export function POSTerminalFinal({ organizationId, locationId, terminalId, userI
 
           success("Session Restored", `Continuing session ${session.sessionNumber}`)
         } else {
+          console.log("No existing session found, creating new session with params:", {
+            terminalId: selectedTerminalId,
+            userId: userId || "",
+            locationId: selectedLocationId,
+            organizationId,
+            openingBalance: 200.0,
+          })
           const newSessionResult = await createPOSSession({
             terminalId: selectedTerminalId,
             userId: userId || "",
@@ -745,7 +762,20 @@ export function POSTerminalFinal({ organizationId, locationId, terminalId, userI
 
           if (newSessionResult.success && newSessionResult.data) {
             const session = newSessionResult.data
-            // setCurrentSession({})
+            console.log("Session created successfully:", session)
+
+            setCurrentSession({
+              id: session.id,
+              sessionNumber: session.sessionNumber,
+              status: session.status as POSSessionStatus,
+              startTime: new Date(session.startTime),
+              openingBalance: session.openingBalance,
+              totalSales: session.totalSales,
+              transactionCount: session.transactionCount,
+              cashTotal: session.cashTotal || 0,
+              cardTotal: session.cardTotal || 0,
+              digitalTotal: session.digitalTotal || 0,
+            })
 
             setCashDrawerStatus({
               isOpen: true,
@@ -755,6 +785,7 @@ export function POSTerminalFinal({ organizationId, locationId, terminalId, userI
 
             success("New Session Started", `Session ${session.sessionNumber} created successfully`)
           } else {
+            console.error("Session creation failed:", newSessionResult.error)
             error("Session Error", newSessionResult.error || "Failed to create POS session")
           }
         }
@@ -1596,10 +1627,30 @@ export function POSTerminalFinal({ organizationId, locationId, terminalId, userI
                       </div>
 
                       <div className="space-y-3">
+                        {cart.length > 0 && !selectedCustomer && (
+                          <div className="p-3 bg-gradient-to-r from-amber-50 to-orange-50 rounded-lg border border-amber-200">
+                            <div className="flex items-center gap-2 text-amber-800">
+                              <User className="h-4 w-4" />
+                              <span className="text-sm font-medium">Please select a customer to complete the sale</span>
+                            </div>
+                          </div>
+                        )}
+                        {!currentSession && (
+                          <div className="p-3 bg-gradient-to-r from-red-50 to-pink-50 rounded-lg border border-red-200">
+                            <div className="flex items-center gap-2 text-red-800">
+                              <AlertTriangle className="h-4 w-4" />
+                              <span className="text-sm font-medium">No active POS session. Please start a session to process transactions.</span>
+                            </div>
+                          </div>
+                        )}
+                        {/* Debug info - remove in production */}
+                        <div className="p-2 bg-gray-100 rounded text-xs">
+                          Debug: Processing: {isProcessing ? 'true' : 'false'} | Session: {currentSession ? 'active' : 'none'} | Cart: {cart.length} items | Customer: {selectedCustomer ? selectedCustomer.name : 'none'}
+                        </div>
                         <Button
                           type="submit"
                           className="w-full bg-gradient-to-r from-emerald-500 to-emerald-600 text-white hover:from-emerald-600 hover:to-emerald-700 shadow-lg hover:shadow-xl transition-all h-12 text-lg font-semibold"
-                          disabled={isProcessing || !currentSession || cart.length === 0}
+                          disabled={isProcessing || !currentSession || cart.length === 0 || !selectedCustomer}
                         >
                           <CreditCard className="mr-3 h-5 w-5" />
                           {isProcessing ? "Processing..." : "Complete Sale"}

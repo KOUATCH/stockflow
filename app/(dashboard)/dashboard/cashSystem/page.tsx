@@ -73,7 +73,7 @@ export default function HomePage() {
   const terminalsData = terminalResponse?.data || []
   console.log(terminalResponse)
 
-  const { data, isLoading, error } = useItemsWithInventory({
+  const { data, isLoading: itemsLoading, error } = useItemsWithInventory({
     locationId: selectedLocation,
     organizationId: orgId,
     trackInventory: true,

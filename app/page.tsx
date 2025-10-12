@@ -191,7 +191,7 @@ export default function LandingPage() {
             </p>
 
             <div className="flex flex-col sm:flex-row gap-4 justify-center mb-16">
-              <Link href="/auth/register">
+              <Link href="/register">
                 <Button
                   size="lg"
                   className="bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white px-8 py-6 text-lg shadow-2xl hover:shadow-emerald-500/25 transition-all duration-300 hover:scale-105"
@@ -391,8 +391,8 @@ export default function LandingPage() {
               <Card
                 key={index}
                 className={`relative ${plan.popular
-                    ? 'border-2 border-emerald-300 ring-4 ring-emerald-100 scale-105 bg-gradient-to-br from-emerald-50 to-teal-50'
-                    : 'border border-slate-200'
+                  ? 'border-2 border-emerald-300 ring-4 ring-emerald-100 scale-105 bg-gradient-to-br from-emerald-50 to-teal-50'
+                  : 'border border-slate-200'
                   } hover:shadow-2xl transition-all duration-300`}
               >
                 {plan.popular && (
@@ -421,16 +421,18 @@ export default function LandingPage() {
                       </li>
                     ))}
                   </ul>
+                  <Link href="/register">
 
-                  <Button
-                    className={`w-full ${plan.popular
+                    <Button
+                      className={`w-full ${plan.popular
                         ? 'bg-gradient-to-r from-emerald-500 to-teal-600 hover:from-emerald-600 hover:to-teal-700 text-white'
                         : 'border-2 border-emerald-300 text-emerald-700 hover:bg-emerald-50'
-                      }`}
-                    variant={plan.popular ? "default" : "outline"}
-                  >
-                    {plan.price === "Custom" ? "Contact Sales" : "Start Free Trial"}
-                  </Button>
+                        }`}
+                      variant={plan.popular ? "default" : "outline"}
+                    >
+                      {plan.price === "Custom" ? "Contact Sales" : "Start Free Trial"}
+                    </Button>
+                  </Link>
                 </CardContent>
               </Card>
             ))}
@@ -448,7 +450,7 @@ export default function LandingPage() {
             Join thousands of retailers who have streamlined their operations with StockFlow
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <Link href="/auth/register">
+            <Link href="/register">
               <Button
                 size="lg"
                 className="bg-white text-emerald-600 hover:bg-emerald-50 px-8 py-6 text-lg shadow-2xl hover:scale-105 transition-all duration-300"

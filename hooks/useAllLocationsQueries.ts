@@ -4,7 +4,7 @@ import { getOrgLocations } from "@/actions/locations/getOrgLocations"
 import updateLocationById from "@/actions/locations/updateLocationById"
 import type { LocationDTO } from "@/types/location"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { toast } from "sonner"
+import { useNotifications } from "@/components/notifications/NotificationProvider"
 
 // Query keys for caching
 export const LocationKeys = {
@@ -25,6 +25,8 @@ export const useOrgLocationsNew = (
   organizationId: string,
   options?: { enabled?: boolean }
 ): UseQueryResult<Awaited<ReturnType<typeof getOrgLocations>>, Error> => {
+  const { error: notifyError } = useNotifications();
+
   return useQuery({
     queryKey: LocationKeys.orgLocations(organizationId),
     queryFn: async () => {
@@ -33,10 +35,22 @@ export const useOrgLocationsNew = (
       }
       try {
         const result = await getOrgLocations(organizationId)
+        console.log('Location fetch result:', result); // Debug log
         return result
       } catch (error) {
         console.error("Failed to fetch organization locations:", error)
-        toast.error("Failed to load locations. Please try again.")
+        notifyError(
+          "Failed to Load Locations",
+          "Unable to load locations for this organization. Please try again.",
+          {
+            category: "error",
+            priority: "normal",
+            action: {
+              label: "Retry",
+              onClick: () => console.log("Retry locations fetch")
+            }
+          }
+        );
         throw error // Re-throw to let React Query handle it
       }
     },
@@ -49,10 +63,12 @@ export const useOrgLocationsNew = (
 
 export function useCreateALocation() {
   const queryClient = useQueryClient()
+  const { formSuccess, formError } = useNotifications();
+
   return useMutation({
     mutationFn: async (data: LocationDTO) => await createLocation(data),
     onSuccess: (_data, variables) => {
-      toast.success("Location added successfully")
+      formSuccess("Location Creation", "Location has been added successfully");
       if (variables.organizationId) {
         queryClient.invalidateQueries({ queryKey: LocationKeys.orgLocations(variables.organizationId) })
       } else {
@@ -60,15 +76,19 @@ export function useCreateALocation() {
       }
     },
     onError: (error: Error) => {
-      toast.error("Failed to add Location", {
-        description: error.message || "Unknown error occurred",
-      })
+      formError(
+        "Location Creation",
+        error.message || "Unknown error occurred",
+        "Failed to add location"
+      );
     },
   })
 }
 
 export function useDeleteLocation() {
   const queryClient = useQueryClient()
+  const { success, error } = useNotifications();
+
   return useMutation({
     mutationFn: async ({ id, organizationId }: { id: string; organizationId?: string }) => await deleteLocation(id),
     onMutate: async ({ id, organizationId }) => {
@@ -114,12 +134,17 @@ export function useDeleteLocation() {
       return { previousData, queryKeys }
     },
     onSuccess: () => {
-      toast.success("Location deleted successfully")
+      success("Location Deleted", "Location has been successfully removed");
     },
-    onError: (error: Error, _variables, context) => {
-      toast.error("Failed to delete Location", {
-        description: error.message || "Unknown error occurred",
-      })
+    onError: (err: Error, _variables, context) => {
+      error(
+        "Delete Failed",
+        err.message || "Unknown error occurred",
+        {
+          category: "error",
+          priority: "normal"
+        }
+      );
       if (context?.previousData && context?.queryKeys) {
         context.queryKeys.forEach((key) => {
           const keyString = JSON.stringify(key)
@@ -142,6 +167,8 @@ export function useDeleteLocation() {
 
 export function useUpdateALocation() {
   const queryClient = useQueryClient()
+  const { formSuccess, formError } = useNotifications();
+
   return useMutation({
     mutationFn: async ({ id, data }: { id: string; data: LocationDTO }) => await updateLocationById(id, data),
     onMutate: async (variables) => {
@@ -180,10 +207,12 @@ export function useUpdateALocation() {
       }
       return { previousLocationDetail, previousLocationsList, previousOrgLocations }
     },
-    onError: (error, variables, context) => {
-      toast.error("Failed to update Location", {
-        description: error.message || "Unknown error occurred",
-      })
+    onError: (err, variables, context) => {
+      formError(
+        "Location Update",
+        err.message || "Unknown error occurred",
+        "Failed to update location"
+      );
       if (context?.previousLocationDetail) {
         queryClient.setQueryData(LocationKeys.detail(variables.id), context.previousLocationDetail)
       }
@@ -194,8 +223,13 @@ export function useUpdateALocation() {
         queryClient.setQueryData(LocationKeys.orgLocations(variables.data.organizationId), context.previousOrgLocations)
       }
     },
-    onSuccess: (updatedLocation, variables) => {
-      toast.success("Location updated successfully")
+    onSuccess: (response, variables) => {
+      formSuccess("Location Update", "Location has been updated successfully");
+
+      // Extract the actual location data from the response
+      const updatedLocation = response?.data;
+      if (!updatedLocation || !response?.success) return;
+
       queryClient.setQueryData(LocationKeys.detail(variables.id), (oldData: LocationDTO | undefined) => {
         return { ...oldData, ...updatedLocation }
       })
@@ -203,14 +237,14 @@ export function useUpdateALocation() {
         if (!oldData) return [updatedLocation]
         return oldData.map((location) => (location.id === variables.id ? updatedLocation : location))
       })
-      if (updatedLocation?.data?.organizationId) {
+      if (updatedLocation.organizationId) {
         queryClient.setQueryData(
-          LocationKeys.orgLocations(updatedLocation?.data?.organizationId),
+          LocationKeys.orgLocations(updatedLocation.organizationId),
           (oldData: { data: LocationDTO[] } | undefined) => {
             if (!oldData) return { data: [updatedLocation] }
             return {
               ...oldData,
-              data: oldData.data.map((location) => (location.id === updatedLocation?.data?.id ? updatedLocation : location)),
+              data: oldData.data.map((location) => (location.id === updatedLocation.id ? updatedLocation : location)),
             }
           },
         )
@@ -221,6 +255,8 @@ export function useUpdateALocation() {
 
 export function useUpdateLocationBasicInfo() {
   const queryClient = useQueryClient()
+  const { formSuccess, formError } = useNotifications();
+
   return useMutation({
     mutationFn: async ({ id, data }: { id: string; data: LocationDTO }) => updateLocationById(id, data),
     onMutate: async (variables) => {
@@ -260,9 +296,11 @@ export function useUpdateLocationBasicInfo() {
       return { previousLocationDetail, previousLocationsList, previousOrgLocations }
     },
     onError: (error, variables, context) => {
-      toast.error("Failed to update location basic info", {
-        description: error.message || "Unknown error occurred",
-      })
+      formError(
+        "Location Basic Info Update",
+        error.message || "Unknown error occurred",
+        "Failed to update location basic info"
+      );
       if (context?.previousLocationDetail) {
         queryClient.setQueryData(LocationKeys.detail(variables.id), context.previousLocationDetail)
       }
@@ -273,8 +311,13 @@ export function useUpdateLocationBasicInfo() {
         queryClient.setQueryData(LocationKeys.orgLocations(variables.data.organizationId), context.previousOrgLocations)
       }
     },
-    onSuccess: (updatedLocation, variables) => {
-      toast.success("Location basic info updated successfully")
+    onSuccess: (response, variables) => {
+      formSuccess("Location Update", "Location has been updated successfully");
+
+      // Extract the actual location data from the response
+      const updatedLocation = response?.data;
+      if (!updatedLocation || !response?.success) return;
+
       queryClient.setQueryData(LocationKeys.detail(variables.id), (oldData: LocationDTO | undefined) => {
         return { ...oldData, ...updatedLocation }
       })
@@ -282,14 +325,14 @@ export function useUpdateLocationBasicInfo() {
         if (!oldData) return [updatedLocation]
         return oldData.map((location) => (location.id === variables.id ? updatedLocation : location))
       })
-      if (updatedLocation?.data?.organizationId) {
+      if (updatedLocation.organizationId) {
         queryClient.setQueryData(
-          LocationKeys.orgLocations(updatedLocation?.data?.organizationId),
+          LocationKeys.orgLocations(updatedLocation.organizationId),
           (oldData: { data: LocationDTO[] } | undefined) => {
             if (!oldData) return { data: [updatedLocation] }
             return {
               ...oldData,
-              data: oldData.data.map((location) => (location.id === updatedLocation?.data?.id ? updatedLocation : location)),
+              data: oldData.data.map((location) => (location.id === updatedLocation.id ? updatedLocation : location)),
             }
           },
         )
@@ -300,6 +343,8 @@ export function useUpdateLocationBasicInfo() {
 
 export function useUpdateLocationOthers() {
   const queryClient = useQueryClient()
+  const { formSuccess, formError } = useNotifications();
+
   return useMutation({
     mutationFn: async ({ id, data }: { id: string; data: LocationDTO }) => updateLocationById(id, data),
     onMutate: async (variables) => {
@@ -339,9 +384,11 @@ export function useUpdateLocationOthers() {
       return { previousLocationDetail, previousLocationsList, previousOrgLocations }
     },
     onError: (error, variables, context) => {
-      toast.error("Failed to update location details", {
-        description: error.message || "Unknown error occurred",
-      })
+      formError(
+        "Location Details Update",
+        error.message || "Unknown error occurred",
+        "Failed to update location details"
+      );
       if (context?.previousLocationDetail) {
         queryClient.setQueryData(LocationKeys.detail(variables.id), context.previousLocationDetail)
       }
@@ -352,8 +399,13 @@ export function useUpdateLocationOthers() {
         queryClient.setQueryData(LocationKeys.orgLocations(variables.data.organizationId), context.previousOrgLocations)
       }
     },
-    onSuccess: (updatedLocation, variables) => {
-      toast.success("Location basic info updated successfully")
+    onSuccess: (response, variables) => {
+      formSuccess("Location Update", "Location has been updated successfully");
+
+      // Extract the actual location data from the response
+      const updatedLocation = response?.data;
+      if (!updatedLocation || !response?.success) return;
+
       queryClient.setQueryData(LocationKeys.detail(variables.id), (oldData: LocationDTO | undefined) => {
         return { ...oldData, ...updatedLocation }
       })
@@ -361,14 +413,14 @@ export function useUpdateLocationOthers() {
         if (!oldData) return [updatedLocation]
         return oldData.map((location) => (location.id === variables.id ? updatedLocation : location))
       })
-      if (updatedLocation?.data?.organizationId) {
+      if (updatedLocation.organizationId) {
         queryClient.setQueryData(
-          LocationKeys.orgLocations(updatedLocation?.data?.organizationId),
+          LocationKeys.orgLocations(updatedLocation.organizationId),
           (oldData: { data: LocationDTO[] } | undefined) => {
             if (!oldData) return { data: [updatedLocation] }
             return {
               ...oldData,
-              data: oldData.data.map((location) => (location.id === updatedLocation?.data?.id ? updatedLocation : location)),
+              data: oldData.data.map((location) => (location.id === updatedLocation.id ? updatedLocation : location)),
             }
           },
         )

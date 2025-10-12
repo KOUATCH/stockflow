@@ -1,8 +1,7 @@
 import { TaxRateKeys } from "@/types/queryKeys";
 import { TaxRate } from "@/types/taxRates";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { toast } from "sonner";
-// import { TaxRateKeys } from "../useAllTaxRateQueries";
+import { useNotifications } from "@/components/notifications/NotificationProvider";
 type TaxRateMutationContext = {
   previousTaxRateDetail?: TaxRate;
   previousTaxRatesList?: TaxRate[];
@@ -13,6 +12,7 @@ function useTaxRateMutation<T>(
   errorMessage: string,
 ) {
   const queryClient = useQueryClient()
+  const { formSuccess, formError } = useNotifications();
 
   return useMutation<TaxRate | null, Error, { id: string; data: T }, TaxRateMutationContext>({
     mutationFn,
@@ -25,24 +25,26 @@ function useTaxRateMutation<T>(
       const previousTaxRateDetail = queryClient.getQueryData<TaxRate>(TaxRateKeys.detail(variables.id))
       const previousTaxRatesList = queryClient.getQueryData<TaxRate[]>(TaxRateKeys.lists())
 
-      // Optimistically update brand detail
+      // Optimistically update tax rate detail
       queryClient.setQueryData(TaxRateKeys.detail(variables.id), (oldData: TaxRate | undefined) => {
         return oldData ? { ...oldData, ...variables.data } : undefined
       })
 
-      // Optimistically update brands list
+      // Optimistically update tax rates list
       queryClient.setQueryData(TaxRateKeys.lists(), (oldData: TaxRate[] | undefined) => {
         if (!oldData) return oldData
-        return oldData.map((brand) => (brand.id === variables.id ? { ...brand, ...variables.data } : brand))
+        return oldData.map((taxRate) => (taxRate.id === variables.id ? { ...taxRate, ...variables.data } : taxRate))
       })
 
       return { previousTaxRateDetail, previousTaxRatesList }
     },
 
     onError: (error: Error, variables, context) => {
-      toast.error(errorMessage, {
-        description: error.message || "Unknown error occurred",
-      })
+      formError(
+        "Tax Rate Operation",
+        error.message || "Unknown error occurred",
+        errorMessage
+      );
 
       // Rollback optimistic updates
       if (context?.previousTaxRateDetail) {
@@ -54,7 +56,7 @@ function useTaxRateMutation<T>(
     },
 
     onSuccess: (updatedTaxRate, variables) => {
-      toast.success(successMessage)
+      formSuccess("Tax Rate Operation", successMessage);
 
       if (!updatedTaxRate) return
 
@@ -62,7 +64,7 @@ function useTaxRateMutation<T>(
       queryClient.setQueryData(TaxRateKeys.detail(variables.id), updatedTaxRate)
       queryClient.setQueryData(TaxRateKeys.lists(), (oldData: TaxRate[] | undefined) => {
         if (!oldData) return [updatedTaxRate]
-        return oldData.map((brand) => (brand.id === variables.id ? updatedTaxRate : brand))
+        return oldData.map((taxRate) => (taxRate.id === variables.id ? updatedTaxRate : taxRate))
       })
 
       // Invalidate related queries to ensure consistency

@@ -1,10 +1,11 @@
 import deleteTaxRate from "@/actions/taxRate/deleteTaxRate"
-import { TaxRateKeys } from "@/types/queryKeys"; // Use TaxRateKeys instead of ItemKeys
+import { TaxRateKeys } from "@/types/queryKeys";
 import { useMutation, useQueryClient } from "@tanstack/react-query"
-import { toast } from "sonner"
+import { useNotifications } from "@/components/notifications/NotificationProvider"
 
 export function useDeleteTaxRate() {
   const queryClient = useQueryClient()
+  const { success, error } = useNotifications();
 
   return useMutation({
     mutationFn: async (id: string) => {
@@ -17,15 +18,24 @@ export function useDeleteTaxRate() {
       return result
     },
     onSuccess: (_, deletedId) => {
-      toast.success("Tax rate deleted successfully")
+      success("Tax Rate Deleted", "Tax rate has been successfully removed");
 
       queryClient.removeQueries({ queryKey: TaxRateKeys.detail(deletedId) })
       queryClient.invalidateQueries({ queryKey: TaxRateKeys.lists() })
     },
-    onError: (error: Error) => {
-      toast.error("Failed to delete tax rate", {
-        description: error.message || "Unknown error occurred",
-      })
+    onError: (err: Error) => {
+      error(
+        "Delete Failed",
+        err.message || "Unknown error occurred",
+        {
+          category: "error",
+          priority: "normal",
+          action: {
+            label: "Try Again",
+            onClick: () => console.log("Retry delete tax rate")
+          }
+        }
+      );
     },
   })
 }

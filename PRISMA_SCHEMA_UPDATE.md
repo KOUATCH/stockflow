@@ -1,0 +1,322 @@
+# Prisma Schema Update for Presence Monitoring
+
+Add the following models and relations to your existing `prisma/schema.prisma` file:
+
+## 1. Add these relations to the existing User model (around line 132):
+
+```prisma
+// Add these to the existing User model relations section
+presenceSessions      EmployeePresenceSession[]
+approvedSessions      EmployeePresenceSession[] @relation("PresenceApprover")
+activityLogs          EmployeeActivityLog[]     @relation("UserActivityLogs")
+breakSessions         EmployeeBreakSession[]    @relation("UserBreakSessions")
+approvedBreaks        EmployeeBreakSession[]    @relation("BreakApprover")
+schedules             EmployeeSchedule[]        @relation("UserSchedules")
+presenceAlerts        PresenceAlert[]           @relation("UserPresenceAlerts")
+resolvedAlerts        PresenceAlert[]           @relation("AlertResolver")
+attendanceReports     AttendanceReport[]        @relation("UserAttendanceReports")
+```
+
+## 2. Add these relations to the existing Organization model (around line 209):
+
+```prisma
+// Add these to the existing Organization model relations section
+presenceSessions      EmployeePresenceSession[]
+employeeSchedules     EmployeeSchedule[]
+presenceAlerts        PresenceAlert[]           @relation("OrgPresenceAlerts")
+attendanceReports     AttendanceReport[]        @relation("OrgAttendanceReports")
+```
+
+## 3. Add these relations to the existing Location model (around line 440):
+
+```prisma
+// Add these to the existing Location model relations section
+presenceSessions      EmployeePresenceSession[]
+employeeSchedules     EmployeeSchedule[]        @relation("ScheduleLocation")
+attendanceReports     AttendanceReport[]        @relation("LocationAttendanceReports")
+```
+
+## 4. Add this relation to the existing POSStation model (around line 1106):
+
+```prisma
+// Add this to the existing POSStation model relations section
+presenceSessions      EmployeePresenceSession[]
+```
+
+## 5. Add these new models at the end of the schema (before the enums section):
+
+```prisma
+// Employee Presence Monitoring Models
+model EmployeePresenceSession {
+  id                    String    @id @default(cuid())
+  userId                String
+  locationId            String
+  organizationId        String
+  terminalId            String?
+  status                PresenceStatus @default(CLOCKED_IN)
+  clockInTime           DateTime  @default(now())
+  clockOutTime          DateTime?
+  expectedClockOutTime  DateTime?
+  totalMinutesWorked    Int       @default(0)
+  totalBreakMinutes     Int       @default(0)
+  overtime              Boolean   @default(false)
+  overtimeMinutes       Int       @default(0)
+  notes                 String?
+  clockInMethod         ClockMethod @default(MANUAL)
+  clockOutMethod        ClockMethod?
+  ipAddress             String?
+  deviceInfo            Json?
+  geolocation           Json?
+  approvedById          String?
+  approvedAt            DateTime?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+
+  // Relations
+  user           User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  location       Location                @relation(fields: [locationId], references: [id], onDelete: Cascade)
+  organization   Organization            @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  terminal       POSStation?             @relation(fields: [terminalId], references: [id], onDelete: SetNull)
+  approver       User?                   @relation("PresenceApprover", fields: [approvedById], references: [id])
+  activityLogs   EmployeeActivityLog[]
+  breakSessions  EmployeeBreakSession[]
+
+  @@unique([userId], where: { status: { in: [CLOCKED_IN, ON_BREAK] } })
+  @@index([userId])
+  @@index([organizationId])
+  @@index([locationId])
+  @@index([status])
+  @@index([clockInTime])
+  @@map("employee_presence_sessions")
+}
+
+model EmployeeActivityLog {
+  id                String   @id @default(cuid())
+  presenceSessionId String
+  userId            String
+  activityType      ActivityType
+  description       String?
+  timestamp         DateTime @default(now())
+  duration          Int?
+  metadata          Json?
+  systemGenerated   Boolean  @default(false)
+
+  // Relations
+  presenceSession EmployeePresenceSession @relation(fields: [presenceSessionId], references: [id], onDelete: Cascade)
+  user            User                    @relation("UserActivityLogs", fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([presenceSessionId])
+  @@index([userId])
+  @@index([timestamp])
+  @@index([activityType])
+  @@map("employee_activity_logs")
+}
+
+model EmployeeBreakSession {
+  id                String    @id @default(cuid())
+  presenceSessionId String
+  userId            String
+  breakType         BreakType @default(REGULAR)
+  startTime         DateTime  @default(now())
+  endTime           DateTime?
+  expectedDuration  Int?
+  actualDuration    Int?
+  reason            String?
+  notes             String?
+  approvedById      String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  // Relations
+  presenceSession EmployeePresenceSession @relation(fields: [presenceSessionId], references: [id], onDelete: Cascade)
+  user            User                    @relation("UserBreakSessions", fields: [userId], references: [id], onDelete: Cascade)
+  approver        User?                   @relation("BreakApprover", fields: [approvedById], references: [id])
+
+  @@index([presenceSessionId])
+  @@index([userId])
+  @@index([startTime])
+  @@map("employee_break_sessions")
+}
+
+model EmployeeSchedule {
+  id             String    @id @default(cuid())
+  userId         String
+  organizationId String
+  locationId     String?
+  dayOfWeek      Int       // 0 = Sunday, 1 = Monday, etc.
+  startTime      String    // "09:00"
+  endTime        String    // "17:00"
+  isActive       Boolean   @default(true)
+  effectiveFrom  DateTime
+  effectiveUntil DateTime?
+  breakDurations Json?     // Array of break durations
+  notes          String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  // Relations
+  user         User         @relation("UserSchedules", fields: [userId], references: [id], onDelete: Cascade)
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  location     Location?    @relation("ScheduleLocation", fields: [locationId], references: [id], onDelete: SetNull)
+
+  @@unique([userId, dayOfWeek, locationId, effectiveFrom], where: { isActive: true })
+  @@index([userId])
+  @@index([organizationId])
+  @@index([dayOfWeek])
+  @@map("employee_schedules")
+}
+
+model PresenceAlert {
+  id              String    @id @default(cuid())
+  userId          String
+  organizationId  String
+  alertType       AlertType
+  severity        AlertSeverity @default(LOW)
+  title           String
+  description     String?
+  isRead          Boolean   @default(false)
+  isResolved      Boolean   @default(false)
+  resolvedById    String?
+  resolvedAt      DateTime?
+  resolutionNotes String?
+  metadata        Json?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+
+  // Relations
+  user         User  @relation("UserPresenceAlerts", fields: [userId], references: [id], onDelete: Cascade)
+  organization Organization @relation("OrgPresenceAlerts", fields: [organizationId], references: [id], onDelete: Cascade)
+  resolver     User? @relation("AlertResolver", fields: [resolvedById], references: [id])
+
+  @@index([userId])
+  @@index([organizationId])
+  @@index([alertType])
+  @@index([isRead])
+  @@index([severity])
+  @@map("presence_alerts")
+}
+
+model AttendanceReport {
+  id                   String    @id @default(cuid())
+  userId               String
+  organizationId       String
+  locationId           String?
+  reportDate           DateTime  @db.Date
+  scheduledMinutes     Int       @default(0)
+  actualMinutes        Int       @default(0)
+  breakMinutes         Int       @default(0)
+  overtimeMinutes      Int       @default(0)
+  lateArrivalMinutes   Int       @default(0)
+  earlyDepartureMinutes Int      @default(0)
+  attendanceScore      Decimal   @default(100.00) @db.Decimal(5,2)
+  productivity         Decimal?  @db.Decimal(5,2)
+  notes                String?
+  generatedAt          DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  // Relations
+  user         User         @relation("UserAttendanceReports", fields: [userId], references: [id], onDelete: Cascade)
+  organization Organization @relation("OrgAttendanceReports", fields: [organizationId], references: [id], onDelete: Cascade)
+  location     Location?    @relation("LocationAttendanceReports", fields: [locationId], references: [id], onDelete: SetNull)
+
+  @@unique([userId, reportDate, locationId])
+  @@index([userId])
+  @@index([organizationId])
+  @@index([reportDate])
+  @@map("attendance_reports")
+}
+```
+
+## 6. Add these new enums at the end of the enums section:
+
+```prisma
+enum PresenceStatus {
+  CLOCKED_IN
+  ON_BREAK
+  CLOCKED_OUT
+  OVERTIME
+  LATE
+  ABSENT
+  OFFLINE
+}
+
+enum ClockMethod {
+  MANUAL
+  BIOMETRIC
+  CARD_SWIPE
+  MOBILE_APP
+  WEB_BROWSER
+  QR_CODE
+  NFC
+  GEOFENCE
+}
+
+enum ActivityType {
+  CLOCK_IN
+  CLOCK_OUT
+  BREAK_START
+  BREAK_END
+  TASK_START
+  TASK_END
+  SYSTEM_LOGIN
+  SYSTEM_LOGOUT
+  POS_TRANSACTION
+  INVENTORY_UPDATE
+  CUSTOMER_SERVICE
+  CLEANING
+  RESTOCKING
+  TRAINING
+  MEETING
+  ADMIN_TASK
+  SYSTEM_IDLE
+  SYSTEM_ACTIVE
+  LOCATION_CHANGE
+  OTHER
+}
+
+enum BreakType {
+  LUNCH
+  SHORT_BREAK
+  PERSONAL
+  TRAINING
+  MEETING
+  EMERGENCY
+  SICK
+  REGULAR
+  EXTENDED
+}
+
+enum AlertType {
+  LATE_ARRIVAL
+  EARLY_DEPARTURE
+  MISSED_CLOCK_OUT
+  EXTENDED_BREAK
+  NO_SHOW
+  OVERTIME_ALERT
+  SCHEDULE_CONFLICT
+  UNUSUAL_ACTIVITY
+  LOCATION_MISMATCH
+  SYSTEM_ERROR
+}
+
+enum AlertSeverity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+  URGENT
+}
+```
+
+## 7. After updating the schema:
+
+```bash
+# Generate Prisma client
+npx prisma generate
+
+# Create and apply migration
+npx prisma migrate dev --name add_presence_monitoring
+
+# Or if in production
+npx prisma db push
+```

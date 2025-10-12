@@ -5,7 +5,7 @@ import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
 import { useRouter } from "next/navigation"
-import { useToast } from "@/hooks/use-toast"
+import { useNotifications } from "@/components/notifications/NotificationProvider"
 import { loginUser } from "@/actions/auth/auth-actions"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
@@ -28,7 +28,7 @@ export function LoginForm() {
   const [error, setError] = useState("")
 
   const router = useRouter()
-  const { toast } = useToast()
+  const notifications = useNotifications()
 
   const form = useForm<LoginForm>({
     resolver: zodResolver(loginSchema),
@@ -51,10 +51,7 @@ export function LoginForm() {
       })
 
       if (result.success && result.user) {
-        toast({
-          title: "Login Successful",
-          description: `Welcome back, ${result.user.firstName}!`,
-        })
+        notifications.success("Login Successful", `Welcome back, ${result.user.firstName}!`)
         router.push("/pos")
       } else {
         setError(result.error || "Login failed")

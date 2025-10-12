@@ -3,7 +3,7 @@
 import { itemStandardInclude } from '@/lib/item/includes';
 import { listItemsSchema } from '@/lib/item/schemas';
 import { db } from '@/prisma/db';
-// import { db } from '@/lib/db'
+// import { db } from '@/prisma/db'
 // import { itemStandardInclude } from '@/lib/items/includes'
 // import { listItemsSchema } from '@/lib/items/schemas'
 import { Prisma } from '@prisma/client';

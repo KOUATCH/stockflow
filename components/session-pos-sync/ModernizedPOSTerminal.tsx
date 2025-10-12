@@ -9,7 +9,7 @@ import {
   updateInventoryLevels,
 } from "@/actions/pos/POSActionFinal"
 
-import { useToast } from "@/hooks/use-toast"
+import { useNotifications } from "@/components/notifications/NotificationProvider"
 import type { Customer } from "@/lib/cashSystem/db"
 import type { CartItem } from "@/lib/cashSystem/types"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
@@ -158,6 +158,9 @@ export function ModernizedPOSTerminal({ organizationId, locationId, terminalId, 
     openingBalance: number
     totalSales: number
     transactionCount: number
+    cashTotal: number
+    cardTotal: number
+    digitalTotal: number
     cashDrawerTransactions?: Array<{
       id: string
       cashDrawer: {
@@ -167,9 +170,6 @@ export function ModernizedPOSTerminal({ organizationId, locationId, terminalId, 
         lastActivity?: Date
       }
     }>
-    cashTotal: number
-    cardTotal: number
-    digitalTotal: number
   } | null>(null)
 
   const [cashDrawerStatus, setCashDrawerStatus] = useState<{
@@ -187,16 +187,21 @@ export function ModernizedPOSTerminal({ organizationId, locationId, terminalId, 
     avgTransaction: 136.15,
   })
 
-  const { toast } = useToast()
+  const notifications = useNotifications()
   const queryClient = useQueryClient()
 
   if (!organizationId) {
-    toast({
-      variant: "destructive",
-      title: "Error",
-      description: "User organization not found.",
-    })
-    return <></>
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 p-6 flex items-center justify-center">
+        <div className="text-center">
+          <div className="p-4 rounded-full bg-red-100 inline-block mb-4">
+            <AlertTriangle className="h-16 w-16 text-red-600" />
+          </div>
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">Organization Required</h2>
+          <p className="text-gray-600">User organization not found. Please contact support.</p>
+        </div>
+      </div>
+    )
   }
 
   const {
@@ -208,14 +213,12 @@ export function ModernizedPOSTerminal({ organizationId, locationId, terminalId, 
     enabled: !!organizationId && !!selectedLocationId,
   })
 
-  if (error) {
-    console.error("Failed to load items:", error)
-    toast({
-      variant: "destructive",
-      title: "Error",
-      description: itemsData?.message || "Failed to load items.",
-    })
-  }
+  useEffect(() => {
+    if (error) {
+      console.error("Failed to load items:", error)
+      notifications.error("Error", itemsData?.message || "Failed to load items.")
+    }
+  }, [error, itemsData?.message, notifications])
   const items = itemsData?.data || []
 
   useEffect(() => {
@@ -244,10 +247,7 @@ export function ModernizedPOSTerminal({ organizationId, locationId, terminalId, 
   useEffect(() => {
     if (selectedLocationId && cart.length > 0) {
       clearCart()
-      toast({
-        title: "Location Changed",
-        description: "Cart cleared due to location change. Items are now filtered for the new location.",
-      })
+      notifications.info("Location Changed", "Cart cleared due to location change. Items are now filtered for the new location.")
     }
   }, [selectedLocationId])
 
@@ -287,11 +287,7 @@ export function ModernizedPOSTerminal({ organizationId, locationId, terminalId, 
     },
     onError: (error) => {
       console.error("Sale creation failed:", error)
-      toast({
-        variant: "destructive",
-        title: "Sale Failed",
-        description: "Failed to create sale. Please try again.",
-      })
+      notifications.error("Sale Failed", "Failed to create sale. Please try again.")
     },
   })
 
@@ -302,11 +298,7 @@ export function ModernizedPOSTerminal({ organizationId, locationId, terminalId, 
     },
     onError: (error) => {
       console.error("Payment creation failed:", error)
-      toast({
-        variant: "destructive",
-        title: "Payment Failed",
-        description: "Failed to process payment. Please try again.",
-      })
+      notifications.error("Payment Failed", "Failed to process payment. Please try again.")
     },
   })
 
@@ -365,20 +357,12 @@ export function ModernizedPOSTerminal({ organizationId, locationId, terminalId, 
 
   const processPayment = async () => {
     if (!currentSession) {
-      toast({
-        variant: "destructive",
-        title: "No Active Session",
-        description: "Please start a POS session before processing payments.",
-      })
+      notifications.error("No Active Session", "Please start a POS session before processing payments.")
       return
     }
 
     if (!cashDrawerStatus.isOpen && paymentMethod === PaymentMethod.CASH) {
-      toast({
-        variant: "destructive",
-        title: "Cash Drawer Closed",
-        description: "Please open the cash drawer before processing cash payments.",
-      })
+      notifications.error("Cash Drawer Closed", "Please open the cash drawer before processing cash payments.")
       return
     }
 
@@ -388,19 +372,12 @@ export function ModernizedPOSTerminal({ organizationId, locationId, terminalId, 
     try {
       const inventoryCheck = validateInventory()
       if (!inventoryCheck.valid) {
-        toast({
-          variant: "destructive",
-          title: "Inventory Error",
-          description: inventoryCheck.message,
-        })
+        notifications.error("Inventory Error", inventoryCheck.message)
         setIsProcessing(false)
         return
       }
 
-      toast({
-        title: "Processing Payment",
-        description: "Please wait while we process your transaction...",
-      })
+      notifications.info("Processing Payment", "Please wait while we process your transaction...")
 
       const progressInterval = setInterval(() => {
         setPaymentProgress((prev) => {
@@ -482,10 +459,7 @@ export function ModernizedPOSTerminal({ organizationId, locationId, terminalId, 
       setIsPaymentDialogOpen(false)
       setCashTendered("")
 
-      toast({
-        title: "Sale Completed Successfully!",
-        description: `Sale ID: ${saleResult.saleId} - Total: $${calculateTotal().toFixed(2)}`,
-      })
+      notifications.success("Sale Completed Successfully!", `Sale ID: ${saleResult.saleId} - Total: $${calculateTotal().toFixed(2)}`)
 
       const lowStockItems = items?.filter((item) => {
         const inventory = item.inventoryLevels?.[0]
@@ -493,19 +467,11 @@ export function ModernizedPOSTerminal({ organizationId, locationId, terminalId, 
       })
 
       if (lowStockItems && lowStockItems.length > 0) {
-        toast({
-          title: "Low Stock Alert",
-          description: `${lowStockItems.length} item(s) are running low on stock.`,
-          variant: "destructive",
-        })
+        notifications.warning("Low Stock Alert", `${lowStockItems.length} item(s) are running low on stock.`)
       }
     } catch (error) {
       console.error("Payment processing error:", error)
-      toast({
-        variant: "destructive",
-        title: "Payment Failed",
-        description: error instanceof Error ? error.message : "An unexpected error occurred",
-      })
+      notifications.error("Payment Failed", error instanceof Error ? error.message : "An unexpected error occurred")
     } finally {
       setIsProcessing(false)
       setPaymentProgress(0)
@@ -527,11 +493,7 @@ export function ModernizedPOSTerminal({ organizationId, locationId, terminalId, 
     const availableStock = item.inventoryLevels?.[0]?.quantityAvailable ?? 0
 
     if (currentQuantityInCart >= availableStock && availableStock > 0) {
-      toast({
-        variant: "destructive",
-        title: "Insufficient Stock",
-        description: `Cannot add more ${item.name}. Only ${availableStock} in stock.`,
-      })
+      notifications.error("Insufficient Stock", `Cannot add more ${item.name}. Only ${availableStock} in stock.`)
       return
     }
 
@@ -569,10 +531,7 @@ export function ModernizedPOSTerminal({ organizationId, locationId, terminalId, 
       ])
     }
 
-    toast({
-      title: "Item Added",
-      description: `${item.name} added to cart`,
-    })
+    notifications.success("Item Added", `${item.name} added to cart`)
   }
 
   const updateQuantity = (cartItemId: string, quantity: number) => {
@@ -588,11 +547,7 @@ export function ModernizedPOSTerminal({ organizationId, locationId, terminalId, 
     const availableStock = item?.inventoryLevels?.[0]?.quantityAvailable ?? 0
 
     if (item && quantity > availableStock && availableStock > 0) {
-      toast({
-        variant: "destructive",
-        title: "Insufficient Stock",
-        description: `Cannot set quantity to ${quantity}. Only ${availableStock} in stock.`,
-      })
+      notifications.error("Insufficient Stock", `Cannot set quantity to ${quantity}. Only ${availableStock} in stock.`)
       return
     }
 
@@ -659,11 +614,11 @@ export function ModernizedPOSTerminal({ organizationId, locationId, terminalId, 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     if (cart.length === 0) {
-      toast({
-        variant: "destructive",
-        title: "Empty Cart",
-        description: "Please add items to cart before processing payment.",
-      })
+      notifications.error("Empty Cart", "Please add items to cart before processing payment.")
+      return
+    }
+    if (!selectedCustomer) {
+      notifications.error("Customer Required", "Please select a customer before completing the sale.")
       return
     }
     setIsPaymentDialogOpen(true)
@@ -698,10 +653,7 @@ export function ModernizedPOSTerminal({ organizationId, locationId, terminalId, 
             })
           }
 
-          toast({
-            title: "Session Restored",
-            description: `Continuing session ${session.sessionNumber}`,
-          })
+          notifications.success("Session Restored", `Continuing session ${session.sessionNumber}`)
         } else {
           const newSessionResult = await createPOSSession({
             terminalId: selectedTerminalId,
@@ -713,7 +665,18 @@ export function ModernizedPOSTerminal({ organizationId, locationId, terminalId, 
 
           if (newSessionResult.success && newSessionResult.data) {
             const session = newSessionResult.data
-            // setCurrentSession({})
+            setCurrentSession({
+              id: session.id,
+              sessionNumber: session.sessionNumber,
+              status: session.status as POSSessionStatus,
+              startTime: new Date(session.startTime),
+              openingBalance: session.openingBalance,
+              totalSales: session.totalSales,
+              transactionCount: session.transactionCount,
+              cashTotal: session.cashTotal || 0,
+              cardTotal: session.cardTotal || 0,
+              digitalTotal: session.digitalTotal || 0,
+            })
 
             setCashDrawerStatus({
               isOpen: true,
@@ -721,25 +684,14 @@ export function ModernizedPOSTerminal({ organizationId, locationId, terminalId, 
               lastActivity: new Date(),
             })
 
-            toast({
-              title: "New Session Started",
-              description: `Session ${session.sessionNumber} created successfully`,
-            })
+            notifications.success("New Session Started", `Session ${session.sessionNumber} created successfully`)
           } else {
-            toast({
-              variant: "destructive",
-              title: "Session Error",
-              description: newSessionResult.error || "Failed to create POS session",
-            })
+            notifications.error("Session Error", newSessionResult.error || "Failed to create POS session")
           }
         }
       } catch (error) {
         console.error("Failed to initialize session:", error)
-        toast({
-          variant: "destructive",
-          title: "Session Error",
-          description: "Failed to initialize POS session",
-        })
+        notifications.error("Session Error", "Failed to initialize POS session")
       }
     }
 
@@ -769,11 +721,7 @@ export function ModernizedPOSTerminal({ organizationId, locationId, terminalId, 
     },
     onError: (error) => {
       console.error("Session creation failed:", error)
-      toast({
-        variant: "destructive",
-        title: "Session Failed",
-        description: "Failed to create POS session",
-      })
+      notifications.error("Session Failed", "Failed to create POS session")
     },
   })
 
@@ -1432,10 +1380,26 @@ export function ModernizedPOSTerminal({ organizationId, locationId, terminalId, 
                       </div>
 
                       <div className="space-y-3">
+                        {cart.length > 0 && !selectedCustomer && (
+                          <div className="p-3 bg-gradient-to-r from-amber-50 to-orange-50 rounded-lg border border-amber-200">
+                            <div className="flex items-center gap-2 text-amber-800">
+                              <User className="h-4 w-4" />
+                              <span className="text-sm font-medium">Please select a customer to complete the sale</span>
+                            </div>
+                          </div>
+                        )}
+                        {!currentSession && (
+                          <div className="p-3 bg-gradient-to-r from-red-50 to-pink-50 rounded-lg border border-red-200">
+                            <div className="flex items-center gap-2 text-red-800">
+                              <AlertTriangle className="h-4 w-4" />
+                              <span className="text-sm font-medium">No active POS session. Please start a session to process transactions.</span>
+                            </div>
+                          </div>
+                        )}
                         <Button
                           type="submit"
                           className="w-full bg-gradient-to-r from-emerald-500 to-emerald-600 text-white hover:from-emerald-600 hover:to-emerald-700 shadow-lg hover:shadow-xl transition-all h-12 text-lg font-semibold"
-                          disabled={isProcessing || !currentSession}
+                          disabled={isProcessing || !currentSession || cart.length === 0 || !selectedCustomer}
                         >
                           <CreditCard className="mr-3 h-5 w-5" />
                           {isProcessing ? "Processing..." : "Complete Sale"}

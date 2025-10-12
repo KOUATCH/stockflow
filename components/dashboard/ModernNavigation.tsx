@@ -1,151 +1,26 @@
 
 "use client";
 
+import { RouteDebugger } from '@/components/debug/RouteDebugger';
 import UserDropdownMenu from '@/components/UserDropdownMenu';
+import { navigationConfig, NavigationItem } from '@/components/dashboard/SidebarNavigation';
 import { useAuth } from '@/lib/auth-unified';
-import { PERMISSIONS } from '@/lib/permissions';
 import {
-  Activity,
-  Award,
-  BarChart3,
   Bell,
-  Briefcase,
   Building2,
   ChevronDown,
   ChevronRight,
-  Cpu,
   Crown,
-  Diamond,
-  DollarSign,
-  Globe,
   Hexagon,
-  Layers,
   Menu,
-  Orbit,
-  Package,
-  Package2,
   Search,
-  Settings,
   Shield,
-  ShoppingBag,
-  Star,
-  Target,
-  TrendingUp,
-  Users,
-  Users2,
-  X,
-  Zap
+  X
 } from 'lucide-react';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { RouteDebugger } from '@/components/debug/RouteDebugger';
 
-// Enhanced navigation configuration with RBAC integration
-const navigationConfig = [
-  {
-    title: "Command Center",
-    href: "/dashboard",
-    icon: Cpu,
-    permission: PERMISSIONS.VIEW_ORGANIZATION_SETTINGS,
-    gradient: "from-violet-500 via-purple-500 to-indigo-600",
-    glowColor: "shadow-violet-500/25",
-    badge: "New",
-    description: "Central hub for all operations"
-  },
-  {
-    title: "Team Universe",
-    icon: Users2,
-    permission: PERMISSIONS.READ_USERS,
-    gradient: "from-rose-500 via-pink-500 to-fuchsia-600",
-    glowColor: "shadow-rose-500/25",
-    badge: "Hot",
-    description: "Manage your dream team",
-    children: [
-      { title: "Admin Panel", href: "/dashboard/admin", permission: PERMISSIONS.MANAGE_ORGANIZATION, icon: Shield },
-      { title: "User Management", href: "/dashboard/settings/users", permission: PERMISSIONS.READ_USERS, icon: Users },
-      { title: "Role Management", href: "/dashboard/settings/roles", permission: PERMISSIONS.READ_ROLES, icon: Crown },
-      { title: "Change Password", href: "/dashboard/change-password", permission: PERMISSIONS.READ_USERS, icon: Star }
-    ]
-  },
-  {
-    title: "Inventory Galaxy",
-    icon: Hexagon,
-    permission: PERMISSIONS.READ_ITEMS,
-    gradient: "from-emerald-500 via-teal-500 to-cyan-600",
-    glowColor: "shadow-emerald-500/25",
-    badge: "Pro",
-    description: "Your digital warehouse",
-    children: [
-      { title: "Product Arsenal", href: "/dashboard/inventory/items", permission: PERMISSIONS.READ_ITEMS, icon: Package2 },
-      { title: "Category Matrix", href: "/dashboard/inventory/categories", permission: PERMISSIONS.READ_ITEMS, icon: Layers },
-      { title: "Brand Empire", href: "/dashboard/inventory/brands", permission: PERMISSIONS.READ_ITEMS, icon: Award },
-      { title: "Inventory Overview", href: "/dashboard/inventory", permission: PERMISSIONS.READ_ITEMS, icon: Target },
-      { title: "Stock Movements", href: "/dashboard/inventory/movements", permission: PERMISSIONS.READ_ITEMS, icon: Bell },
-      { title: "Stock Transfers", href: "/dashboard/inventory/transfers", permission: PERMISSIONS.MANAGE_INVENTORY_LEVELS, icon: Orbit }
-    ]
-  },
-  {
-    title: "Revenue Engine",
-    icon: Diamond,
-    permission: PERMISSIONS.VIEW_SALES_REPORTS,
-    gradient: "from-amber-500 via-orange-500 to-red-500",
-    glowColor: "shadow-amber-500/25",
-    badge: "$$",
-    description: "Money-making machine",
-    children: [
-      { title: "Sales Dashboard", href: "/dashboard/sales", permission: PERMISSIONS.VIEW_SALES_REPORTS, icon: TrendingUp },
-      // { title: "Sales Orders", href: "/dashboard/app/sales/orders", permission: PERMISSIONS.VIEW_SALES_REPORTS, icon: FileText },
-      { title: "POS Terminal", href: "/dashboard/app/sales/pos", permission: PERMISSIONS.OPERATE_POS, icon: Zap },
-      { title: "Advanced POS", href: "/dashboard/session-pos-sync", permission: PERMISSIONS.OPERATE_POS, icon: Diamond },
-      { title: "Customer Base", href: "/dashboard/customers", permission: PERMISSIONS.READ_CUSTOMERS, icon: Users }
-    ]
-  },
-  {
-    title: "Supply Chain",
-    icon: ShoppingBag,
-    permission: PERMISSIONS.READ_PURCHASE_ORDERS,
-    gradient: "from-sky-500 via-blue-500 to-indigo-500",
-    glowColor: "shadow-sky-500/25",
-    badge: "Elite",
-    description: "Procurement powerhouse",
-    children: [
-      { title: "Purchase Orders", href: "/dashboard/purchase-orders", permission: PERMISSIONS.READ_PURCHASE_ORDERS, icon: Briefcase },
-      { title: "Purchase Workflow", href: "/dashboard/purchaseOrderWorkflow", permission: PERMISSIONS.READ_PURCHASE_ORDERS, icon: Briefcase },
-      { title: "Supplier Management", href: "/dashboard/purchases/suppliers", permission: PERMISSIONS.READ_SUPPLIERS, icon: Globe },
-      { title: "Purchase Management", href: "/dashboard/purchases", permission: PERMISSIONS.READ_PURCHASE_ORDERS, icon: Package }
-    ]
-  },
-  {
-    title: "Intelligence Hub",
-    icon: Activity,
-    permission: PERMISSIONS.VIEW_ANALYTICS,
-    gradient: "from-indigo-500 via-purple-500 to-pink-500",
-    glowColor: "shadow-indigo-500/25",
-    badge: "AI",
-    description: "Data-driven insights",
-    children: [
-      { title: "Analytics Dashboard", href: "/dashboard/analytics", permission: PERMISSIONS.VIEW_ANALYTICS, icon: BarChart3 },
-      { title: "Financial Reports", href: "/dashboard/app/reports/financial", permission: PERMISSIONS.VIEW_FINANCIAL_REPORTS, icon: BarChart3 },
-      { title: "Inventory Reports", href: "/dashboard/app/reports/inventory", permission: PERMISSIONS.VIEW_INVENTORY_REPORTS, icon: TrendingUp },
-      { title: "Sales Analytics", href: "/dashboard/app/reports/sales", permission: PERMISSIONS.VIEW_SALES_REPORTS, icon: Target }
-    ]
-  },
-  {
-    title: "Control Center",
-    icon: Settings,
-    permission: PERMISSIONS.VIEW_ORGANIZATION_SETTINGS,
-    gradient: "from-slate-500 via-gray-600 to-zinc-700",
-    glowColor: "shadow-slate-500/25",
-    badge: "Admin",
-    description: "System configuration",
-    children: [
-      { title: "General Settings", href: "/dashboard/app/settings", permission: PERMISSIONS.VIEW_ORGANIZATION_SETTINGS, icon: Building2 },
-      { title: "Location Management", href: "/dashboard/settings/locations", permission: PERMISSIONS.MANAGE_LOCATION_SETTINGS, icon: Globe },
-      { title: "Tax Configuration", href: "/dashboard/settings/tax-rates", permission: PERMISSIONS.MANAGE_ORGANIZATION, icon: DollarSign },
-      { title: "User Management", href: "/dashboard/settings/users", permission: PERMISSIONS.READ_USERS, icon: Users }
-    ]
-  }
-];
+// Use the enhanced navigation configuration from SidebarNavigation
 
 
 const ModernNavigation = ({ children }: { children: React.ReactNode }) => {
@@ -153,18 +28,24 @@ const ModernNavigation = ({ children }: { children: React.ReactNode }) => {
   const pathname = usePathname();
   const router = useRouter();
   const [isMobileOpen, setIsMobileOpen] = useState(false);
-  const [expandedItems, setExpandedItems] = useState(new Set(['Team Universe', 'Inventory Galaxy']));
+  const [expandedItems, setExpandedItems] = useState(new Set(['Dashboard']));
   const [currentPath, setCurrentPath] = useState('/dashboard');
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [hoveredItem, setHoveredItem] = useState<string | null>(null);
+  const [isClient, setIsClient] = useState(false);
+
+  // Handle client-side hydration
+  useEffect(() => {
+    setIsClient(true);
+  }, []);
 
   // Sync currentPath with actual pathname
   useEffect(() => {
     setCurrentPath(pathname);
   }, [pathname]);
 
-  // Show loading state while session is loading
-  if (status === "loading") {
+  // Prevent hydration mismatch by showing loading state on server and during initial client render
+  if (!isClient || status === "loading") {
     return (
       <div className="flex h-screen items-center justify-center bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
         <div className="text-center">
@@ -195,40 +76,39 @@ const ModernNavigation = ({ children }: { children: React.ReactNode }) => {
   }
 
   const toggleExpanded = (title: string) => {
-    const newExpanded = new Set(expandedItems);
-    if (newExpanded.has(title)) {
-      newExpanded.delete(title);
-    } else {
+    const newExpanded = new Set<string>();
+    // If the clicked item is already expanded, close it (empty set)
+    // If it's not expanded, open only this item
+    if (!expandedItems.has(title)) {
       newExpanded.add(title);
     }
     setExpandedItems(newExpanded);
   };
 
   const filteredNavigation = navigationConfig.filter(item => {
-    if (!hasPermission(item.permission)) return false;
+    const hasItemPermission = hasPermission(item.permission);
+
+    // Debug logging for troubleshooting
+    if (process.env.NODE_ENV === 'development') {
+      console.log(`Checking navigation item: ${item.title}`, {
+        permission: item.permission,
+        hasPermission: hasItemPermission,
+        userPermissions: user?.permissions?.slice(0, 5) // Only log first 5 to avoid spam
+      });
+    }
+
+    if (!hasItemPermission) return false;
     if (item.children) {
       return item.children.some(child => hasPermission(child.permission));
     }
     return true;
   });
 
-  type NavItemType = {
-    title: string;
-    href?: string;
-    icon?: React.ElementType;
-    permission: string;
-    gradient?: string;
-    glowColor?: string;
-    badge?: string;
-    description?: string;
-    children?: NavItemType[];
-  };
-
-  const NavItem = ({ item, isChild = false }: { item: NavItemType; isChild?: boolean }) => {
+  const NavItem = ({ item, isChild = false }: { item: NavigationItem; isChild?: boolean }) => {
     const Icon = item.icon;
     const isExpanded = expandedItems.has(item.title);
     const isActive = currentPath === item.href ||
-      (item.children && item.children.some((child: NavItemType) => child.href === currentPath));
+      (item.children && item.children.some((child) => child.href === currentPath));
     const isHovered = hoveredItem === item.title;
 
     return (
@@ -247,7 +127,7 @@ const ModernNavigation = ({ children }: { children: React.ReactNode }) => {
           className={`
             w-full flex items-center gap-3 px-4 py-3 rounded-2xl transition-all duration-300 relative overflow-hidden cursor-pointer
             ${isActive && !isChild
-              ? `bg-gradient-to-r ${item.gradient} text-white shadow-2xl ${item.glowColor} transform scale-[1.02]`
+              ? `bg-gradient-to-r ${item.gradient || 'from-gray-500 to-gray-600'} text-white shadow-2xl ${item.glowColor || 'shadow-gray-500/25'} transform scale-[1.02]`
               : isActive && isChild
                 ? 'bg-gradient-to-r from-blue-500/10 to-indigo-500/10 text-blue-700 border border-blue-200/50 shadow-md'
                 : 'text-gray-700 hover:bg-gradient-to-r hover:from-gray-50 hover:to-white hover:text-gray-900 hover:shadow-lg hover:border hover:border-gray-200/50'
@@ -259,7 +139,7 @@ const ModernNavigation = ({ children }: { children: React.ReactNode }) => {
           {/* Animated background glow */}
           {(isActive || isHovered) && !isChild && (
             <div className={`
-              absolute inset-0 bg-gradient-to-r ${item.gradient} opacity-10 rounded-2xl
+              absolute inset-0 bg-gradient-to-r ${item.gradient || 'from-gray-500 to-gray-600'} opacity-10 rounded-2xl
               transition-opacity duration-300
             `} />
           )}
@@ -276,7 +156,7 @@ const ModernNavigation = ({ children }: { children: React.ReactNode }) => {
                 ${isActive && !isChild
                   ? 'bg-white/20 backdrop-blur-sm'
                   : isHovered && !isChild
-                    ? `bg-gradient-to-r ${item.gradient} bg-opacity-10`
+                    ? `bg-gradient-to-r ${item.gradient || 'from-gray-500 to-gray-600'} bg-opacity-10`
                     : ''
                 }
               `}>
@@ -364,8 +244,8 @@ const ModernNavigation = ({ children }: { children: React.ReactNode }) => {
           `}>
             <div className="space-y-1">
               {item.children
-                .filter((child: { permission: string }) => hasPermission(child.permission))
-                .map((child: { title: string; href?: string; permission: string; icon?: any }, index: number) => (
+                .filter((child) => hasPermission(child.permission))
+                .map((child, index: number) => (
                   <div
                     key={child.title}
                     className={`
@@ -374,7 +254,12 @@ const ModernNavigation = ({ children }: { children: React.ReactNode }) => {
                     `}
                     style={{ transitionDelay: isExpanded ? `${index * 50}ms` : '0ms' }}
                   >
-                    <NavItem item={child} isChild />
+                    <NavItem item={{
+                      title: child.title,
+                      href: child.href,
+                      icon: child.icon || item.icon, // Use child icon or parent icon
+                      permission: child.permission
+                    }} isChild />
                   </div>
                 ))
               }

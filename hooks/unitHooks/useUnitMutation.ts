@@ -1,8 +1,7 @@
 import { UnitKeys } from "@/types/queryKeys";
 import { Unit } from "@/types/unit";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { toast } from "sonner";
-// import { UnitKeys } from "../useAllUnitQueries";
+import { useNotifications } from "@/components/notifications/NotificationProvider";
 type UnitMutationContext = {
   previousUnitDetail?: Unit;
   previousUnitsList?: Unit[];
@@ -13,6 +12,7 @@ function useUnitMutation<T>(
   errorMessage: string,
 ) {
   const queryClient = useQueryClient()
+  const { formSuccess, formError } = useNotifications();
 
   return useMutation<Unit | null, Error, { id: string; data: T }, UnitMutationContext>({
     mutationFn,
@@ -25,24 +25,26 @@ function useUnitMutation<T>(
       const previousUnitDetail = queryClient.getQueryData<Unit>(UnitKeys.detail(variables.id))
       const previousUnitsList = queryClient.getQueryData<Unit[]>(UnitKeys.lists())
 
-      // Optimistically update brand detail
+      // Optimistically update unit detail
       queryClient.setQueryData(UnitKeys.detail(variables.id), (oldData: Unit | undefined) => {
         return oldData ? { ...oldData, ...variables.data } : undefined
       })
 
-      // Optimistically update brands list
+      // Optimistically update units list
       queryClient.setQueryData(UnitKeys.lists(), (oldData: Unit[] | undefined) => {
         if (!oldData) return oldData
-        return oldData.map((brand) => (brand.id === variables.id ? { ...brand, ...variables.data } : brand))
+        return oldData.map((unit) => (unit.id === variables.id ? { ...unit, ...variables.data } : unit))
       })
 
       return { previousUnitDetail, previousUnitsList }
     },
 
     onError: (error: Error, variables, context) => {
-      toast.error(errorMessage, {
-        description: error.message || "Unknown error occurred",
-      })
+      formError(
+        "Unit Operation",
+        error.message || "Unknown error occurred",
+        errorMessage
+      );
 
       // Rollback optimistic updates
       if (context?.previousUnitDetail) {
@@ -54,7 +56,7 @@ function useUnitMutation<T>(
     },
 
     onSuccess: (updatedUnit, variables) => {
-      toast.success(successMessage)
+      formSuccess("Unit Operation", successMessage);
 
       if (!updatedUnit) return
 
@@ -62,7 +64,7 @@ function useUnitMutation<T>(
       queryClient.setQueryData(UnitKeys.detail(variables.id), updatedUnit)
       queryClient.setQueryData(UnitKeys.lists(), (oldData: Unit[] | undefined) => {
         if (!oldData) return [updatedUnit]
-        return oldData.map((brand) => (brand.id === variables.id ? updatedUnit : brand))
+        return oldData.map((unit) => (unit.id === variables.id ? updatedUnit : unit))
       })
 
       // Invalidate related queries to ensure consistency

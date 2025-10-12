@@ -1,8 +1,8 @@
 "use client";
 
-import { ReactNode } from 'react';
-import { NotificationProvider } from '@/components/notifications/NotificationProvider';
 import ModernNavigation from '@/components/dashboard/ModernNavigation';
+import { NotificationProvider } from '@/components/notifications/NotificationProvider';
+import { ReactNode } from 'react';
 
 interface DashboardLayoutProps {
   children: ReactNode;

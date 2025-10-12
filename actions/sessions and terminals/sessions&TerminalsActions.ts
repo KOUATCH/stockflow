@@ -8,7 +8,7 @@ import { revalidatePath } from "next/cache"
 export interface TerminalInfo {
   id: string
   name: string
-  terminalNumber: string
+  stationNumber: string
   isActive: boolean
   hasCashDrawer: boolean
   locationId: string
@@ -37,10 +37,10 @@ export interface SessionInfo {
   status: "ACTIVE" | "SUSPENDED" | "CLOSED" | "RECONCILED"
   startTime: Date
   endTime?: Date
-  terminalId: string
-  terminal: {
+  stationId: string
+  station: {
     name: string
-    terminalNumber: string
+    stationNumber: string
   }
   userId: string
   user: {
@@ -86,14 +86,14 @@ export async function getTerminals(
         },
       },
       orderBy: {
-        terminalNumber: 'asc',
+        name: 'asc',
       },
     })
 
     const terminalInfo: TerminalInfo[] = terminals.map(terminal => ({
       id: terminal.id,
       name: terminal.name,
-      terminalNumber: terminal.terminalNumber,
+      stationNumber: terminal.stationNumber,
       isActive: terminal.isActive,
       hasCashDrawer: terminal.hasCashDrawer,
       locationId: terminal.locationId,
@@ -142,14 +142,14 @@ export async function getAvailableTerminals(
         },
       },
       orderBy: {
-        terminalNumber: 'asc',
+        name: 'asc',
       },
     })
 
     const terminalInfo: TerminalInfo[] = terminals.map(terminal => ({
       id: terminal.id,
       name: terminal.name,
-      terminalNumber: terminal.terminalNumber,
+      stationNumber: terminal.stationNumber,
       isActive: terminal.isActive,
       hasCashDrawer: terminal.hasCashDrawer,
       locationId: terminal.locationId,
@@ -178,7 +178,7 @@ export async function detectTerminal(
         isActive: true,
         OR: [
           { name: { contains: identifier, mode: 'insensitive' } },
-          { terminalNumber: { contains: identifier, mode: 'insensitive' } },
+          { stationNumber: { contains: identifier, mode: 'insensitive' } },
         ],
       },
       include: {
@@ -208,7 +208,7 @@ export async function detectTerminal(
     const terminalInfo: TerminalInfo = {
       id: terminal.id,
       name: terminal.name,
-      terminalNumber: terminal.terminalNumber,
+      stationNumber: terminal.stationNumber,
       isActive: terminal.isActive,
       hasCashDrawer: terminal.hasCashDrawer,
       locationId: terminal.locationId,
@@ -246,10 +246,10 @@ export async function getUserActiveSession(
         status: "ACTIVE",
       },
       include: {
-        terminal: {
+        station: {
           select: {
             name: true,
-            terminalNumber: true,
+            stationNumber: true,
           },
         },
         user: {
@@ -272,8 +272,8 @@ export async function getUserActiveSession(
       status: session.status,
       startTime: session.startTime,
       endTime: session.endTime ?? undefined,
-      terminalId: session.terminalId,
-      terminal: session.terminal,
+      stationId: session?.stationId,
+      station: session.station,
       userId: session.userId,
       user: {
         firstName: session.user.firstName ?? "",
@@ -329,7 +329,7 @@ export async function getTerminalStatus(
     const terminalInfo: TerminalInfo = {
       id: terminal.id,
       name: terminal.name,
-      terminalNumber: terminal.terminalNumber,
+      stationNumber: terminal.stationNumber,
       isActive: terminal.isActive,
       hasCashDrawer: terminal.hasCashDrawer,
       locationId: terminal.locationId,
@@ -366,7 +366,7 @@ export async function forceCloseSession(
     const session = await db.pOSSession.findUnique({
       where: { id: sessionId },
       include: {
-        terminal: true,
+        station: true,
       },
     })
 
@@ -383,9 +383,9 @@ export async function forceCloseSession(
       },
     })
 
-    // Clear terminal's current session
+    // Clear station's current session
     await db.pOSStation.update({
-      where: { id: session.terminalId },
+      where: { id: session.stationId },
       data: {
         currentSessionId: null,
       },
@@ -661,7 +661,7 @@ export function TerminalSelector({ locationId, organizationId }: {
       {detectedTerminal ? (
         <div>
           <h3>Detected Terminal: {detectedTerminal.name}</h3>
-          <p>Terminal #{detectedTerminal.terminalNumber}</p>
+          <p>Terminal #{detectedTerminal.stationNumber}</p>
         </div>
       ) : (
         <div>
@@ -673,7 +673,7 @@ export function TerminalSelector({ locationId, organizationId }: {
             <option value="">Choose terminal...</option>
             {availableTerminals?.map(terminal => (
               <option key={terminal.id} value={terminal.id}>
-                {terminal.name} (#{terminal.terminalNumber})
+                {terminal.name} (#{terminal.stationNumber})
               </option>
             ))}
           </select>

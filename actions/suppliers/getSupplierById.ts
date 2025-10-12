@@ -2,7 +2,7 @@
 
 import { supplierInclude } from '@/lib/supplier/include'
 import { db } from '@/prisma/db'
-// import { db } from '@/lib/db'
+// import { db } from '@/prisma/db'
 // import { supplierInclude } from '@/lib/suppliers/includes'
 import type {
   SupplierWithRelations

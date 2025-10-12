@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { useToast } from "@/hooks/use-toast"
+import { useNotifications } from "@/components/notifications/NotificationProvider"
 import {
   Calculator,
   DollarSign,
@@ -78,7 +78,7 @@ export function CashReconciliationReportComponent({ locationId, organizationId }
   const [selectedPeriod, setSelectedPeriod] = useState("today")
   const [reconciliations] = useState<ReconciliationData[]>(mockReconciliations)
   const [selectedSession, setSelectedSession] = useState<ReconciliationData | null>(null)
-  const { toast } = useToast()
+  const notifications = useNotifications()
 
   const currentSession = reconciliations.find((r) => r.status === "open") || reconciliations[0]
   const totalVariance = reconciliations.reduce((sum, r) => sum + r.variance, 0)
@@ -112,10 +112,7 @@ export function CashReconciliationReportComponent({ locationId, organizationId }
   }
 
   const exportReport = () => {
-    toast({
-      title: "Report Exported",
-      description: "Cash reconciliation report has been exported to CSV",
-    })
+    notifications.success("Report Exported", "Cash reconciliation report has been exported to CSV")
   }
 
   return (

@@ -1,4 +1,4 @@
-import { auth } from "@/auth-middleware";
+import { auth } from "@/auth";
 import { NextRequest, NextResponse } from "next/server";
 
 // Security headers for all responses

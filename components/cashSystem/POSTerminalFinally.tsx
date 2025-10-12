@@ -9,7 +9,7 @@ import {
   updateInventoryLevels,
 } from "@/actions/pos/POSActionFinal"
 
-import { useToast } from "@/hooks/use-toast"
+import { useNotifications } from "@/components/notifications/NotificationProvider"
 import type { Customer } from "@/lib/cashSystem/db"
 import type { CartItem } from "@/lib/cashSystem/types"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
@@ -191,7 +191,7 @@ export function POSTerminalFinally({ organizationId, locationId, terminalId, use
     avgTransaction: 136.15,
   })
 
-  const { toast } = useToast()
+  const notifications = useNotifications()
   const queryClient = useQueryClient()
 
   const {
@@ -215,11 +215,7 @@ export function POSTerminalFinally({ organizationId, locationId, terminalId, use
     },
     onError: (error) => {
       console.error("Sale creation failed:", error)
-      toast({
-        variant: "destructive",
-        title: "Sale Failed",
-        description: "Failed to create sale. Please try again.",
-      })
+      notifications.error("Sale Failed", "Failed to create sale. Please try again.")
     },
   })
 
@@ -230,11 +226,7 @@ export function POSTerminalFinally({ organizationId, locationId, terminalId, use
     },
     onError: (error) => {
       console.error("Payment creation failed:", error)
-      toast({
-        variant: "destructive",
-        title: "Payment Failed",
-        description: "Failed to process payment. Please try again.",
-      })
+      notifications.error("Payment Failed", "Failed to process payment. Please try again.")
     },
   })
 
@@ -274,21 +266,13 @@ export function POSTerminalFinally({ organizationId, locationId, terminalId, use
     },
     onError: (error) => {
       console.error("Session creation failed:", error)
-      toast({
-        variant: "destructive",
-        title: "Session Failed",
-        description: "Failed to create POS session",
-      })
+      notifications.error("Session Failed", "Failed to create POS session")
     },
   })
 
   useEffect(() => {
     if (!organizationId) {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "User organization not found.",
-      })
+      notifications.error("Error", "User organization not found.")
     }
   }, [organizationId, toast])
 
@@ -374,10 +358,7 @@ export function POSTerminalFinally({ organizationId, locationId, terminalId, use
             })
           }
 
-          toast({
-            title: "Session Restored",
-            description: `Continuing session ${session.sessionNumber}`,
-          })
+          notifications.success("Session Restored", `Continuing session ${session.sessionNumber}`)
         } else {
           const newSessionResult = await createPOSSession({
             terminalId: selectedTerminalId,
@@ -395,25 +376,14 @@ export function POSTerminalFinally({ organizationId, locationId, terminalId, use
               lastActivity: new Date(),
             })
 
-            toast({
-              title: "New Session Started",
-              description: `Session ${session.sessionNumber} created successfully`,
-            })
+            notifications.success("New Session Started", `Session ${session.sessionNumber} created successfully`)
           } else {
-            toast({
-              variant: "destructive",
-              title: "Session Error",
-              description: newSessionResult.error || "Failed to create POS session",
-            })
+            notifications.error("Session Error", newSessionResult.error || "Failed to create POS session")
           }
         }
       } catch (error) {
         console.error("Failed to initialize session:", error)
-        toast({
-          variant: "destructive",
-          title: "Session Error",
-          description: "Failed to initialize POS session",
-        })
+        notifications.error("Session Error", "Failed to initialize POS session")
       }
     }
 
@@ -444,10 +414,7 @@ export function POSTerminalFinally({ organizationId, locationId, terminalId, use
   useEffect(() => {
     if (selectedLocationId && cart.length > 0) {
       clearCart()
-      toast({
-        title: "Location Changed",
-        description: "Cart cleared due to location change. Items are now filtered for the new location.",
-      })
+      notifications.info("Location Changed", "Cart cleared due to location change. Items are now filtered for the new location.")
     }
   }, [selectedLocationId, cart, toast])
 

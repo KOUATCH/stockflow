@@ -2,7 +2,7 @@
 
 import { supplierInclude } from '@/lib/supplier/include'
 import { db } from '@/prisma/db'
-// import { db } from '@/lib/db'
+// import { db } from '@/prisma/db'
 // import { supplierInclude } from '@/lib/suppliers/includes'
 import {
   UnlinkItemFromSupplierDTO,
@@ -11,7 +11,7 @@ import {
 } from '@/types/supplier'
 import { Prisma } from '@prisma/client'
 import { revalidatePath, revalidateTag } from 'next/cache'
-// import { db } from '@/lib/db'
+// import { db } from '@/prisma/db'
 // import { supplierInclude } from '@/lib/suppliers/includes'
 
 

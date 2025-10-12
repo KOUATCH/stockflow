@@ -12,9 +12,6 @@ export default function CashDrawerPage() {
   const { session, status, user, organizationId, isAuthenticated, isLoading } = useClientAuth()
   const [selectedLocationId, setSelectedLocationId] = useState<string>("")
 
-  const user = session?.user
-  const organizationId = user?.organizationId || ""
-
   // Get locations for the organization
   const { data: locationsResult } = useOrgLocationsNew(organizationId)
   const locations = locationsResult?.data || []

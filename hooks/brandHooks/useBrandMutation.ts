@@ -1,6 +1,6 @@
 import { Brand, BrandDTO } from "@/types/brand";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { toast } from "sonner";
+import { useNotifications } from "@/components/notifications/NotificationProvider";
 import { BrandKeys } from "../useAllBrandQueries";
 
 type BrandMutationContext = {
@@ -14,6 +14,7 @@ function useBrandMutation<T>(
   errorMessage: string
 ) {
   const queryClient = useQueryClient();
+  const { formSuccess, formError } = useNotifications();
 
   return useMutation<Brand | null, Error, { id: string; data: T }, BrandMutationContext>({
     mutationFn,
@@ -37,9 +38,11 @@ function useBrandMutation<T>(
     },
 
     onError: (error, { id }, context) => {
-      toast.error(errorMessage, {
-        description: error.message || "Unknown error occurred",
-      });
+      formError(
+        "Brand Operation",
+        error.message || "Unknown error occurred",
+        errorMessage
+      );
 
       if (context?.previousBrandDetail) {
         queryClient.setQueryData(BrandKeys.detail(id), context.previousBrandDetail);
@@ -51,7 +54,7 @@ function useBrandMutation<T>(
     },
 
     onSuccess: (updatedBrand, { id }) => {
-      toast.success(successMessage);
+      formSuccess("Brand Operation", successMessage);
 
       if (!updatedBrand) return;
 

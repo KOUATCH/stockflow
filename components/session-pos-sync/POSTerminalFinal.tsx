@@ -9,7 +9,7 @@ import {
   updateInventoryLevels,
 } from "@/actions/pos/POSActionFinal"
 
-import { useToast } from "@/hooks/use-toast"
+import { useNotifications } from "@/components/notifications/NotificationProvider"
 import type { Customer } from "@/lib/cashSystem/db"
 import type { CartItem } from "@/lib/cashSystem/types"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
@@ -216,7 +216,7 @@ export function POSTerminalFinal({ organizationId, locationId, terminalId, userI
     avgTransaction: 136.15,
   })
 
-  const { toast } = useToast()
+  const notifications = useNotifications()
   const queryClient = useQueryClient()
 
   const notification = useNotification()
@@ -258,13 +258,9 @@ export function POSTerminalFinal({ organizationId, locationId, terminalId, userI
 
   useEffect(() => {
     if (error && organizationId) {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: itemsData?.message || "Failed to load items.",
-      })
+      notifications.error("Error", itemsData?.message || "Failed to load items.")
     }
-  }, [error, itemsData?.message, toast, organizationId])
+  }, [error, itemsData?.message, notifications, organizationId])
 
   const items = itemsData?.data || []
 
@@ -299,10 +295,7 @@ export function POSTerminalFinal({ organizationId, locationId, terminalId, userI
     if (selectedLocationId && cart.length > 0 && organizationId) {
       console.log(`Clearing cart due to location change from ${locationId} to ${selectedLocationId}`)
       clearCart()
-      toast({
-        title: "Location Changed",
-        description: "Cart cleared due to location change. Items are now filtered for the new location.",
-      })
+      notifications.info("Location Changed", "Cart cleared due to location change. Items are now filtered for the new location.")
     }
   }, [selectedLocationId, organizationId]) // Removed cart dependency to prevent infinite loops
 
@@ -342,11 +335,7 @@ export function POSTerminalFinal({ organizationId, locationId, terminalId, userI
     },
     onError: (error) => {
       console.error("Sale creation failed:", error)
-      toast({
-        variant: "destructive",
-        title: "Sale Failed",
-        description: "Failed to create sale. Please try again.",
-      })
+      notifications.error("Sale Failed", "Failed to create sale. Please try again.")
     },
   })
 
@@ -357,11 +346,7 @@ export function POSTerminalFinal({ organizationId, locationId, terminalId, userI
     },
     onError: (error) => {
       console.error("Payment creation failed:", error)
-      toast({
-        variant: "destructive",
-        title: "Payment Failed",
-        description: "Failed to process payment. Please try again.",
-      })
+      notifications.error("Payment Failed", "Failed to process payment. Please try again.")
     },
   })
 
@@ -668,11 +653,11 @@ export function POSTerminalFinal({ organizationId, locationId, terminalId, userI
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     if (cart.length === 0) {
-      toast({
-        variant: "destructive",
-        title: "Empty Cart",
-        description: "Please add items to cart before processing payment.",
-      })
+      notifications.error("Empty Cart", "Please add items to cart before processing payment.")
+      return
+    }
+    if (!selectedCustomer) {
+      notifications.error("Customer Required", "Please select a customer before completing the sale.")
       return
     }
     setIsPaymentDialogOpen(true)
@@ -709,10 +694,7 @@ export function POSTerminalFinal({ organizationId, locationId, terminalId, userI
             })
           }
 
-          toast({
-            title: "Session Restored",
-            description: `Continuing session ${session.sessionNumber}`,
-          })
+          notifications.success("Session Restored", `Continuing session ${session.sessionNumber}`)
         } else {
           const newSessionResult = await createPOSSession({
             terminalId: selectedTerminalId,
@@ -732,32 +714,21 @@ export function POSTerminalFinal({ organizationId, locationId, terminalId, userI
               lastActivity: new Date(),
             })
 
-            toast({
-              title: "New Session Started",
-              description: `Session ${session.sessionNumber} created successfully`,
-            })
+            notifications.success("New Session Started", `Session ${session.sessionNumber} created successfully`)
           } else {
-            toast({
-              variant: "destructive",
-              title: "Session Error",
-              description: newSessionResult.error || "Failed to create POS session",
-            })
+            notifications.error("Session Error", newSessionResult.error || "Failed to create POS session")
           }
         }
       } catch (error) {
         console.error("Failed to initialize session:", error)
-        toast({
-          variant: "destructive",
-          title: "Session Error",
-          description: "Failed to initialize POS session",
-        })
+        notifications.error("Session Error", "Failed to initialize POS session")
       }
     }
 
     if (selectedTerminalId && userId && selectedLocationId && organizationId) {
       initializeSession()
     }
-  }, [selectedTerminalId, userId, selectedLocationId, organizationId, toast])
+  }, [selectedTerminalId, userId, selectedLocationId, organizationId, notifications])
 
   const createSessionMutation = useMutation({
     mutationFn: createPOSSession,
@@ -780,11 +751,7 @@ export function POSTerminalFinal({ organizationId, locationId, terminalId, userI
     },
     onError: (error) => {
       console.error("Session creation failed:", error)
-      toast({
-        variant: "destructive",
-        title: "Session Failed",
-        description: "Failed to create POS session",
-      })
+      notifications.error("Session Failed", "Failed to create POS session")
     },
   })
 
@@ -1469,10 +1436,30 @@ export function POSTerminalFinal({ organizationId, locationId, terminalId, userI
                       </div>
 
                       <div className="space-y-3">
+                        {cart.length > 0 && !selectedCustomer && (
+                          <div className="p-3 bg-gradient-to-r from-amber-50 to-orange-50 rounded-lg border border-amber-200">
+                            <div className="flex items-center gap-2 text-amber-800">
+                              <User className="h-4 w-4" />
+                              <span className="text-sm font-medium">Please select a customer to complete the sale</span>
+                            </div>
+                          </div>
+                        )}
+                        {!currentSession && (
+                          <div className="p-3 bg-gradient-to-r from-red-50 to-pink-50 rounded-lg border border-red-200">
+                            <div className="flex items-center gap-2 text-red-800">
+                              <AlertTriangle className="h-4 w-4" />
+                              <span className="text-sm font-medium">No active POS session. Please start a session to process transactions.</span>
+                            </div>
+                          </div>
+                        )}
+                        {/* Debug info */}
+                        <div className="p-2 bg-gray-100 rounded text-xs">
+                          Debug: Processing: {isProcessing ? 'true' : 'false'} | Session: {currentSession ? 'active' : 'none'} | Cart: {cart.length} items | Customer: {selectedCustomer ? selectedCustomer.name : 'none'}
+                        </div>
                         <Button
                           type="submit"
                           className="w-full bg-gradient-to-r from-emerald-500 to-emerald-600 text-white hover:from-emerald-600 hover:to-emerald-700 shadow-lg hover:shadow-xl transition-all h-12 text-lg font-semibold"
-                          disabled={isProcessing || !currentSession || cart.length === 0}
+                          disabled={isProcessing || !currentSession || cart.length === 0 || !selectedCustomer}
                         >
                           <CreditCard className="mr-3 h-5 w-5" />
                           {isProcessing ? "Processing..." : "Complete Sale"}

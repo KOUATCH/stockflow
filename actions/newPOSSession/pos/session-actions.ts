@@ -4,7 +4,7 @@ import { db } from "@/prisma/db";
 // import { POSSessionStatus } from "@/types"
 
 export async function openPOSSession(data: {
-  terminalId: string
+  stationId: string
   userId: string
   locationId: string
   organizationId: string
@@ -13,10 +13,32 @@ export async function openPOSSession(data: {
   try {
     console.log("[v0] Opening POS session with data:", data)
 
-    // Check if there's already an active session for this terminal
+    // Validate required fields
+    if (!data.stationId) {
+      return {
+        success: false,
+        error: "Station ID is required",
+      }
+    }
+
+    if (!data.userId) {
+      return {
+        success: false,
+        error: "User ID is required",
+      }
+    }
+
+    if (!data.locationId) {
+      return {
+        success: false,
+        error: "Location ID is required",
+      }
+    }
+
+    // Check if there's already an active session for this station
     const existingSession = await db.pOSSession.findFirst({
       where: {
-        terminalId: data.terminalId,
+        stationId: data.stationId,
         status:"ACTIVE",
       },
     })
@@ -24,62 +46,82 @@ export async function openPOSSession(data: {
     if (existingSession) {
       return {
         success: false,
-        error: "Terminal already has an active session",
+        error: "station already has an active session",
       }
     }
 
-    // Create new session
+    // Generate session number
+    const sessionNumber = `SES-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${String(Date.now()).slice(-6)}`
+
+    // Create new session with proper session totals initialization
     const session = await db.pOSSession.create({
       data: {
-        terminalId: data.terminalId,
+        sessionNumber,
+        stationId: data.stationId,
         userId: data.userId,
         locationId: data.locationId,
-        openingBalance: data.openingBalance,
-        status:"ACTIVE",
+        status: "ACTIVE",
         startTime: new Date(),
-        sessionNumber: `SES-${new Date().toISOString().slice(0, 10)}-${Math.floor(Math.random() * 1000)
-          .toString()
-          .padStart(3, "0")}`,
+        openingBalance: data.openingBalance,
+        totalSales: 0,
+        totalTax: 0,
+        totalDiscount: 0,
+        transactionCount: 0,
+        cashTotal: 0,
+        cardTotal: 0,
+        digitalTotal: 0,
       },
     })
 
-    // Create cash drawer entry
-    await db.cashDrawer.create({
-      data: {
-        terminalId: data.terminalId,
-        locationId: data.locationId,
-        name: `Drawer-${data.terminalId}`,
-        drawerNumber:" 1",
-        currentBalance: data.openingBalance,
-        expectedBalance: data.openingBalance,
-        isOpen: true,
-      },
-    })
-
-    // Find the cash drawer for this terminal and location
-    const cashDrawer = await db.cashDrawer.findFirst({
+    // Create or find existing cash drawer for this station
+    let cashDrawer = await db.cashDrawer.findFirst({
       where: {
-        terminalId: data.terminalId,
+        stationId: data.stationId,
         locationId: data.locationId,
-        isOpen: true,
       },
     })
 
     if (!cashDrawer) {
-      throw new Error("Cash drawer not found for this terminal and location")
+      cashDrawer = await db.cashDrawer.create({
+        data: {
+          stationId: data.stationId,
+          locationId: data.locationId,
+          name: `Drawer-${data.stationId}`,
+          drawerNumber: "1",
+          currentBalance: data.openingBalance,
+          expectedBalance: data.openingBalance,
+          isOpen: true,
+        },
+      })
+    } else {
+      // Update existing cash drawer
+      await db.cashDrawer.update({
+        where: { id: cashDrawer.id },
+        data: {
+          currentBalance: data.openingBalance,
+          expectedBalance: data.openingBalance,
+          isOpen: true,
+        },
+      })
     }
 
-    // Create opening cash transaction
+    // Create opening balance transaction with proper relations
     await db.cashDrawerTransaction.create({
       data: {
-        sessionId: session.id,
-        cashDrawerId: cashDrawer.id,
-        type: "CASH_IN",
+        cashDrawer: {
+          connect: { id: cashDrawer.id }
+        },
+        session: {
+          connect: { id: session.id }
+        },
+        user: {
+          connect: { id: data.userId }
+        },
+        type: "OPENING_BALANCE",
         amount: data.openingBalance,
-        balanceBefore: data.openingBalance,
+        reason: "Session opened",
+        balanceBefore: 0,
         balanceAfter: data.openingBalance,
-        notes: "Opening cash",
-        userId: data.userId,
       },
     })
 
@@ -99,55 +141,82 @@ export async function openPOSSession(data: {
 
 export async function closePOSSession(data: {
   sessionId: string
-  terminalId: string
+  stationId: string
   closingBalance: number
   userId: string
 }) {
   try {
     console.log("[v0] Closing POS session:", data.sessionId)
 
-    // Update session status
-    const session = await db.pOSSession.update({
+    // Get the current session with all data
+    const currentSession = await db.pOSSession.findUnique({
       where: { id: data.sessionId },
-      data: {
-        status: "SUSPENDED",
-        endTime: new Date(),
-        closingBalance: data.closingBalance,
+      include: {
+        cashDrawerTransactions: {
+          include: { cashDrawer: true },
+        },
       },
     })
 
-    // Find the open cash drawer for this terminal
-    const cashDrawer = await db.cashDrawer.findFirst({
-      where: {
-        terminalId: data.terminalId,
-        isOpen: true,
-      },
-    });
-
-    if (!cashDrawer) {
-      throw new Error("Open cash drawer not found for this terminal");
+    if (!currentSession) {
+      throw new Error("Session not found")
     }
 
-    // Update cash drawer
+    // Calculate session variance
+    const expectedBalance = currentSession.openingBalance + currentSession.totalSales
+    const variance = data.closingBalance - expectedBalance
+
+    // Update session with closing information
+    const session = await db.pOSSession.update({
+      where: { id: data.sessionId },
+      data: {
+        status: "CLOSED",
+        endTime: new Date(),
+        closingBalance: data.closingBalance,
+        expectedBalance: expectedBalance,
+        variance: variance,
+      },
+    })
+
+    // Find the open cash drawer for this station
+    const cashDrawer = await db.cashDrawer.findFirst({
+      where: {
+        stationId: data.stationId,
+        isOpen: true,
+      },
+    })
+
+    if (!cashDrawer) {
+      throw new Error("Open cash drawer not found for this station")
+    }
+
+    // Update cash drawer to closed state
     await db.cashDrawer.update({
       where: { id: cashDrawer.id },
       data: {
         isOpen: false,
-        currentBalance: 0,
+        currentBalance: data.closingBalance,
       },
     })
 
-    // Create closing cash transaction
+    // Create closing balance transaction with proper relations
     await db.cashDrawerTransaction.create({
       data: {
-        sessionId: data.sessionId,
-        cashDrawerId: cashDrawer.id,
-        type: "CASH_OUT",
+        cashDrawer: {
+          connect: { id: cashDrawer.id }
+        },
+        session: {
+          connect: { id: data.sessionId }
+        },
+        user: {
+          connect: { id: data.userId }
+        },
+        type: "CLOSING_BALANCE",
         amount: data.closingBalance,
+        reason: "Session closed",
         balanceBefore: cashDrawer.currentBalance,
-        balanceAfter: 0,
-        notes: "Closing cash",
-        userId: data.userId,
+        balanceAfter: data.closingBalance,
+        notes: variance !== 0 ? `Variance: $${variance.toFixed(2)}` : undefined,
       },
     })
 
@@ -165,22 +234,51 @@ export async function closePOSSession(data: {
   }
 }
 
-export async function getCurrentSession(terminalId: string) {
+export async function getCurrentSession(stationId: string) {
   try {
+    console.log("[v0] Getting current session for station:", stationId)
+
     const session = await db.pOSSession.findFirst({
       where: {
-        terminalId,
+        stationId,
         status: "ACTIVE",
       },
       include: {
-        terminal: true,
-        user: true,
-        cashDrawerTransactions:{
-          include: { 
-          cashDrawer: true,
+        user: {
+          select: {
+            id: true,
+            name: true,
+            firstName: true,
+            lastName: true,
+          },
+        },
+        Location: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+        cashDrawerTransactions: {
+          include: {
+            cashDrawer: {
+              select: {
+                id: true,
+                name: true,
+                currentBalance: true,
+                expectedBalance: true,
+                isOpen: true,
+              },
+            },
+          },
+          orderBy: {
+            createdAt: 'desc',
+          },
+          take: 1,
         },
       },
-  }})
+    })
+
+    console.log("[v0] Found session:", session ? session.id : "none")
 
     return {
       success: true,

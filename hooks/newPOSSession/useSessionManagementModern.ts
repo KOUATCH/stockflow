@@ -1,11 +1,11 @@
 "use client"
 
 import { closePOSSession, getCurrentSession, openPOSSession } from "@/actions/newPOSSession/pos/session-actions"
-import { useToast } from "@/hooks/use-toast"
+import { useNotifications } from "@/components/notifications/NotificationProvider"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
 interface OpenSessionData {
-  terminalId: string
+  stationId: string
   userId: string
   locationId: string
   organizationId: string
@@ -20,7 +20,7 @@ interface CloseSessionData {
 }
 
 export function useSessionManagement(terminalId: string) {
-  const { toast } = useToast()
+  const notifications = useNotifications()
   const queryClient = useQueryClient()
 
   // Query to get current session
@@ -48,21 +48,19 @@ export function useSessionManagement(terminalId: string) {
       return result
     },
     onSuccess: (data) => {
-      toast({
-        title: "Session Opened Successfully",
-        description: `POS session has been opened with $${data.data?.openingBalance || 0} opening balance.`,
-        variant: "default",
-      })
+      notifications.success(
+        "Session Opened Successfully",
+        `POS session has been opened with $${data.data?.openingBalance || 0} opening balance.`
+      )
       queryClient.invalidateQueries({ queryKey: ["currentSession"] })
       queryClient.invalidateQueries({ queryKey: ["cashDrawer"] })
       queryClient.invalidateQueries({ queryKey: ["realTimeBalance"] })
     },
     onError: (error: Error) => {
-      toast({
-        variant: "destructive",
-        title: "Failed to Open Session",
-        description: error.message || "An unexpected error occurred while opening the session.",
-      })
+      notifications.error(
+        "Failed to Open Session",
+        error.message || "An unexpected error occurred while opening the session."
+      )
     },
   })
 
@@ -76,22 +74,20 @@ export function useSessionManagement(terminalId: string) {
       return result
     },
     onSuccess: (data) => {
-      toast({
-        title: "Session Closed Successfully",
-        description: `POS session has been closed. Final balance: $${data.data?.closingBalance || 0}.`,
-        variant: "default",
-      })
+      notifications.success(
+        "Session Closed Successfully",
+        `POS session has been closed. Final balance: $${data.data?.closingBalance || 0}.`
+      )
       queryClient.invalidateQueries({ queryKey: ["currentSession"] })
       queryClient.invalidateQueries({ queryKey: ["cashDrawer"] })
       queryClient.invalidateQueries({ queryKey: ["realTimeBalance"] })
       queryClient.invalidateQueries({ queryKey: ["sessionHistory"] })
     },
     onError: (error: Error) => {
-      toast({
-        variant: "destructive",
-        title: "Failed to Close Session",
-        description: error.message || "An unexpected error occurred while closing the session.",
-      })
+      notifications.error(
+        "Failed to Close Session",
+        error.message || "An unexpected error occurred while closing the session."
+      )
     },
   })
 
@@ -101,7 +97,7 @@ export function useSessionManagement(terminalId: string) {
     }
 
     const sessionData: OpenSessionData = {
-      terminalId,
+      stationId: terminalId,
       userId,
       locationId: locationId || "",
       organizationId: organizationId || "",

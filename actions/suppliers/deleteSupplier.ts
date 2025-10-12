@@ -4,7 +4,7 @@
 'use server'
 
 import { db } from '@/prisma/db'
-// import { db } from '@/lib/db'
+// import { db } from '@/prisma/db'
 // import { supplierInclude } from '@/lib/suppliers/includes'
 import {
   type SupplierResponse

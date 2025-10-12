@@ -1,7 +1,7 @@
 "use client"
 
 import { closePOSSession, getCurrentSession, openPOSSession } from "@/actions/newPOSSession/pos/session-actions"
-import { useToast } from "@/hooks/use-toast"
+import { useNotifications } from "@/components/notifications/NotificationProvider"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
 interface OpenSessionData {
@@ -20,7 +20,7 @@ interface CloseSessionData {
 }
 
 export function useSessionManagement(terminalId: string) {
-  const { toast } = useToast()
+  const notifications = useNotifications()
   const queryClient = useQueryClient()
 
   // Query to get current session
@@ -46,19 +46,18 @@ export function useSessionManagement(terminalId: string) {
       return result
     },
     onSuccess: (data) => {
-      toast({
-        title: "Session Opened",
-        description: "POS session has been successfully opened.",
-      })
+      notifications.success(
+        "Session Opened",
+        "POS session has been successfully opened."
+      )
       // Invalidate and refetch session data
       queryClient.invalidateQueries({ queryKey: ["currentSession", terminalId] })
     },
     onError: (error: Error) => {
-      toast({
-        variant: "destructive",
-        title: "Failed to Open Session",
-        description: error.message,
-      })
+      notifications.error(
+        "Failed to Open Session",
+        error.message
+      )
     },
   })
 
@@ -72,19 +71,18 @@ export function useSessionManagement(terminalId: string) {
       return result
     },
     onSuccess: () => {
-      toast({
-        title: "Session Closed",
-        description: "POS session has been successfully closed.",
-      })
+      notifications.success(
+        "Session Closed",
+        "POS session has been successfully closed."
+      )
       // Invalidate and refetch session data
       queryClient.invalidateQueries({ queryKey: ["currentSession", terminalId] })
     },
     onError: (error: Error) => {
-      toast({
-        variant: "destructive",
-        title: "Failed to Close Session",
-        description: error.message,
-      })
+      notifications.error(
+        "Failed to Close Session",
+        error.message
+      )
     },
   })
 

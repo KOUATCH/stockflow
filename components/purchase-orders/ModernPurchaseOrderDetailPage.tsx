@@ -39,7 +39,7 @@ import {
   XCircle,
   Zap
 } from "lucide-react"
-import { useClientAuth } from "@/hooks/useClientAuth"
+import { useSession } from "next-auth/react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useCallback, useMemo, useState } from "react"
@@ -192,7 +192,7 @@ export default function ModernPurchaseOrderDetailPage({
       await approveMutation.mutateAsync({
         id: purchaseOrder.id,
         organizationId,
-        approvedBy: user || null
+        approvedBy: session?.user?.id || null
       })
       setShowApproveDialog(false)
       success(
@@ -295,8 +295,8 @@ export default function ModernPurchaseOrderDetailPage({
       await receiveItemsMutation.mutateAsync({
         id: purchaseOrder.id,
         organizationId,
-        receivedBy: user || null,
-        receivedById: user || 'system', // Fallback to system if no user
+        receivedBy: session?.user?.id || null,
+        receivedById: session?.user?.id || 'system', // Fallback to system if no user
         notes: 'Items received via workflow',
         items: itemsToReceive
       })

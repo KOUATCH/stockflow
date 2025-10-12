@@ -1,6 +1,5 @@
-// config/useAuth.ts - Custom authentication utilities
-import { getUserWithRoles } from "@/lib/auth-helpers";
-import { verifySession } from "@/lib/session-auth";
+// config/useAuth.ts - Unified authentication utilities using NextAuth
+import { auth } from "@/auth";
 import { Role } from "@prisma/client";
 import { redirect } from "next/navigation";
 
@@ -22,19 +21,13 @@ export interface AuthenticatedUser {
 
 // Function to check authorization and return NotAuthorized component if needed
 export async function checkPermission(requiredPermission: string) {
-  const session = await verifySession();
+  const session = await auth();
 
-  if (!session) {
+  if (!session?.user) {
     redirect("/login");
   }
 
-  // Get user with roles and permissions
-  const userWithRoles = await getUserWithRoles(session.userId);
-  if (!userWithRoles) {
-    redirect("/login");
-  }
-
-  const userPermissions = userWithRoles?.roles?.map(role => role.permissions).flat() || [];
+  const userPermissions = session.user.permissions || [];
 
   if (!userPermissions.includes(requiredPermission)) {
     // Redirect to unauthorized page or return unauthorized component
@@ -46,48 +39,38 @@ export async function checkPermission(requiredPermission: string) {
 
 // Function to get authenticated user or redirect
 export async function getAuthenticatedUser(): Promise<AuthenticatedUser> {
-  const session = await verifySession();
+  // Use unified NextAuth session
+  const session = await auth();
 
-  if (!session) {
+  if (!session?.user) {
     redirect("/login");
   }
 
-  // Get user with roles and permissions from database
-  const userWithRoles = await getUserWithRoles(session.userId);
-  if (!userWithRoles) {
-    redirect("/login");
-  }
-
+  // NextAuth session already contains all user data and permissions
   return {
-    id: userWithRoles.id,
-    firstName: userWithRoles.firstName || '',
-    lastName: userWithRoles.lastName || '',
-    phone: userWithRoles.phone || '',
-    roles: userWithRoles.roles,
-    permissions: userWithRoles?.roles?.map(role => role.permissions).flat() || [],
-    name: userWithRoles.name,
-    email: userWithRoles.email,
-    image: userWithRoles.image,
-    organizationId: userWithRoles.organizationId,
-    organizationName: userWithRoles.organization?.name || null,
+    id: session.user.id,
+    firstName: session.user.firstName || '',
+    lastName: session.user.lastName || '',
+    phone: session.user.phone || '',
+    roles: session.user.roles || [],
+    permissions: session.user.permissions || [],
+    name: session.user.name,
+    email: session.user.email,
+    image: session.user.image,
+    organizationId: session.user.organizationId,
+    organizationName: session.user.organizationName || null,
   } as AuthenticatedUser;
 }
 
 // Function to check multiple permissions (any)
 export async function checkAnyPermission(permissions: string[]) {
-  const session = await verifySession();
+  const session = await auth();
 
-  if (!session) {
+  if (!session?.user) {
     redirect("/login");
   }
 
-  // Get user with roles and permissions
-  const userWithRoles = await getUserWithRoles(session.userId);
-  if (!userWithRoles) {
-    redirect("/login");
-  }
-
-  const userPermissions = userWithRoles?.roles?.map(role => role.permissions ?? []).flat() || [];
+  const userPermissions = session.user.permissions || [];
 
   const hasAnyPermission = permissions.some((permission) =>
     userPermissions.includes(permission)
@@ -102,19 +85,13 @@ export async function checkAnyPermission(permissions: string[]) {
 
 // Function to check multiple permissions (all)
 export async function checkAllPermissions(permissions: string[]) {
-  const session = await verifySession();
+  const session = await auth();
 
-  if (!session) {
+  if (!session?.user) {
     redirect("/login");
   }
 
-  // Get user with roles and permissions
-  const userWithRoles = await getUserWithRoles(session.userId);
-  if (!userWithRoles) {
-    redirect("/login");
-  }
-
-  const userPermissions = userWithRoles?.roles?.map(role => role.permissions).flat() || [];
+  const userPermissions = session.user.permissions || [];
 
   const hasAllPermissions = permissions.every((permission) =>
     userPermissions.includes(permission)

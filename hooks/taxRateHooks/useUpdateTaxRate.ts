@@ -2,10 +2,11 @@ import updateTaxRateByIdNew from "@/actions/taxRate/updateTaxRateByIdNew"
 import { TaxRateKeys } from "@/types/queryKeys"
 import type { UpdateTaxRatePayload } from "@/types/taxRates"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
-import { toast } from "sonner"
+import { useNotifications } from "@/components/notifications/NotificationProvider"
 
 export function useUpdateTaxRate() {
   const queryClient = useQueryClient()
+  const { formSuccess, formError } = useNotifications();
 
   return useMutation({
     mutationFn: async ({ id, data }: { id: string; data: UpdateTaxRatePayload }) => {
@@ -18,7 +19,7 @@ export function useUpdateTaxRate() {
       return result
     },
     onSuccess: (data, variables) => {
-      toast.success("Tax rate updated successfully")
+      formSuccess("Tax Rate Update", "Tax rate has been updated successfully");
 
       // Invalidate and refetch tax rates
       queryClient.invalidateQueries({ queryKey: TaxRateKeys.lists() })
@@ -31,9 +32,11 @@ export function useUpdateTaxRate() {
       }
     },
     onError: (error: Error) => {
-      toast.error("Failed to update tax rate", {
-        description: error.message || "Unknown error occurred",
-      })
+      formError(
+        "Tax Rate Update",
+        error.message || "Unknown error occurred",
+        "Failed to update tax rate"
+      );
     },
   })
 }

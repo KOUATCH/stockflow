@@ -2,7 +2,7 @@
 
 import { useState } from "react"
 import { useRouter } from "next/navigation"
-import { useToast } from "@/hooks/use-toast"
+import { useNotifications } from "@/components/notifications/NotificationProvider"
 import { logoutUser, switchOrganization } from "@/actions/auth/auth-actions"
 import type { User } from "@/actions/auth/auth-actions"
 import {
@@ -29,23 +29,16 @@ interface UserMenuProps {
 export function UserMenu({ user, currentOrganizationId }: UserMenuProps) {
   const [isLoading, setIsLoading] = useState(false)
   const router = useRouter()
-  const { toast } = useToast()
+  const notifications = useNotifications()
 
   const handleLogout = async () => {
     setIsLoading(true)
     try {
       await logoutUser()
-      toast({
-        title: "Logged out",
-        description: "You have been successfully logged out.",
-      })
+      notifications.success("Logged out", "You have been successfully logged out.")
       router.push("/login")
     } catch (error) {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Failed to log out. Please try again.",
-      })
+      notifications.error("Error", "Failed to log out. Please try again.")
     } finally {
       setIsLoading(false)
     }
@@ -58,24 +51,13 @@ export function UserMenu({ user, currentOrganizationId }: UserMenuProps) {
     try {
       const result = await switchOrganization(organizationId)
       if (result.success) {
-        toast({
-          title: "Organization switched",
-          description: "Successfully switched organization context.",
-        })
+        notifications.success("Organization switched", "Successfully switched organization context.")
         router.refresh()
       } else {
-        toast({
-          variant: "destructive",
-          title: "Error",
-          description: result.error || "Failed to switch organization",
-        })
+        notifications.error("Error", result.error || "Failed to switch organization")
       }
     } catch (error) {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Failed to switch organization. Please try again.",
-      })
+      notifications.error("Error", "Failed to switch organization. Please try again.")
     } finally {
       setIsLoading(false)
     }

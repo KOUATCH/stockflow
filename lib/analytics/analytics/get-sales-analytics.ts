@@ -1,6 +1,6 @@
 "use server"
 
-import { db } from "@/lib/db"
+import { db } from "@/prisma/db"
 import { endOfDay, startOfDay, startOfMonth, startOfWeek, subDays } from "date-fns"
 
 export interface SalesAnalytics {

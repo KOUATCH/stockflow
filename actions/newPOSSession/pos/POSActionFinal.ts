@@ -24,7 +24,7 @@ export interface POSSession {
 }
 
 export interface CreatePOSSessionData {
-  terminalId: string
+  stationId: string
   userId: string
   locationId: string
   organizationId: string
@@ -33,7 +33,7 @@ export interface CreatePOSSessionData {
 
 export interface CreateSaleData {
   sessionId: string
-  terminalId: string
+  stationId: string
   customerId?: string
   userId: string
   locationId: string
@@ -143,12 +143,12 @@ export async function createPOSSession(data: CreatePOSSessionData) {
   }
 }
 
-export async function getActivePOSSession(terminalId: string) {
+export async function getActivePOSSession(stationId: string) {
   try {
     // Simulate API delay
     await new Promise((resolve) => setTimeout(resolve, 200))
 
-    // Find active session for terminal (mock logic)
+    // Find active session for station (mock logic)
     const activeSession = mockSessions.find((session) => session.status === "ACTIVE" && session.id)
 
     if (activeSession) {

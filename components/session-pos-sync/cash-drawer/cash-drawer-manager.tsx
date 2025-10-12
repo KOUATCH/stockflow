@@ -16,7 +16,7 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog"
 import { Textarea } from "@/components/ui/textarea"
-import { useToast } from "@/hooks/use-toast"
+import { useNotifications } from "@/components/notifications/NotificationProvider"
 import { DollarSign, Plus, Minus, Calculator, History, Lock, Unlock, Clock } from "lucide-react"
 
 interface CashDrawerManagerProps {
@@ -91,7 +91,7 @@ export function CashDrawerManager({ terminalId, locationId, organizationId, user
     },
   ])
 
-  const { toast } = useToast()
+  const notifications = useNotifications()
 
   const calculateCashCountTotal = () => {
     return (
@@ -126,11 +126,11 @@ export function CashDrawerManager({ terminalId, locationId, organizationId, user
     setCurrentBalance(countedAmount)
     setIsCountDialogOpen(false)
 
-    toast({
-      title: "Cash Count Completed",
-      description: `Counted: $${countedAmount.toFixed(2)} | Variance: ${variance >= 0 ? "+" : ""}$${variance.toFixed(2)}`,
-      variant: Math.abs(variance) > 5 ? "destructive" : "default",
-    })
+    if (Math.abs(variance) > 5) {
+      notifications.warning("Cash Count Completed", `Counted: $${countedAmount.toFixed(2)} | Variance: ${variance >= 0 ? "+" : ""}$${variance.toFixed(2)}`);
+    } else {
+      notifications.success("Cash Count Completed", `Counted: $${countedAmount.toFixed(2)} | Variance: ${variance >= 0 ? "+" : ""}$${variance.toFixed(2)}`);
+    }
 
     // Reset count
     setCashCount({
@@ -150,20 +150,12 @@ export function CashDrawerManager({ terminalId, locationId, organizationId, user
   const handleAddRemoveCash = () => {
     const transactionAmount = Number.parseFloat(amount)
     if (isNaN(transactionAmount) || transactionAmount <= 0) {
-      toast({
-        title: "Invalid Amount",
-        description: "Please enter a valid amount greater than 0",
-        variant: "destructive",
-      })
+      notifications.error("Invalid Amount", "Please enter a valid amount greater than 0")
       return
     }
 
     if (!reason.trim()) {
-      toast({
-        title: "Reason Required",
-        description: "Please provide a reason for this transaction",
-        variant: "destructive",
-      })
+      notifications.error("Reason Required", "Please provide a reason for this transaction")
       return
     }
 
@@ -171,11 +163,7 @@ export function CashDrawerManager({ terminalId, locationId, organizationId, user
     const newBalance = currentBalance + finalAmount
 
     if (newBalance < 0) {
-      toast({
-        title: "Insufficient Funds",
-        description: "Cannot remove more cash than available in drawer",
-        variant: "destructive",
-      })
+      notifications.error("Insufficient Funds", "Cannot remove more cash than available in drawer")
       return
     }
 
@@ -195,18 +183,16 @@ export function CashDrawerManager({ terminalId, locationId, organizationId, user
     setAmount("")
     setReason("")
 
-    toast({
-      title: `Cash ${transactionType === "add" ? "Added" : "Removed"}`,
-      description: `$${transactionAmount.toFixed(2)} ${transactionType === "add" ? "added to" : "removed from"} drawer`,
-    })
+    notifications.cashOperation(
+      transactionType === "add" ? "addition" : "removal",
+      transactionAmount,
+      `$${transactionAmount.toFixed(2)} ${transactionType === "add" ? "added to" : "removed from"} drawer`
+    )
   }
 
   const toggleDrawer = () => {
     setIsOpen(!isOpen)
-    toast({
-      title: `Cash Drawer ${!isOpen ? "Opened" : "Closed"}`,
-      description: `Drawer is now ${!isOpen ? "open" : "closed"} for transactions`,
-    })
+    notifications.info(`Cash Drawer ${!isOpen ? "Opened" : "Closed"}`, `Drawer is now ${!isOpen ? "open" : "closed"} for transactions`)
   }
 
   const getTransactionIcon = (type: CashTransaction["type"]) => {

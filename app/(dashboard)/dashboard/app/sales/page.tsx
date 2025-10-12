@@ -16,8 +16,6 @@ export default function HomePage() {
   // const { user, isAuthenticated } = useAuth()
   const [activeTab, setActiveTab] = useState("overview")
   const { session, user, organizationId } = useClientAuth()
-  const organizationId = session.data?.user?.organizationId ?? ""
-  const user = session.data?.user
 
   if (!user) {
     return (

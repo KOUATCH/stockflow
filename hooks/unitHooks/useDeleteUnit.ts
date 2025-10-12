@@ -1,28 +1,36 @@
 import { unitAPI } from "@/services/unitAPI"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
-import { toast } from "sonner"
-import { ItemKeys } from "../../types/queryKeys"
-// import { itemAPI } from "../api/itemAPI"
-// import { ItemKeys } from "../keys/itemKeys"
+import { useNotifications } from "@/components/notifications/NotificationProvider"
+import { UnitKeys } from "../../types/queryKeys"
 
 export function useDeleteUnit() {
   const queryClient = useQueryClient()
+  const { success, error } = useNotifications();
 
   return useMutation({
     mutationFn: async (id: string) => {
       return await unitAPI.deleteUnit(id)
     },
     onSuccess: (_, deletedId) => {
-      toast.success("Unit deleted successfully")
+      success("Unit Deleted", "Unit has been successfully removed");
 
       // Remove from cache and invalidate related queries
-      queryClient.removeQueries({ queryKey: ItemKeys.detail(deletedId) })
-      queryClient.invalidateQueries({ queryKey: ItemKeys.lists() })
+      queryClient.removeQueries({ queryKey: UnitKeys.detail(deletedId) })
+      queryClient.invalidateQueries({ queryKey: UnitKeys.lists() })
     },
-    onError: (error: Error) => {
-      toast.error("Failed to delete item", {
-        description: error.message || "Unknown error occurred",
-      })
+    onError: (err: Error) => {
+      error(
+        "Delete Failed",
+        err.message || "Unknown error occurred",
+        {
+          category: "error",
+          priority: "normal",
+          action: {
+            label: "Try Again",
+            onClick: () => console.log("Retry delete unit")
+          }
+        }
+      );
     },
   })
 }

@@ -1,6 +1,6 @@
 "use server"
 
-import { db } from "@/lib/db"
+import { db } from "@/prisma/db"
 import { startOfDay, endOfDay, startOfMonth, startOfYear, subMonths, subYears } from "date-fns"
 
 export interface FinancialMetrics {

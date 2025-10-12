@@ -1,0 +1,629 @@
+// =============================================================================
+// COMPREHENSIVE FINANCIAL REPORTING SCHEMA - Enterprise Grade
+// Add this to your main schema.prisma file
+// =============================================================================
+
+// Chart of Accounts
+model ChartOfAccounts {
+  id                    String                    @id @default(cuid())
+  accountNumber         String                    @unique
+  accountName           String
+  accountType           AccountType
+  accountSubType        AccountSubType
+  parentAccountId       String?
+  isActive              Boolean                   @default(true)
+  description           String?
+  taxReportingCategory  TaxReportingCategory?
+  normalBalance         NormalBalance
+  allowManualEntries    Boolean                   @default(true)
+  requiresProject       Boolean                   @default(false)
+  requiresDepartment    Boolean                   @default(false)
+  organizationId        String
+  createdAt             DateTime                  @default(now())
+  updatedAt             DateTime                  @updatedAt
+
+  // Relationships
+  organization          Organization              @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  parentAccount         ChartOfAccounts?          @relation("AccountHierarchy", fields: [parentAccountId], references: [id])
+  childAccounts         ChartOfAccounts[]         @relation("AccountHierarchy")
+  generalLedgerEntries  GeneralLedgerEntry[]
+  budgetLineItems       BudgetLineItem[]
+  journalEntryLines     JournalEntryLine[]
+
+  @@index([organizationId])
+  @@index([accountType])
+  @@index([accountNumber])
+  @@index([parentAccountId])
+  @@map("chart_of_accounts")
+}
+
+// General Ledger
+model GeneralLedgerEntry {
+  id                String                  @id @default(cuid())
+  accountId         String
+  transactionDate   DateTime
+  description       String
+  debitAmount       Decimal                 @db.Decimal(15, 2) @default(0)
+  creditAmount      Decimal                 @db.Decimal(15, 2) @default(0)
+  runningBalance    Decimal                 @db.Decimal(15, 2)
+  referenceType     ReferenceType?
+  referenceId       String?
+  journalEntryId    String?
+  fiscalYear        Int
+  fiscalQuarter     Int
+  fiscalMonth       Int
+  departmentId      String?
+  projectId         String?
+  locationId        String?
+  organizationId    String
+  createdBy         String?
+  createdAt         DateTime                @default(now())
+  updatedAt         DateTime                @updatedAt
+
+  // Relationships
+  account           ChartOfAccounts         @relation(fields: [accountId], references: [id])
+  organization      Organization            @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  journalEntry      JournalEntry?           @relation(fields: [journalEntryId], references: [id])
+  department        Department?             @relation(fields: [departmentId], references: [id])
+  project           Project?                @relation(fields: [projectId], references: [id])
+  location          Location?               @relation(fields: [locationId], references: [id])
+  user              User?                   @relation(fields: [createdBy], references: [id])
+
+  @@index([organizationId])
+  @@index([accountId])
+  @@index([transactionDate])
+  @@index([fiscalYear, fiscalQuarter])
+  @@index([journalEntryId])
+  @@index([referenceType, referenceId])
+  @@map("general_ledger_entries")
+}
+
+// Journal Entries
+model JournalEntry {
+  id                String                  @id @default(cuid())
+  entryNumber       String                  @unique
+  entryDate         DateTime
+  description       String
+  reference         String?
+  status            JournalEntryStatus      @default(DRAFT)
+  totalDebits       Decimal                 @db.Decimal(15, 2)
+  totalCredits      Decimal                 @db.Decimal(15, 2)
+  isBalanced        Boolean                 @default(false)
+  sourceDocument    String?
+  reversalOfId      String?
+  isReversal        Boolean                 @default(false)
+  reversalDate      DateTime?
+  departmentId      String?
+  projectId         String?
+  organizationId    String
+  createdBy         String?
+  approvedBy        String?
+  approvedAt        DateTime?
+  postedBy          String?
+  postedAt          DateTime?
+  createdAt         DateTime                @default(now())
+  updatedAt         DateTime                @updatedAt
+
+  // Relationships
+  organization      Organization            @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  lines             JournalEntryLine[]
+  generalLedgerEntries GeneralLedgerEntry[]
+  department        Department?             @relation(fields: [departmentId], references: [id])
+  project           Project?                @relation(fields: [projectId], references: [id])
+  creator           User?                   @relation("JournalEntryCreator", fields: [createdBy], references: [id])
+  approver          User?                   @relation("JournalEntryApprover", fields: [approvedBy], references: [id])
+  poster            User?                   @relation("JournalEntryPoster", fields: [postedBy], references: [id])
+  reversalOf        JournalEntry?           @relation("JournalEntryReversal", fields: [reversalOfId], references: [id])
+  reversals         JournalEntry[]          @relation("JournalEntryReversal")
+
+  @@index([organizationId])
+  @@index([entryDate])
+  @@index([status])
+  @@index([createdBy])
+  @@index([entryNumber])
+  @@map("journal_entries")
+}
+
+// Journal Entry Lines
+model JournalEntryLine {
+  id              String            @id @default(cuid())
+  journalEntryId  String
+  lineNumber      Int
+  accountId       String
+  description     String?
+  debitAmount     Decimal           @db.Decimal(15, 2) @default(0)
+  creditAmount    Decimal           @db.Decimal(15, 2) @default(0)
+  departmentId    String?
+  projectId       String?
+  customerId      String?
+  supplierId      String?
+  itemId          String?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  // Relationships
+  journalEntry    JournalEntry      @relation(fields: [journalEntryId], references: [id], onDelete: Cascade)
+  account         ChartOfAccounts   @relation(fields: [accountId], references: [id])
+  department      Department?       @relation(fields: [departmentId], references: [id])
+  project         Project?          @relation(fields: [projectId], references: [id])
+  customer        Customer?         @relation(fields: [customerId], references: [id])
+  supplier        Supplier?         @relation(fields: [supplierId], references: [id])
+  item            Item?             @relation(fields: [itemId], references: [id])
+
+  @@index([journalEntryId])
+  @@index([accountId])
+  @@index([lineNumber])
+  @@map("journal_entry_lines")
+}
+
+// Financial Periods
+model FinancialPeriod {
+  id              String            @id @default(cuid())
+  periodName      String
+  startDate       DateTime          @db.Date
+  endDate         DateTime          @db.Date
+  fiscalYear      Int
+  fiscalQuarter   Int
+  fiscalMonth     Int
+  periodType      PeriodType
+  isCurrentPeriod Boolean           @default(false)
+  isClosed        Boolean           @default(false)
+  closedBy        String?
+  closedAt        DateTime?
+  organizationId  String
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  // Relationships
+  organization    Organization      @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  closedByUser    User?             @relation(fields: [closedBy], references: [id])
+  financialReports FinancialReport[]
+  budgets         Budget[]
+
+  @@unique([organizationId, fiscalYear, fiscalQuarter, fiscalMonth])
+  @@index([organizationId])
+  @@index([fiscalYear])
+  @@index([startDate, endDate])
+  @@map("financial_periods")
+}
+
+// Financial Reports
+model FinancialReport {
+  id                String              @id @default(cuid())
+  reportType        FinancialReportType
+  reportName        String
+  reportPeriodId    String
+  generatedDate     DateTime            @default(now())
+  reportData        Json
+  reportFormat      ReportFormat        @default(JSON)
+  status            ReportStatus        @default(DRAFT)
+  organizationId    String
+  generatedBy       String?
+  approvedBy        String?
+  approvedAt        DateTime?
+  publishedAt       DateTime?
+  expiresAt         DateTime?
+  version           Int                 @default(1)
+  notes             String?
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+
+  // Relationships
+  organization      Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  reportPeriod      FinancialPeriod     @relation(fields: [reportPeriodId], references: [id])
+  generator         User?               @relation("ReportGenerator", fields: [generatedBy], references: [id])
+  approver          User?               @relation("ReportApprover", fields: [approvedBy], references: [id])
+
+  @@index([organizationId])
+  @@index([reportType])
+  @@index([reportPeriodId])
+  @@index([status])
+  @@index([generatedDate])
+  @@map("financial_reports")
+}
+
+// Budgets
+model Budget {
+  id                String              @id @default(cuid())
+  budgetName        String
+  budgetType        BudgetType
+  periodId          String
+  startDate         DateTime            @db.Date
+  endDate           DateTime            @db.Date
+  totalBudget       Decimal             @db.Decimal(15, 2)
+  actualSpent       Decimal             @db.Decimal(15, 2) @default(0)
+  variance          Decimal             @db.Decimal(15, 2) @default(0)
+  variancePercent   Decimal             @db.Decimal(5, 2) @default(0)
+  status            BudgetStatus        @default(DRAFT)
+  organizationId    String
+  departmentId      String?
+  projectId         String?
+  createdBy         String?
+  approvedBy        String?
+  approvedAt        DateTime?
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+
+  // Relationships
+  organization      Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  period            FinancialPeriod     @relation(fields: [periodId], references: [id])
+  department        Department?         @relation(fields: [departmentId], references: [id])
+  project           Project?            @relation(fields: [projectId], references: [id])
+  creator           User?               @relation("BudgetCreator", fields: [createdBy], references: [id])
+  approver          User?               @relation("BudgetApprover", fields: [approvedBy], references: [id])
+  lineItems         BudgetLineItem[]
+
+  @@index([organizationId])
+  @@index([budgetType])
+  @@index([periodId])
+  @@index([status])
+  @@map("budgets")
+}
+
+// Budget Line Items
+model BudgetLineItem {
+  id                String            @id @default(cuid())
+  budgetId          String
+  accountId         String
+  description       String
+  budgetedAmount    Decimal           @db.Decimal(15, 2)
+  actualAmount      Decimal           @db.Decimal(15, 2) @default(0)
+  variance          Decimal           @db.Decimal(15, 2) @default(0)
+  variancePercent   Decimal           @db.Decimal(5, 2) @default(0)
+  departmentId      String?
+  projectId         String?
+  createdAt         DateTime          @default(now())
+  updatedAt         DateTime          @updatedAt
+
+  // Relationships
+  budget            Budget            @relation(fields: [budgetId], references: [id], onDelete: Cascade)
+  account           ChartOfAccounts   @relation(fields: [accountId], references: [id])
+  department        Department?       @relation(fields: [departmentId], references: [id])
+  project           Project?          @relation(fields: [projectId], references: [id])
+
+  @@index([budgetId])
+  @@index([accountId])
+  @@map("budget_line_items")
+}
+
+// Financial Ratios & Analytics
+model FinancialRatio {
+  id                String              @id @default(cuid())
+  ratioType         FinancialRatioType
+  ratioName         String
+  ratioValue        Decimal             @db.Decimal(10, 4)
+  calculationDate   DateTime            @default(now())
+  periodId          String?
+  organizationId    String
+  benchmarkValue    Decimal?            @db.Decimal(10, 4)
+  industryAverage   Decimal?            @db.Decimal(10, 4)
+  previousValue     Decimal?            @db.Decimal(10, 4)
+  trend             TrendDirection?
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+
+  // Relationships
+  organization      Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([ratioType])
+  @@index([calculationDate])
+  @@map("financial_ratios")
+}
+
+// Departments (for cost center reporting)
+model Department {
+  id                  String                  @id @default(cuid())
+  departmentCode      String                  @unique
+  departmentName      String
+  description         String?
+  parentDepartmentId  String?
+  managerId           String?
+  budgetAmount        Decimal?                @db.Decimal(15, 2)
+  isActive            Boolean                 @default(true)
+  organizationId      String
+  createdAt           DateTime                @default(now())
+  updatedAt           DateTime                @updatedAt
+
+  // Relationships
+  organization        Organization            @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  parentDepartment    Department?             @relation("DepartmentHierarchy", fields: [parentDepartmentId], references: [id])
+  childDepartments    Department[]            @relation("DepartmentHierarchy")
+  manager             User?                   @relation(fields: [managerId], references: [id])
+  budgets             Budget[]
+  budgetLineItems     BudgetLineItem[]
+  journalEntries      JournalEntry[]
+  journalEntryLines   JournalEntryLine[]
+  generalLedgerEntries GeneralLedgerEntry[]
+
+  @@index([organizationId])
+  @@index([departmentCode])
+  @@index([parentDepartmentId])
+  @@map("departments")
+}
+
+// Projects (for project-based reporting)
+model Project {
+  id                  String                  @id @default(cuid())
+  projectCode         String                  @unique
+  projectName         String
+  description         String?
+  projectManagerId    String?
+  startDate           DateTime?               @db.Date
+  endDate             DateTime?               @db.Date
+  budgetAmount        Decimal?                @db.Decimal(15, 2)
+  actualCost          Decimal?                @db.Decimal(15, 2) @default(0)
+  status              ProjectStatus           @default(ACTIVE)
+  organizationId      String
+  createdAt           DateTime                @default(now())
+  updatedAt           DateTime                @updatedAt
+
+  // Relationships
+  organization        Organization            @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  projectManager      User?                   @relation(fields: [projectManagerId], references: [id])
+  budgets             Budget[]
+  budgetLineItems     BudgetLineItem[]
+  journalEntries      JournalEntry[]
+  journalEntryLines   JournalEntryLine[]
+  generalLedgerEntries GeneralLedgerEntry[]
+
+  @@index([organizationId])
+  @@index([projectCode])
+  @@index([status])
+  @@map("projects")
+}
+
+// Tax Information
+model TaxInformation {
+  id                String              @id @default(cuid())
+  taxType           TaxType
+  taxRate           Decimal             @db.Decimal(5, 4)
+  taxJurisdiction   String
+  effectiveDate     DateTime            @db.Date
+  expiryDate        DateTime?           @db.Date
+  isActive          Boolean             @default(true)
+  description       String?
+  organizationId    String
+  createdAt         DateTime            @default(now())
+  updatedAt         DateTime            @updatedAt
+
+  // Relationships
+  organization      Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([taxType])
+  @@index([effectiveDate])
+  @@map("tax_information")
+}
+
+// Audit Trail
+model AuditTrail {
+  id                String              @id @default(cuid())
+  tableName         String
+  recordId          String
+  action            AuditAction
+  oldValues         Json?
+  newValues         Json?
+  changedFields     String[]
+  userId            String?
+  ipAddress         String?
+  userAgent         String?
+  timestamp         DateTime            @default(now())
+  organizationId    String
+
+  // Relationships
+  organization      Organization        @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user              User?               @relation(fields: [userId], references: [id])
+
+  @@index([organizationId])
+  @@index([tableName])
+  @@index([recordId])
+  @@index([timestamp])
+  @@index([userId])
+  @@map("audit_trail")
+}
+
+// =============================================================================
+// ENUMS
+// =============================================================================
+
+enum AccountType {
+  ASSETS
+  LIABILITIES
+  EQUITY
+  REVENUE
+  EXPENSES
+  OTHER_INCOME
+  OTHER_EXPENSES
+}
+
+enum AccountSubType {
+  // Assets
+  CURRENT_ASSETS
+  CASH_AND_EQUIVALENTS
+  ACCOUNTS_RECEIVABLE
+  INVENTORY
+  PREPAID_EXPENSES
+  OTHER_CURRENT_ASSETS
+  FIXED_ASSETS
+  ACCUMULATED_DEPRECIATION
+  INTANGIBLE_ASSETS
+  LONG_TERM_ASSETS
+
+  // Liabilities
+  CURRENT_LIABILITIES
+  ACCOUNTS_PAYABLE
+  ACCRUED_LIABILITIES
+  SHORT_TERM_DEBT
+  TAXES_PAYABLE
+  LONG_TERM_DEBT
+  OTHER_LIABILITIES
+
+  // Equity
+  PAID_IN_CAPITAL
+  RETAINED_EARNINGS
+  CURRENT_EARNINGS
+  DIVIDENDS
+  TREASURY_STOCK
+
+  // Revenue
+  SALES_REVENUE
+  SERVICE_REVENUE
+  OTHER_REVENUE
+  RETURNS_AND_ALLOWANCES
+
+  // Expenses
+  COST_OF_GOODS_SOLD
+  OPERATING_EXPENSES
+  SALARIES_AND_WAGES
+  BENEFITS
+  RENT
+  UTILITIES
+  INSURANCE
+  DEPRECIATION
+  AMORTIZATION
+  MARKETING
+  PROFESSIONAL_SERVICES
+  TRAVEL
+  OFFICE_EXPENSES
+  INTEREST_EXPENSE
+  TAX_EXPENSE
+}
+
+enum TaxReportingCategory {
+  SALES_TAX
+  INCOME_TAX
+  PAYROLL_TAX
+  PROPERTY_TAX
+  EXCISE_TAX
+  NON_TAXABLE
+  TAX_DEDUCTIBLE
+}
+
+enum NormalBalance {
+  DEBIT
+  CREDIT
+}
+
+enum ReferenceType {
+  SALES_ORDER
+  PURCHASE_ORDER
+  PAYMENT
+  RECEIPT
+  INVOICE
+  BILL
+  INVENTORY_ADJUSTMENT
+  PAYROLL
+  BANK_TRANSACTION
+  DEPRECIATION
+  MANUAL_ENTRY
+}
+
+enum JournalEntryStatus {
+  DRAFT
+  PENDING_APPROVAL
+  APPROVED
+  POSTED
+  REVERSED
+  REJECTED
+}
+
+enum PeriodType {
+  MONTHLY
+  QUARTERLY
+  YEARLY
+  CUSTOM
+}
+
+enum FinancialReportType {
+  INCOME_STATEMENT
+  BALANCE_SHEET
+  CASH_FLOW_STATEMENT
+  STATEMENT_OF_EQUITY
+  TRIAL_BALANCE
+  GENERAL_LEDGER
+  ACCOUNTS_RECEIVABLE_AGING
+  ACCOUNTS_PAYABLE_AGING
+  BUDGET_VS_ACTUAL
+  FINANCIAL_RATIO_ANALYSIS
+  COMPREHENSIVE_ANALYSIS
+}
+
+enum ReportFormat {
+  JSON
+  PDF
+  EXCEL
+  CSV
+  HTML
+}
+
+enum ReportStatus {
+  DRAFT
+  GENERATED
+  REVIEWED
+  APPROVED
+  PUBLISHED
+  ARCHIVED
+}
+
+enum BudgetType {
+  OPERATING
+  CAPITAL
+  CASH_FLOW
+  PROJECT
+  DEPARTMENT
+  MASTER
+}
+
+enum BudgetStatus {
+  DRAFT
+  PENDING_APPROVAL
+  APPROVED
+  ACTIVE
+  COMPLETED
+  CANCELLED
+}
+
+enum FinancialRatioType {
+  LIQUIDITY
+  LEVERAGE
+  PROFITABILITY
+  EFFICIENCY
+  MARKET
+}
+
+enum TrendDirection {
+  IMPROVING
+  DECLINING
+  STABLE
+}
+
+enum ProjectStatus {
+  PLANNING
+  ACTIVE
+  ON_HOLD
+  COMPLETED
+  CANCELLED
+}
+
+enum TaxType {
+  SALES_TAX
+  INCOME_TAX
+  PAYROLL_TAX
+  PROPERTY_TAX
+  EXCISE_TAX
+  VAT
+  GST
+  OTHER
+}
+
+enum AuditAction {
+  CREATE
+  UPDATE
+  DELETE
+  VIEW
+  APPROVE
+  REJECT
+  POST
+  REVERSE
+}

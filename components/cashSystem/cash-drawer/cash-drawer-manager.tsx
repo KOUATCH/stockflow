@@ -5,7 +5,7 @@ import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { useToast } from "@/hooks/use-toast"
+import { useNotifications } from "@/components/notifications/NotificationProvider"
 import { CashDrawer, cashDrawerTransaction, cashDrawerTransactionType, POSSession, POSSessionStatus } from "@/lib/cashSystem/db"
 import { format } from "date-fns"
 import {
@@ -120,7 +120,7 @@ export function CashDrawerManager({ terminalId, userId, locationId, organization
     },
   ])
 
-  const { toast } = useToast()
+  const notifications = useNotifications()
 
   const hasActiveSession = currentSession?.status === "ACTIVE"
   const expectedBalance = currentSession ? currentSession.openingBalance + currentSession.cashTotal : 0
@@ -192,17 +192,10 @@ export function CashDrawerManager({ terminalId, userId, locationId, organization
 
       setRecentEvents((prev) => [openingEvent, ...prev])
 
-      toast({
-        title: "Session Opened Successfully",
-        description: `Session ${newSession.sessionNumber} started with $${openingBalance.toFixed(2)}`,
-      })
+      notifications.success("Session Opened Successfully", `Session ${newSession.sessionNumber} started with $${openingBalance.toFixed(2)}`)
       setShowSessionDialog(false)
     } catch (error) {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Failed to open session. Please try again.",
-      })
+      notifications.error("Error", "Failed to open session. Please try again.")
     }
   }
 
@@ -249,18 +242,14 @@ export function CashDrawerManager({ terminalId, userId, locationId, organization
 
       setRecentEvents((prev) => [closingEvent, ...prev])
 
-      toast({
-        title: "Session Closed Successfully",
-        description: `Session closed with ${finalVariance >= 0 ? "surplus" : "shortage"} of $${Math.abs(finalVariance).toFixed(2)}`,
-        variant: Math.abs(finalVariance) > 5 ? "destructive" : "default",
-      })
+      if (Math.abs(finalVariance) > 5) {
+        notifications.warning("Session Closed Successfully", `Session closed with ${finalVariance >= 0 ? "surplus" : "shortage"} of $${Math.abs(finalVariance).toFixed(2)}`);
+      } else {
+        notifications.success("Session Closed Successfully", `Session closed with ${finalVariance >= 0 ? "surplus" : "shortage"} of $${Math.abs(finalVariance).toFixed(2)}`);
+      }
       setShowSessionDialog(false)
     } catch (error) {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Failed to close session. Please try again.",
-      })
+      notifications.error("Error", "Failed to close session. Please try again.")
     }
   }
 
@@ -272,11 +261,7 @@ export function CashDrawerManager({ terminalId, userId, locationId, organization
       const newBalance = cashDrawerStatus.currentBalance + (isAddition ? amount : -amount)
 
       if (!isAddition && newBalance < 0) {
-        toast({
-          variant: "destructive",
-          title: "Insufficient Cash",
-          description: "Cannot remove more cash than available in drawer.",
-        })
+        notifications.error("Insufficient Cash", "Cannot remove more cash than available in drawer.")
         return
       }
 
@@ -303,17 +288,14 @@ export function CashDrawerManager({ terminalId, userId, locationId, organization
 
       setRecentEvents((prev) => [transactionEvent, ...prev.slice(0, 19)]) // Keep last 20 events
 
-      toast({
-        title: `Cash ${isAddition ? "Added" : "Removed"} Successfully`,
-        description: `$${amount.toFixed(2)} ${isAddition ? "added to" : "removed from"} drawer. New balance: $${newBalance.toFixed(2)}`,
-      })
+      notifications.cashOperation(
+        isAddition ? "addition" : "removal",
+        amount,
+        `New balance: $${newBalance.toFixed(2)}`
+      )
       setShowTransactionDialog(false)
     } catch (error) {
-      toast({
-        variant: "destructive",
-        title: "Transaction Failed",
-        description: "Failed to process cash transaction. Please try again.",
-      })
+      notifications.error("Transaction Failed", "Failed to process cash transaction. Please try again.")
     }
   }
 

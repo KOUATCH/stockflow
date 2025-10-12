@@ -50,9 +50,8 @@ export default function HomePage() {
   const [selectedLocation, setSelectedLocation] = useState<string>("loc_1")
   const [selectedTerminal, setSelectedTerminal] = useState<string>("terminal_1")
   const { session, user, organizationId } = useClientAuth()
-  const user = AuthSession.data?.user
   console.log("User from session:", user)
-  const orgId = user?.organizationId || "org_1"
+  const orgId = organizationId || "org_1"
 
   // const { data: locations, isLoading: locationsLoading } = useLocationsByOrganization(orgId)
   const userId = user?.id

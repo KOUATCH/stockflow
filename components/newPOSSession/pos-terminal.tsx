@@ -1,6 +1,6 @@
 "use client"
 
-import { useToast } from "@/hooks/use-toast"
+import { useNotifications } from "@/components/notifications/NotificationProvider"
 import { useOrgCategories } from "@/hooks/useAllCategoriesqueries"
 import { useCustomers } from "@/hooks/useCustomers"
 import { useQueryClient } from "@tanstack/react-query"
@@ -152,7 +152,7 @@ export function pOSStation({ organizationId, locationId, terminalId, userId }: p
 
   // const [customers, setCustomers] = useState<Customer[]>([])
 
-  const { toast } = useToast()
+  const notifications = useNotifications()
   const queryClient = useQueryClient()
 
   // ... existing mutations and effects ...
@@ -175,11 +175,7 @@ export function pOSStation({ organizationId, locationId, terminalId, userId }: p
     const availableStock = item.inventoryLevels?.[0]?.quantityAvailable ?? 0
 
     if (currentQuantityInCart >= availableStock && availableStock > 0) {
-      toast({
-        variant: "destructive",
-        title: "Insufficient Stock",
-        description: `Cannot add more ${item.name}. Only ${availableStock} in stock.`,
-      })
+      notifications.error("Insufficient Stock", `Cannot add more ${item.name}. Only ${availableStock} in stock.`)
       return
     }
 
@@ -222,10 +218,7 @@ export function pOSStation({ organizationId, locationId, terminalId, userId }: p
       return [item.id, ...filtered].slice(0, 5)
     })
 
-    toast({
-      title: "Item Added",
-      description: `${item.name} added to cart`,
-    })
+    notifications.success("Item Added", `${item.name} added to cart`)
   }
 
   const removeFromCart = (itemId: string) => {
@@ -243,11 +236,7 @@ export function pOSStation({ organizationId, locationId, terminalId, userId }: p
 
     const availableStock = item.inventoryLevels?.[0]?.quantityAvailable ?? 0
     if (newQuantity > availableStock) {
-      toast({
-        variant: "destructive",
-        title: "Insufficient Stock",
-        description: `Cannot add more ${item.name}. Only ${availableStock} in stock.`,
-      })
+      notifications.error("Insufficient Stock", `Cannot add more ${item.name}. Only ${availableStock} in stock.`)
       return
     }
 
@@ -268,11 +257,7 @@ export function pOSStation({ organizationId, locationId, terminalId, userId }: p
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     if (cart.length === 0) {
-      toast({
-        variant: "destructive",
-        title: "Empty Cart",
-        description: "Please add items to cart before processing payment.",
-      })
+      notifications.error("Empty Cart", "Please add items to cart before processing payment.")
       return
     }
     setIsPaymentDialogOpen(true)
@@ -462,10 +447,7 @@ export function pOSStation({ organizationId, locationId, terminalId, userId }: p
                           className="flex-shrink-0 w-24 h-24 rounded-xl cursor-pointer transition-all duration-200 hover:scale-105 bg-orange-100 hover:bg-orange-200 text-orange-700"
                           onClick={() => {
                             // Handle favorites filter
-                            toast({
-                              title: "Favorites",
-                              description: "Showing favorite items",
-                            })
+                            notifications.info("Favorites", "Showing favorite items")
                           }}
                         >
                           <div className="flex flex-col items-center justify-center h-full p-2">
@@ -480,10 +462,7 @@ export function pOSStation({ organizationId, locationId, terminalId, userId }: p
                           className="flex-shrink-0 w-24 h-24 rounded-xl cursor-pointer transition-all duration-200 hover:scale-105 bg-purple-100 hover:bg-purple-200 text-purple-700"
                           onClick={() => {
                             // Handle recent items filter
-                            toast({
-                              title: "Recent Items",
-                              description: "Showing recently used items",
-                            })
+                            notifications.info("Recent Items", "Showing recently used items")
                           }}
                         >
                           <div className="flex flex-col items-center justify-center h-full p-2">
@@ -504,10 +483,7 @@ export function pOSStation({ organizationId, locationId, terminalId, userId }: p
                         className="flex items-center gap-2 text-orange-600 border-orange-200 hover:bg-orange-50 bg-transparent"
                         onClick={() => {
                           // Handle discount functionality
-                          toast({
-                            title: "Add Discount",
-                            description: "Discount functionality coming soon",
-                          })
+                          notifications.info("Add Discount", "Discount functionality coming soon")
                         }}
                       >
                         <Percent className="h-4 w-4" />

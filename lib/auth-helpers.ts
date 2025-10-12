@@ -1,4 +1,4 @@
-import { prisma } from "@/lib/db"
+import { prisma } from "@/prisma/db"
 
 export async function getUserWithRoles(userId: string) {
   try {
@@ -16,16 +16,16 @@ export async function getUserWithRoles(userId: string) {
           }
         },
         roles: {
-          where: {
-            organization: {
-              isActive: true
-            }
-          },
           select: {
             id: true,
             name: true,
             code: true,
-            permissions: true
+            permissions: true,
+            rolePermissions: {
+              include: {
+                permission: true
+              }
+            }
           }
         }
       }
@@ -48,7 +48,11 @@ export async function getUserPermissions(userId: string) {
 
     // Flatten all permissions from all roles
     const allPermissions = user.roles.reduce((acc, role) => {
-      return [...acc, ...role.permissions]
+      // Get permissions from role.permissions array (direct permissions)
+      // AND from rolePermissions relationship (linked permissions)
+      const directPermissions = role.permissions || []
+      const linkedPermissions = role.rolePermissions?.map(rp => rp.permission.code) || []
+      return [...acc, ...directPermissions, ...linkedPermissions]
     }, [] as string[])
 
     // Remove duplicates and return

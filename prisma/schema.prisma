@@ -60,8 +60,8 @@ model AuditLog {
   riskAssessment    String?
   approvalChain     String[]
   createdAt         DateTime      @default(now())
-  user              User?         @relation(fields: [userId], references: [id], onDelete: SetNull)
   organization      Organization? @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user              User?         @relation(fields: [userId], references: [id])
 
   @@index([userId])
   @@index([action])
@@ -97,6 +97,7 @@ model User {
   updatedAt              DateTime                @updatedAt
   organizationId         String
   accounts               Account[]
+  auditLogs              AuditLog[]
   cashDrawerTransactions CashDrawerTransaction[]
   dailyReports           DailySalesReport[]
   receivedGoodsReceipts  GoodsReceipt[]          @relation("GoodsReceiptReceivedBy")
@@ -104,32 +105,43 @@ model User {
   managedLocations       Location[]              @relation("LocationManager")
   refundsProcessed       PaymentRefund[]
   paymentsProcessed      Payment[]
+  requestedApprovals     PermissionApproval[]    @relation("PermissionRequester")
+  reviewedApprovals      PermissionApproval[]    @relation("PermissionReviewer")
+  PermissionApproval     PermissionApproval[]
+  grantedPermSessions    PermissionSession[]     @relation("PermissionSessionGranter")
+  revokedPermSessions    PermissionSession[]     @relation("PermissionSessionRevoker")
+  PermissionSession      PermissionSession[]
   posSessions            POSSession[]
   approvedPurchaseOrders PurchaseOrder[]         @relation("PurchaseOrderApprovedBy")
   createdPurchaseOrders  PurchaseOrder[]         @relation("PurchaseOrderCreatedBy")
+  grantedResourcePerms   ResourcePermission[]    @relation("ResourcePermissionGranter")
+  ResourcePermission     ResourcePermission[]
+  ownedResources         Resource[]              @relation("ResourceOwner")
+  grantedRolePermissions RolePermission[]        @relation("RolePermissionGranter")
   createdSalesOrders     SalesOrder[]            @relation("SalesOrderCreatedBy")
   sessions               Session[]
   approvedAdjustments    StockAdjustment[]       @relation("AdjustmentApprovedBy")
   createdAdjustments     StockAdjustment[]       @relation("AdjustmentCreatedBy")
   approvedTransfers      StockTransfer[]         @relation("TransferApprovedBy")
   createdTransfers       StockTransfer[]         @relation("TransferCreatedBy")
-  auditLogs              AuditLog[]
-  organization           Organization            @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  roles                  Role[]                  @relation("UserRoles")
-  userPermissions        UserPermission[]
-  ownedResources         Resource[]              @relation("ResourceOwner")
-  grantedRolePermissions RolePermission[]        @relation("RolePermissionGranter")
   grantedUserPermissions UserPermission[]        @relation("UserPermissionGranter")
-  grantedResourcePerms   ResourcePermission[]    @relation("ResourcePermissionGranter")
-  grantedPermSessions    PermissionSession[]     @relation("PermissionSessionGranter")
-  revokedPermSessions    PermissionSession[]     @relation("PermissionSessionRevoker")
-  requestedApprovals     PermissionApproval[]    @relation("PermissionRequester")
-  reviewedApprovals      PermissionApproval[]    @relation("PermissionReviewer")
-  userSessions           UserSession[]
+  userPermissions        UserPermission[]
   revokedSessions        UserSession[]           @relation("SessionRevoker")
-  ResourcePermission     ResourcePermission[]
-  PermissionSession      PermissionSession[]
-  PermissionApproval     PermissionApproval[]
+  userSessions           UserSession[]
+
+  // Presence System Relations
+  presenceSessions         EmployeePresenceSession[] @relation("EmployeePresenceSessions")
+  approvedPresenceSessions EmployeePresenceSession[] @relation("ApprovedPresenceSessions")
+  activityLogs             EmployeeActivityLog[]     @relation("EmployeeActivityLogs")
+  breakSessions            EmployeeBreakSession[]    @relation("EmployeeBreakSessions")
+  approvedBreakSessions    EmployeeBreakSession[]    @relation("ApprovedBreakSessions")
+  schedules                EmployeeSchedule[]        @relation("EmployeeSchedules")
+  presenceAlerts           PresenceAlert[]           @relation("EmployeePresenceAlerts")
+  resolvedPresenceAlerts   PresenceAlert[]           @relation("ResolvedPresenceAlerts")
+  attendanceReports        AttendanceReport[]        @relation("EmployeeAttendanceReports")
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  roles        Role[]       @relation("UserRoles")
 
   @@index([organizationId])
   @@index([email])
@@ -157,12 +169,12 @@ model Role {
   organizationId       String
   createdAt            DateTime             @default(now())
   updatedAt            DateTime             @updatedAt
+  resourcePermissions  ResourcePermission[]
+  rolePermissions      RolePermission[]
   organization         Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   parent               Role?                @relation("RoleHierarchy", fields: [parentId], references: [id])
   children             Role[]               @relation("RoleHierarchy")
   users                User[]               @relation("UserRoles")
-  rolePermissions      RolePermission[]
-  resourcePermissions  ResourcePermission[]
 
   @@unique([organizationId, code])
   @@index([code])
@@ -186,6 +198,7 @@ model Organization {
   isActive              Boolean                @default(true)
   createdAt             DateTime               @default(now())
   updatedAt             DateTime               @updatedAt
+  auditLogs             AuditLog[]
   brands                Brand[]
   categories            Category[]
   customers             Customer[]
@@ -197,6 +210,7 @@ model Organization {
   locations             Location[]
   posStations           POSStation[]
   purchaseOrders        PurchaseOrder[]
+  resources             Resource[]
   roles                 Role[]
   salesOrders           SalesOrder[]
   stockAdjustments      StockAdjustment[]
@@ -205,8 +219,12 @@ model Organization {
   taxRates              TaxRate[]
   units                 Unit[]
   users                 User[]
-  auditLogs             AuditLog[]
-  resources             Resource[]
+
+  // Presence System Relations
+  presenceSessions  EmployeePresenceSession[] @relation("OrganizationPresenceSessions")
+  schedules         EmployeeSchedule[]        @relation("OrganizationSchedules")
+  presenceAlerts    PresenceAlert[]           @relation("OrganizationPresenceAlerts")
+  attendanceReports AttendanceReport[]        @relation("OrganizationAttendanceReports")
 
   @@index([slug])
   @@index([isActive])
@@ -246,11 +264,11 @@ model Resource {
   metadata            Json?
   createdAt           DateTime             @default(now())
   updatedAt           DateTime             @updatedAt
+  permissionApprovals PermissionApproval[]
+  resourcePermissions ResourcePermission[]
   organization        Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   owner               User?                @relation("ResourceOwner", fields: [ownerId], references: [id])
   userPermissions     UserPermission[]
-  resourcePermissions ResourcePermission[]
-  permissionApprovals PermissionApproval[]
 
   @@unique([resourceType, resourceId, organizationId])
   @@index([organizationId, resourceType])
@@ -267,9 +285,9 @@ model RolePermission {
   grantedAt    DateTime   @default(now())
   expiresAt    DateTime?
   isActive     Boolean    @default(true)
-  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
-  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
   granter      User?      @relation("RolePermissionGranter", fields: [grantedBy], references: [id])
+  permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
+  role         Role       @relation(fields: [roleId], references: [id], onDelete: Cascade)
 
   @@unique([roleId, permissionId])
   @@index([roleId])
@@ -289,10 +307,10 @@ model UserPermission {
   expiresAt    DateTime?
   reason       String?
   isActive     Boolean    @default(true)
-  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+  granter      User       @relation("UserPermissionGranter", fields: [grantedBy], references: [id])
   permission   Permission @relation(fields: [permissionId], references: [id], onDelete: Cascade)
   resource     Resource?  @relation(fields: [resourceId], references: [id], onDelete: Cascade)
-  granter      User       @relation("UserPermissionGranter", fields: [grantedBy], references: [id])
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, permissionId, resourceId])
   @@index([userId])
@@ -312,10 +330,10 @@ model ResourcePermission {
   grantedAt      DateTime  @default(now())
   expiresAt      DateTime?
   conditions     Json?
-  resource       Resource  @relation(fields: [resourceId], references: [id], onDelete: Cascade)
-  user           User?     @relation(fields: [userId], references: [id], onDelete: Cascade)
-  role           Role?     @relation(fields: [roleId], references: [id], onDelete: Cascade)
   granter        User      @relation("ResourcePermissionGranter", fields: [grantedBy], references: [id])
+  resource       Resource  @relation(fields: [resourceId], references: [id], onDelete: Cascade)
+  role           Role?     @relation(fields: [roleId], references: [id], onDelete: Cascade)
+  user           User?     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([resourceId])
   @@index([userId])
@@ -336,9 +354,9 @@ model PermissionSession {
   revokedAt   DateTime?
   revokedBy   String?
   reason      String?
-  user        User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
   granter     User                  @relation("PermissionSessionGranter", fields: [grantedBy], references: [id])
   revoker     User?                 @relation("PermissionSessionRevoker", fields: [revokedBy], references: [id])
+  user        User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([expiresAt])
@@ -359,10 +377,10 @@ model PermissionApproval {
   reviewedAt           DateTime?
   approvedUntil        DateTime?
   reviewNotes          String?
-  user                 User           @relation(fields: [userId], references: [id], onDelete: Cascade)
-  resource             Resource?      @relation(fields: [resourceId], references: [id], onDelete: Cascade)
   requester            User           @relation("PermissionRequester", fields: [requestedBy], references: [id])
+  resource             Resource?      @relation(fields: [resourceId], references: [id], onDelete: Cascade)
   reviewer             User?          @relation("PermissionReviewer", fields: [reviewedBy], references: [id])
+  user                 User           @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([status])
@@ -383,8 +401,8 @@ model UserSession {
   expiresAt           DateTime?
   revokedAt           DateTime?
   revokedBy           String?
-  user                User      @relation(fields: [userId], references: [id], onDelete: Cascade)
   revoker             User?     @relation("SessionRevoker", fields: [revokedBy], references: [id])
+  user                User      @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([userId])
   @@index([sessionToken])
@@ -438,6 +456,11 @@ model Location {
   stockAdjustments      StockAdjustment[]
   transfersFrom         StockTransfer[]        @relation("TransferFrom")
   transfersTo           StockTransfer[]        @relation("TransferTo")
+
+  // Presence System Relations
+  presenceSessions  EmployeePresenceSession[] @relation("LocationPresenceSessions")
+  schedules         EmployeeSchedule[]        @relation("LocationSchedules")
+  attendanceReports AttendanceReport[]        @relation("LocationAttendanceReports")
 
   @@unique([organizationId, code])
   @@index([organizationId])
@@ -863,7 +886,7 @@ model SalesOrder {
   locationId     String
   organizationId String
   createdById    String?
-  terminalId     String?
+  stationId      String?
   sessionId      String?
   createdAt      DateTime         @default(now())
   updatedAt      DateTime         @updatedAt
@@ -874,7 +897,7 @@ model SalesOrder {
   location       Location         @relation(fields: [locationId], references: [id])
   organization   Organization     @relation(fields: [organizationId], references: [id])
   session        POSSession?      @relation(fields: [sessionId], references: [id])
-  terminal       POSStation?      @relation(fields: [terminalId], references: [id])
+  station        POSStation?      @relation(fields: [stationId], references: [id])
 
   @@unique([orderNumber, organizationId, locationId])
   @@index([customerId])
@@ -1087,7 +1110,7 @@ model StockTransferLine {
 
 model POSStation {
   id               String       @id @default(cuid())
-  terminalNumber   String       @unique
+  stationNumber    String       @unique
   name             String
   isActive         Boolean      @default(true)
   hasCashDrawer    Boolean      @default(true)
@@ -1107,7 +1130,7 @@ model POSStation {
 
   @@index([locationId])
   @@index([organizationId])
-  @@map("pos_terminals")
+  @@map("pos_stations")
 }
 
 model POSSession {
@@ -1116,7 +1139,7 @@ model POSSession {
   status                 POSSessionStatus        @default(ACTIVE)
   startTime              DateTime                @default(now())
   endTime                DateTime?
-  terminalId             String
+  stationId              String
   locationId             String
   userId                 String
   openingBalance         Float                   @default(0)
@@ -1135,13 +1158,13 @@ model POSSession {
   updatedAt              DateTime                @updatedAt
   cashDrawerTransactions CashDrawerTransaction[]
   Location               Location                @relation(fields: [locationId], references: [id])
-  terminal               POSStation              @relation("StationSessions", fields: [terminalId], references: [id])
+  station                POSStation              @relation("StationSessions", fields: [stationId], references: [id])
   user                   User                    @relation(fields: [userId], references: [id])
   currentStation         POSStation?             @relation("CurrentSession")
   POSStation             POSStation[]
   salesOrders            SalesOrder[]
 
-  @@index([terminalId])
+  @@index([stationId])
   @@index([userId])
   @@index([status])
   @@map("pos_sessions")
@@ -1155,12 +1178,12 @@ model CashDrawer {
   expectedBalance Float                   @default(0)
   isOpen          Boolean                 @default(false)
   locationId      String
-  terminalId      String
+  stationId       String
   createdAt       DateTime                @default(now())
   updatedAt       DateTime                @updatedAt
   transactions    CashDrawerTransaction[]
   location        Location                @relation(fields: [locationId], references: [id])
-  terminal        POSStation              @relation(fields: [terminalId], references: [id])
+  station         POSStation              @relation(fields: [stationId], references: [id])
 
   @@index([locationId])
   @@map("cash_drawers")
@@ -1242,6 +1265,185 @@ model PaymentRefund {
   @@index([paymentId])
   @@index([status])
   @@map("payment_refunds")
+}
+
+// ===== PRESENCE & ATTENDANCE SYSTEM =====
+model EmployeePresenceSession {
+  id                   String         @id @default(cuid())
+  userId               String
+  locationId           String
+  organizationId       String
+  stationId            String?
+  status               PresenceStatus @default(CLOCKED_OUT)
+  clockInTime          DateTime
+  clockOutTime         DateTime?
+  expectedClockOutTime DateTime?
+  totalMinutesWorked   Int            @default(0)
+  totalBreakMinutes    Int            @default(0)
+  overtime             Boolean        @default(false)
+  overtimeMinutes      Int            @default(0)
+  notes                String?
+  clockInMethod        ClockMethod    @default(WEB_BROWSER)
+  clockOutMethod       ClockMethod?
+  ipAddress            String?
+  deviceInfo           Json?
+  geolocation          Json?
+  approvedById         String?
+  approvedAt           DateTime?
+  createdAt            DateTime       @default(now())
+  updatedAt            DateTime       @updatedAt
+
+  // Relations
+  user          User                   @relation("EmployeePresenceSessions", fields: [userId], references: [id], onDelete: Cascade)
+  location      Location               @relation("LocationPresenceSessions", fields: [locationId], references: [id])
+  organization  Organization           @relation("OrganizationPresenceSessions", fields: [organizationId], references: [id])
+  approvedBy    User?                  @relation("ApprovedPresenceSessions", fields: [approvedById], references: [id])
+  breakSessions EmployeeBreakSession[]
+  activityLogs  EmployeeActivityLog[]
+
+  @@index([userId])
+  @@index([locationId])
+  @@index([organizationId])
+  @@index([status])
+  @@index([clockInTime])
+  @@map("employee_presence_sessions")
+}
+
+model EmployeeActivityLog {
+  id                String       @id @default(cuid())
+  presenceSessionId String
+  userId            String
+  activityType      ActivityType
+  description       String?
+  timestamp         DateTime     @default(now())
+  duration          Int?
+  metadata          Json?
+  systemGenerated   Boolean      @default(false)
+
+  // Relations
+  presenceSession EmployeePresenceSession @relation(fields: [presenceSessionId], references: [id], onDelete: Cascade)
+  user            User                    @relation("EmployeeActivityLogs", fields: [userId], references: [id])
+
+  @@index([presenceSessionId])
+  @@index([userId])
+  @@index([activityType])
+  @@index([timestamp])
+  @@map("employee_activity_logs")
+}
+
+model EmployeeBreakSession {
+  id                String    @id @default(cuid())
+  presenceSessionId String
+  userId            String
+  breakType         BreakType @default(REGULAR)
+  startTime         DateTime  @default(now())
+  endTime           DateTime?
+  expectedDuration  Int?
+  actualDuration    Int?
+  reason            String?
+  notes             String?
+  approvedById      String?
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+
+  // Relations
+  presenceSession EmployeePresenceSession @relation(fields: [presenceSessionId], references: [id], onDelete: Cascade)
+  user            User                    @relation("EmployeeBreakSessions", fields: [userId], references: [id])
+  approvedBy      User?                   @relation("ApprovedBreakSessions", fields: [approvedById], references: [id])
+
+  @@index([presenceSessionId])
+  @@index([userId])
+  @@index([startTime])
+  @@map("employee_break_sessions")
+}
+
+model EmployeeSchedule {
+  id             String    @id @default(cuid())
+  userId         String
+  organizationId String
+  locationId     String?
+  dayOfWeek      Int
+  startTime      String
+  endTime        String
+  isActive       Boolean   @default(true)
+  effectiveFrom  DateTime  @default(now())
+  effectiveUntil DateTime?
+  breakDurations Int[]
+  notes          String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+
+  // Relations
+  user         User         @relation("EmployeeSchedules", fields: [userId], references: [id], onDelete: Cascade)
+  organization Organization @relation("OrganizationSchedules", fields: [organizationId], references: [id])
+  location     Location?    @relation("LocationSchedules", fields: [locationId], references: [id])
+
+  @@index([userId])
+  @@index([organizationId])
+  @@index([dayOfWeek])
+  @@index([effectiveFrom])
+  @@map("employee_schedules")
+}
+
+model PresenceAlert {
+  id              String        @id @default(cuid())
+  userId          String
+  organizationId  String
+  alertType       AlertType
+  severity        AlertSeverity @default(MEDIUM)
+  title           String
+  description     String?
+  isRead          Boolean       @default(false)
+  isResolved      Boolean       @default(false)
+  resolvedById    String?
+  resolvedAt      DateTime?
+  resolutionNotes String?
+  metadata        Json?
+  createdAt       DateTime      @default(now())
+  updatedAt       DateTime      @updatedAt
+
+  // Relations
+  user         User         @relation("EmployeePresenceAlerts", fields: [userId], references: [id], onDelete: Cascade)
+  organization Organization @relation("OrganizationPresenceAlerts", fields: [organizationId], references: [id])
+  resolver     User?        @relation("ResolvedPresenceAlerts", fields: [resolvedById], references: [id])
+
+  @@index([userId])
+  @@index([organizationId])
+  @@index([alertType])
+  @@index([severity])
+  @@index([isRead])
+  @@index([isResolved])
+  @@map("presence_alerts")
+}
+
+model AttendanceReport {
+  id                    String   @id @default(cuid())
+  userId                String
+  organizationId        String
+  locationId            String?
+  reportDate            DateTime
+  scheduledMinutes      Int
+  actualMinutes         Int
+  breakMinutes          Int
+  overtimeMinutes       Int
+  lateArrivalMinutes    Int      @default(0)
+  earlyDepartureMinutes Int      @default(0)
+  attendanceScore       Float
+  productivity          Float?
+  notes                 String?
+  generatedAt           DateTime @default(now())
+  updatedAt             DateTime @updatedAt
+
+  // Relations
+  user         User         @relation("EmployeeAttendanceReports", fields: [userId], references: [id], onDelete: Cascade)
+  organization Organization @relation("OrganizationAttendanceReports", fields: [organizationId], references: [id])
+  location     Location?    @relation("LocationAttendanceReports", fields: [locationId], references: [id])
+
+  @@unique([userId, reportDate, locationId], name: "userId_reportDate_locationId")
+  @@index([userId])
+  @@index([organizationId])
+  @@index([reportDate])
+  @@map("attendance_reports")
 }
 
 enum InviteStatus {
@@ -1450,4 +1652,82 @@ enum ApprovalStatus {
   REJECTED
   EXPIRED
   CANCELLED
+}
+
+// ===== PRESENCE SYSTEM ENUMS =====
+enum PresenceStatus {
+  CLOCKED_IN
+  ON_BREAK
+  CLOCKED_OUT
+  OVERTIME
+  LATE
+  ABSENT
+  OFFLINE
+}
+
+enum ClockMethod {
+  MANUAL
+  BIOMETRIC
+  CARD_SWIPE
+  MOBILE_APP
+  WEB_BROWSER
+  QR_CODE
+  NFC
+  GEOFENCE
+}
+
+enum ActivityType {
+  CLOCK_IN
+  CLOCK_OUT
+  BREAK_START
+  BREAK_END
+  TASK_START
+  TASK_END
+  SYSTEM_LOGIN
+  SYSTEM_LOGOUT
+  POS_TRANSACTION
+  INVENTORY_UPDATE
+  CUSTOMER_SERVICE
+  CLEANING
+  RESTOCKING
+  TRAINING
+  MEETING
+  ADMIN_TASK
+  SYSTEM_IDLE
+  SYSTEM_ACTIVE
+  LOCATION_CHANGE
+  OTHER
+}
+
+enum BreakType {
+  LUNCH
+  SHORT_BREAK
+  PERSONAL
+  TRAINING
+  MEETING
+  EMERGENCY
+  SICK
+  REGULAR
+  EXTENDED
+}
+
+enum AlertType {
+  LATE_ARRIVAL
+  EARLY_DEPARTURE
+  MISSED_CLOCK_OUT
+  EXTENDED_BREAK
+  NO_SHOW
+  OVERTIME_ALERT
+  SCHEDULE_CONFLICT
+  UNUSUAL_ACTIVITY
+  LOCATION_MISMATCH
+  SYSTEM_ERROR
+}
+
+enum AlertSeverity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+  URGENT
 }

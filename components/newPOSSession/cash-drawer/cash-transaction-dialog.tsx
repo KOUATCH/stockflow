@@ -4,7 +4,7 @@ import { useState } from "react"
 import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
-import { useToast } from "@/hooks/use-toast"
+import { useNotifications } from "@/components/notifications/NotificationProvider"
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
@@ -55,7 +55,7 @@ const CASH_OUT_REASONS = [
 export function CashTransactionDialog({ open, onOpenChange, type, sessionId, onSuccess }: CashTransactionDialogProps) {
   const [customReason, setCustomReason] = useState("")
   const [isProcessing, setIsProcessing] = useState(false)
-  const { toast } = useToast()
+  const notifications = useNotifications()
 
   const form = useForm<CashTransactionForm>({
     resolver: zodResolver(cashTransactionSchema),
@@ -77,20 +77,12 @@ export function CashTransactionDialog({ open, onOpenChange, type, sessionId, onS
     const finalReason = isCustomReason ? customReason : selectedReasonData?.label || data.reason
 
     if (isCustomReason && !customReason.trim()) {
-      toast({
-        variant: "destructive",
-        title: "Error",
-        description: "Please specify a custom reason",
-      })
+      notifications.error("Error", "Please specify a custom reason")
       return
     }
 
     if (data.amount <= 0) {
-      toast({
-        variant: "destructive",
-        title: "Invalid Amount",
-        description: "Amount must be greater than zero",
-      })
+      notifications.error("Invalid Amount", "Amount must be greater than zero")
       return
     }
 
@@ -101,11 +93,7 @@ export function CashTransactionDialog({ open, onOpenChange, type, sessionId, onS
       form.reset()
       setCustomReason("")
     } catch (error) {
-      toast({
-        variant: "destructive",
-        title: "Transaction Failed",
-        description: "Failed to process cash transaction. Please try again.",
-      })
+      notifications.error("Transaction Failed", "Failed to process cash transaction. Please try again.")
     } finally {
       setIsProcessing(false)
     }

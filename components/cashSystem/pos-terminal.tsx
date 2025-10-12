@@ -2,7 +2,7 @@
 
 import { createInventoryTransactions, createPayment, createPOSSession, createSale, getActivePOSSession, updateInventoryLevels } from "@/actions/pos/POSActionFinal"
 
-import { useToast } from "@/hooks/use-toast"
+import { useNotifications } from "@/components/notifications/NotificationProvider"
 import { Customer } from "@/lib/cashSystem/db"
 import { CartItem } from "@/lib/cashSystem/types"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
@@ -159,7 +159,7 @@ export function pOSStation({ organizationId, locationId, terminalId, userId }: p
   })
 
 
-  const { toast } = useToast()
+  const notifications = useNotifications()
   const queryClient = useQueryClient()
   //   const authSession = useSession()
   // const user= authSession.data?.user

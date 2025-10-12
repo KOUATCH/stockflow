@@ -1,7 +1,7 @@
 'use client'
 
 import { linkItemsToSupplier } from '@/actions/suppliers/linkItemsToSupplier'
-// import { db } from '@/lib/db'
+// import { db } from '@/prisma/db'
 // import { supplierInclude } from '@/lib/suppliers/includes'
 import {
   LinkItemsToSupplierDTO,
@@ -9,7 +9,7 @@ import {
   type SupplierWithRelations
 } from '@/types/supplier'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
-// import { db } from '@/lib/db'
+// import { db } from '@/prisma/db'
 // import { supplierInclude } from '@/lib/suppliers/includes'
 import { SupplierKeys } from '@/actions/suppliers/supplierKeys'
 

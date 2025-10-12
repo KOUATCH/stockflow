@@ -194,7 +194,7 @@ export function withPagePermission(
     return function PermissionProtectedPage(props: P) {
       // This would be implemented on the client side using React hooks
       // The actual implementation would use the permission hooks
-      return <WrappedComponent {...props} />;
+      return React.createElement(WrappedComponent, props);
     };
   };
 }

@@ -2,7 +2,7 @@ import NextAuth from "next-auth"
 import CredentialsProvider from "next-auth/providers/credentials"
 import GoogleProvider from "next-auth/providers/google"
 import { PrismaAdapter } from "@auth/prisma-adapter"
-import { prisma } from "@/lib/db"
+import { prisma } from "@/prisma/db"
 // Password verification will be done server-side in API routes
 import type { NextAuthConfig } from "next-auth"
 
@@ -79,7 +79,7 @@ const config = {
 
         try {
           // Use the dedicated API route for credential verification
-          const baseUrl = process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_BASE_URL || `http://localhost:3003`
+          const baseUrl = process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_BASE_URL || `http://localhost:3000`
 
           const response = await fetch(`${baseUrl}/api/auth/verify-credentials`, {
             method: 'POST',

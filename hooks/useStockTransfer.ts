@@ -6,7 +6,7 @@ import {
   updateTransferStatus,
 } from "@/actions/stock/stockTransferActions"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { toast } from "sonner"
+import { useNotifications } from "@/components/notifications/NotificationProvider"
 
 export function useStockTransfers(locationId?: string, status?: string) {
   return useQuery({
@@ -28,6 +28,7 @@ export function useStockTransfer(id: string) {
 
 export function useCreateStockTransfer() {
   const queryClient = useQueryClient()
+  const { success, error } = useNotifications()
 
   return useMutation({
     mutationFn: createStockTransfer,
@@ -35,20 +36,39 @@ export function useCreateStockTransfer() {
       // Invalidate and refetch transfers
       queryClient.invalidateQueries({ queryKey: ["stock-transfers"] })
 
-      toast.success("Stock transfer created successfully", {
-        description: `Transfer ${data.transferNumber} from ${data.fromLocation?.name} to ${data.toLocation?.name}`,
-      })
+      success(
+        "Stock Transfer Created",
+        `Transfer ${data.transferNumber} from ${data.fromLocation?.name} to ${data.toLocation?.name} has been created successfully`,
+        {
+          category: "inventory",
+          priority: "normal",
+          action: {
+            label: "View Transfer",
+            onClick: () => console.log("View transfer", data.id)
+          }
+        }
+      )
     },
-    onError: (error) => {
-      toast.error("Failed to create stock transfer", {
-        description: error.message,
-      })
+    onError: (err) => {
+      error(
+        "Transfer Creation Failed",
+        err.message || "Unable to create stock transfer",
+        {
+          category: "inventory",
+          priority: "high",
+          action: {
+            label: "Try Again",
+            onClick: () => console.log("Retry transfer creation")
+          }
+        }
+      )
     },
   })
 }
 
 export function useUpdateTransferStatus() {
   const queryClient = useQueryClient()
+  const { success, error } = useNotifications()
 
   return useMutation({
     mutationFn: ({
@@ -65,20 +85,43 @@ export function useUpdateTransferStatus() {
       queryClient.invalidateQueries({ queryKey: ["stock-transfers"] })
       queryClient.invalidateQueries({ queryKey: ["stock-transfer", data.id] })
 
-      toast.success("Transfer status updated successfully", {
-        description: `Transfer ${data.transferNumber} is now ${data.status.toLowerCase()}`,
-      })
+      const statusLabel = data.status.replace('_', ' ').toLowerCase()
+      const statusColor = data.status === 'COMPLETED' ? 'success' :
+                         data.status === 'CANCELLED' ? 'warning' : 'info'
+
+      success(
+        "Transfer Status Updated",
+        `Transfer ${data.transferNumber} is now ${statusLabel}`,
+        {
+          category: "inventory",
+          priority: "normal",
+          action: {
+            label: "View Details",
+            onClick: () => console.log("View transfer details", data.id)
+          }
+        }
+      )
     },
-    onError: (error) => {
-      toast.error("Failed to update transfer status", {
-        description: error.message,
-      })
+    onError: (err) => {
+      error(
+        "Status Update Failed",
+        err.message || "Unable to update transfer status",
+        {
+          category: "inventory",
+          priority: "normal",
+          action: {
+            label: "Try Again",
+            onClick: () => console.log("Retry status update")
+          }
+        }
+      )
     },
   })
 }
 
 export function useDeleteStockTransfer() {
   const queryClient = useQueryClient()
+  const { success, error } = useNotifications()
 
   return useMutation({
     mutationFn: deleteStockTransfer,
@@ -86,12 +129,28 @@ export function useDeleteStockTransfer() {
       // Invalidate and refetch transfers
       queryClient.invalidateQueries({ queryKey: ["stock-transfers"] })
 
-      toast.success("Stock transfer deleted successfully")
+      success(
+        "Transfer Deleted",
+        "The stock transfer has been permanently removed from the system",
+        {
+          category: "inventory",
+          priority: "normal"
+        }
+      )
     },
-    onError: (error) => {
-      toast.error("Failed to delete stock transfer", {
-        description: error.message,
-      })
+    onError: (err) => {
+      error(
+        "Delete Failed",
+        err.message || "Unable to delete the stock transfer",
+        {
+          category: "inventory",
+          priority: "normal",
+          action: {
+            label: "Try Again",
+            onClick: () => console.log("Retry delete transfer")
+          }
+        }
+      )
     },
   })
 }
