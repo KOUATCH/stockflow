@@ -1,24 +1,22 @@
 "use client"
 
 import { ItemWithInventoryLevelsPayload } from "@/types/itemTypes"
+import { useRouter } from "next/navigation"
 import { useCallback, useState } from "react"
 
 export const useItemManagement = () => {
+  const router = useRouter()
   const [formDialogOpen, setFormDialogOpen] = useState(false)
-  const [comprehensiveFormOpen, setComprehensiveFormOpen] = useState(false)
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
-  const [itemToEdit, setItemToEdit] = useState<ItemWithInventoryLevelsPayload | null>(null)
   const [itemToDelete, setItemToDelete] = useState<ItemWithInventoryLevelsPayload | null>(null)
 
   const handleAddClick = useCallback(() => {
-    setItemToEdit(null)
     setFormDialogOpen(true)
   }, [])
 
   const handleEditClick = useCallback((item: ItemWithInventoryLevelsPayload) => {
-    setItemToEdit(item)
-    setComprehensiveFormOpen(true)
-  }, [])
+    router.push(`/dashboard/inventory/items/${item.id}/edit`)
+  }, [router])
 
   const handleDeleteClick = useCallback((item: ItemWithInventoryLevelsPayload) => {
     setItemToDelete(item)
@@ -26,19 +24,14 @@ export const useItemManagement = () => {
   }, [])
 
   const resetFormToDefaults = useCallback(() => {
-    setItemToEdit(null)
     setItemToDelete(null)
   }, [])
 
   return {
     formDialogOpen,
     setFormDialogOpen,
-    comprehensiveFormOpen,
-    setComprehensiveFormOpen,
     deleteDialogOpen,
     setDeleteDialogOpen,
-    itemToEdit,
-    setItemToEdit,
     itemToDelete,
     setItemToDelete,
     handleAddClick,

@@ -77,7 +77,7 @@ export function PresenceDashboard({
       {/* Quick Status for Current User */}
       <PresenceStatusCard
         status={currentStatus?.status || "OFFLINE"}
-        className="bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200"
+        className="bg-gradient-to-r from-teal-50 to-emerald-50 border-teal-200"
       />
 
       {/* Main Content Tabs */}

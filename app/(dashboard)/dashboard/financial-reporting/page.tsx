@@ -7,7 +7,7 @@
 
 import React from 'react';
 import { useAuth } from '@/hooks/useAuth';
-import { RoleBasedFinancialDashboard } from '@/components/financial-reporting/role-based-financial-dashboard';
+import { ComprehensiveFinancialDashboard } from '@/components/finance/ComprehensiveFinancialDashboard';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -79,7 +79,7 @@ export default function FinancialReportingPage() {
   // Main dashboard
   return (
     <div className="container mx-auto py-6">
-      <RoleBasedFinancialDashboard
+      <ComprehensiveFinancialDashboard
         organizationId={user.organizationId}
       />
     </div>

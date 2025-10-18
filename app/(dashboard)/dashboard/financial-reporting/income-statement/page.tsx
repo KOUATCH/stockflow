@@ -31,7 +31,6 @@ import {
 } from 'lucide-react';
 import { format, subMonths, startOfMonth, endOfMonth } from 'date-fns';
 import { useAuth } from '@/hooks/useAuth';
-import { useFinancialNotifications } from '@/lib/financial-reporting/notifications/financial-notification-service';
 import { useReportExport } from '@/hooks/useReportExport';
 import { cn, formatCurrency, formatPercentage } from '@/lib/utils';
 
@@ -159,7 +158,7 @@ const IncomeStatementLine: React.FC<IncomeStatementLineProps> = ({
 
 export default function IncomeStatementPage() {
   const { user } = useAuth();
-  const notifications = useFinancialNotifications();
+  // const notifications = useFinancialNotifications(); // Temporarily disabled
   const {
     isExporting,
     exportIncomeStatement,

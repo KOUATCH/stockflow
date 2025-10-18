@@ -110,7 +110,7 @@ const EnterpriseNavigation = ({ children }: { children: ReactNode }) => {
             ${isActive && !isChild
               ? `bg-gradient-to-r ${item.gradient} text-white shadow-2xl ${item.glowColor} transform scale-[1.02]`
               : isActive && isChild
-                ? "bg-gradient-to-r from-blue-500/10 to-indigo-500/10 text-blue-700 border border-blue-200/50 shadow-md"
+                ? "bg-gradient-to-r from-teal-500/10 to-emerald-500/10 text-teal-700 border border-teal-200/50 shadow-md"
                 : "text-gray-700 hover:bg-gradient-to-r hover:from-gray-50 hover:to-white hover:text-gray-900 hover:shadow-lg hover:border hover:border-gray-200/50"
             }
             ${isChild ? "ml-8 py-2.5" : ""}

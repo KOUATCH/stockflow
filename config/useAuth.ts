@@ -29,7 +29,8 @@ export async function checkPermission(requiredPermission: string) {
 
   const userPermissions = session.user.permissions || [];
 
-  if (!userPermissions.includes(requiredPermission)) {
+  // Check for exact permission match OR wildcard permission for superadmins
+  if (!userPermissions.includes(requiredPermission) && !userPermissions.includes('*')) {
     // Redirect to unauthorized page or return unauthorized component
     redirect("/unauthorized");
   }
@@ -72,6 +73,11 @@ export async function checkAnyPermission(permissions: string[]) {
 
   const userPermissions = session.user.permissions || [];
 
+  // Check for wildcard permission first (superadmin access)
+  if (userPermissions.includes('*')) {
+    return true;
+  }
+
   const hasAnyPermission = permissions.some((permission) =>
     userPermissions.includes(permission)
   );
@@ -92,6 +98,11 @@ export async function checkAllPermissions(permissions: string[]) {
   }
 
   const userPermissions = session.user.permissions || [];
+
+  // Check for wildcard permission first (superadmin access)
+  if (userPermissions.includes('*')) {
+    return true;
+  }
 
   const hasAllPermissions = permissions.every((permission) =>
     userPermissions.includes(permission)

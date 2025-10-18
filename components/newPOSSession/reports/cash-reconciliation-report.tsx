@@ -7,6 +7,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { DatePicker } from "@/components/ui/date-picker"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { format, subDays } from "date-fns"
@@ -34,8 +35,8 @@ export function CashReconciliationReportComponent({ locationId, organizationId }
   const [isLoading, setIsLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
   const [statusFilter, setStatusFilter] = useState<string>("all")
-  const [startDate, setStartDate] = useState(format(subDays(new Date(), 7), "yyyy-MM-dd"))
-  const [endDate, setEndDate] = useState(format(new Date(), "yyyy-MM-dd"))
+  const [startDate, setStartDate] = useState<Date>(subDays(new Date(), 7))
+  const [endDate, setEndDate] = useState<Date>(new Date())
 
   const loadReports = async () => {
     if (!organizationId || !locationId) return
@@ -45,8 +46,8 @@ export function CashReconciliationReportComponent({ locationId, organizationId }
       const data = await getCashReconciliationReports(
         organizationId,
         locationId,
-        new Date(startDate),
-        new Date(endDate),
+        startDate,
+        endDate,
       )
       setReports(data)
       setFilteredReports(data)
@@ -276,12 +277,23 @@ export function CashReconciliationReportComponent({ locationId, organizationId }
 
             <div className="space-y-2">
               <Label htmlFor="startDate">Start Date</Label>
-              <Input id="startDate" type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+              <DatePicker
+                date={startDate}
+                onDateChange={setStartDate}
+                placeholder="Select start date"
+                maxDate={endDate}
+              />
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="endDate">End Date</Label>
-              <Input id="endDate" type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
+              <DatePicker
+                date={endDate}
+                onDateChange={setEndDate}
+                placeholder="Select end date"
+                minDate={startDate}
+                maxDate={new Date()}
+              />
             </div>
 
             <div className="space-y-2">

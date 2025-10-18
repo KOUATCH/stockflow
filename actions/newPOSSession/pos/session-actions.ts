@@ -35,12 +35,27 @@ export async function openPOSSession(data: {
       }
     }
 
-    // Check if there's already an active session for this station
+    if (!data.organizationId) {
+      return {
+        success: false,
+        error: "Organization ID is required",
+      }
+    }
+
+    console.log("[Session] Validation passed, checking for existing sessions")
+
+    // Check if there's already an active session for this station in this organization
     const existingSession = await db.pOSSession.findFirst({
       where: {
         stationId: data.stationId,
         status:"ACTIVE",
+        Location: {
+          organizationId: data.organizationId
+        }
       },
+      include: {
+        Location: true
+      }
     })
 
     if (existingSession) {
@@ -54,6 +69,7 @@ export async function openPOSSession(data: {
     const sessionNumber = `SES-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${String(Date.now()).slice(-6)}`
 
     // Create new session with proper session totals initialization
+    console.log("[Session] Creating new session with number:", sessionNumber)
     const session = await db.pOSSession.create({
       data: {
         sessionNumber,
@@ -73,7 +89,10 @@ export async function openPOSSession(data: {
       },
     })
 
+    console.log("[Session] Session created successfully with ID:", session.id)
+
     // Create or find existing cash drawer for this station
+    console.log("[Session] Looking for existing cash drawer for station:", data.stationId)
     let cashDrawer = await db.cashDrawer.findFirst({
       where: {
         stationId: data.stationId,
@@ -82,6 +101,7 @@ export async function openPOSSession(data: {
     })
 
     if (!cashDrawer) {
+      console.log("[Session] Creating new cash drawer")
       cashDrawer = await db.cashDrawer.create({
         data: {
           stationId: data.stationId,
@@ -93,7 +113,9 @@ export async function openPOSSession(data: {
           isOpen: true,
         },
       })
+      console.log("[Session] Cash drawer created with ID:", cashDrawer.id)
     } else {
+      console.log("[Session] Updating existing cash drawer with ID:", cashDrawer.id)
       // Update existing cash drawer
       await db.cashDrawer.update({
         where: { id: cashDrawer.id },
@@ -131,10 +153,14 @@ export async function openPOSSession(data: {
       data: session,
     }
   } catch (error) {
-    console.error("[v0] Error opening session:", error)
+    console.error("[Session] Error opening session:", error)
+
+    // More detailed error message
+    const errorMessage = error instanceof Error ? error.message : "Unknown error occurred"
+
     return {
       success: false,
-      error: "Failed to open session",
+      error: `Failed to open session: ${errorMessage}`,
     }
   }
 }
@@ -234,6 +260,68 @@ export async function closePOSSession(data: {
   }
 }
 
+export async function forceCloseActiveSession(stationId: string, organizationId: string) {
+  try {
+    console.log("[Session] Force closing active session for station:", stationId)
+
+    // Find any active session for this station
+    const activeSession = await db.pOSSession.findFirst({
+      where: {
+        stationId,
+        status: "ACTIVE",
+        Location: {
+          organizationId: organizationId
+        }
+      },
+      include: {
+        Location: true
+      }
+    })
+
+    if (activeSession) {
+      // Close the session with current balance as closing balance
+      await db.pOSSession.update({
+        where: { id: activeSession.id },
+        data: {
+          status: "CLOSED",
+          endTime: new Date(),
+          closingBalance: activeSession.openingBalance,
+          expectedBalance: activeSession.openingBalance,
+          variance: 0,
+        },
+      })
+
+      // Close any open cash drawers for this station
+      await db.cashDrawer.updateMany({
+        where: {
+          stationId,
+          isOpen: true,
+        },
+        data: {
+          isOpen: false,
+        },
+      })
+
+      console.log("[Session] Force closed session:", activeSession.id)
+      return {
+        success: true,
+        data: activeSession,
+      }
+    }
+
+    return {
+      success: true,
+      data: null,
+    }
+  } catch (error) {
+    console.error("[Session] Error force closing session:", error)
+    return {
+      success: false,
+      error: "Failed to force close session",
+    }
+  }
+}
+
 export async function getCurrentSession(stationId: string) {
   try {
     console.log("[v0] Getting current session for station:", stationId)
@@ -256,6 +344,7 @@ export async function getCurrentSession(stationId: string) {
           select: {
             id: true,
             name: true,
+            organizationId: true,
           },
         },
         cashDrawerTransactions: {

@@ -20,6 +20,7 @@ async function handleCreateItem(formData: FormData) {
     costPrice: parseFloat(formData.get('costPrice') as string) || 0,
     sellingPrice: parseFloat(formData.get('sellingPrice') as string) || 0,
     thumbnail: formData.get('thumbnail') as string,
+    imageUrls: formData.get('imageUrls') as string,
     organizationId: formData.get('organizationId') as string,
     categoryId: formData.get('categoryId') as string || null,
     brandId: formData.get('brandId') as string || null,
@@ -49,7 +50,7 @@ export default async function CreateItemPage() {
 
   if (!user?.organizationId) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-violet-50/30 to-purple-50/50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-800">
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-emerald-50/30 to-teal-50/50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-800">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-8">
           <div className="max-w-md mx-auto text-center py-16">
             <div className="w-20 h-20 bg-slate-100 dark:bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-6">

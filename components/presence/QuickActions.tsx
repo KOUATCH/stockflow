@@ -139,7 +139,7 @@ export function QuickActions({ currentStatus, organizationId, className }: Quick
       label: 'My Schedule',
       description: 'View work schedule',
       icon: Calendar,
-      color: 'bg-purple-500 hover:bg-purple-600',
+      color: 'bg-teal-500 hover:bg-teal-600',
       textColor: 'text-white',
       action: () => window.location.href = '/dashboard/presence/schedule',
       disabled: false

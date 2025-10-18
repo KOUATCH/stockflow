@@ -14,6 +14,7 @@ import {
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { DatePicker } from "@/components/ui/date-picker"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
@@ -44,7 +45,7 @@ import {
 import { type SetStateAction, useMemo, useState } from "react"
 
 const CompleteIntegratedDailySalesDashboard = ({ organizationId = "default-org", defaultLocationId = "1" }) => {
-  const [selectedDate, setSelectedDate] = useState(new Date().toISOString().split("T")[0])
+  const [selectedDate, setSelectedDate] = useState<Date>(new Date())
   const [selectedLocationId, setSelectedLocationId] = useState(defaultLocationId)
   const [isGenerateDialogOpen, setIsGenerateDialogOpen] = useState(false)
   const [isFinalizeDialogOpen, setIsFinalizeDialogOpen] = useState(false)
@@ -174,11 +175,11 @@ const CompleteIntegratedDailySalesDashboard = ({ organizationId = "default-org",
             </SelectContent>
           </Select>
 
-          <Input
-            type="date"
-            value={selectedDate}
-            onChange={(e) => setSelectedDate(e.target.value)}
-            className="w-auto"
+          <DatePicker
+            date={selectedDate}
+            onDateChange={setSelectedDate}
+            placeholder="Select date"
+            maxDate={new Date()}
           />
 
           <div className="flex gap-2">

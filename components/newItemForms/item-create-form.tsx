@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
+import { DatePicker } from "@/components/ui/date-picker"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Separator } from "@/components/ui/separator"
 import { Switch } from "@/components/ui/switch"
@@ -52,7 +53,7 @@ type CreateValues = z.infer<typeof createSchema> & {
     createdById?: string
     batchNumber?: string
     serialNumbers?: string[] | string
-    expiryDate?: string
+    expiryDate?: Date
     referenceNumber?: string
   }
 }
@@ -204,10 +205,7 @@ export default function ItemCreateForm({
               .filter(Boolean)
             : (values.initialInventory?.serialNumbers as string[] | undefined)
 
-        const expiry =
-          values.initialInventory?.expiryDate && values.initialInventory.expiryDate !== ""
-            ? new Date(values.initialInventory.expiryDate)
-            : undefined
+        const expiry = values.initialInventory?.expiryDate || undefined
 
         const payload: any = {
           ...values,
@@ -967,10 +965,11 @@ export default function ItemCreateForm({
                               <FormItem>
                                 <FormLabel>Expiry Date</FormLabel>
                                 <FormControl>
-                                  <Input
-                                    type="date"
-                                    value={field.value || ""}
-                                    onChange={field.onChange}
+                                  <DatePicker
+                                    date={field.value}
+                                    onDateChange={field.onChange}
+                                    placeholder="Select expiry date"
+                                    minDate={new Date()}
                                     disabled={mode === "edit"}
                                   />
                                 </FormControl>

@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { DatePicker } from '@/components/ui/date-picker';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -141,10 +142,11 @@ export function StockAdjustmentForm({ onSuccess }: StockAdjustmentFormProps) {
 
             <div className="space-y-2">
               <Label htmlFor="expiryDate">Expiry Date (optional)</Label>
-              <Input
-                id="expiryDate"
-                type="date"
-                {...register('expiryDate')}
+              <DatePicker
+                date={watch('expiryDate') ? new Date(watch('expiryDate')) : undefined}
+                onDateChange={(date) => setValue('expiryDate', date?.toISOString().split('T')[0] || '')}
+                placeholder="Select expiry date"
+                minDate={new Date()} // Can't expire in the past
               />
             </div>
           </div>

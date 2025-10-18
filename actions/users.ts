@@ -2,7 +2,7 @@
 
 import { db } from "@/prisma/db";
 import { CreateUserProps } from "@/types/types";
-import { hashPassword, verifyPassword } from "@/lib/argon2-server";
+import { hashPassword, verifyPassword } from "@/lib/password";
 
 // Get all users for an organization
 export async function getUsers(organizationId: string) {

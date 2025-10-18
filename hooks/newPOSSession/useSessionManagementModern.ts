@@ -1,6 +1,6 @@
 "use client"
 
-import { closePOSSession, getCurrentSession, openPOSSession } from "@/actions/newPOSSession/pos/session-actions"
+import { closePOSSession, getCurrentSession, openPOSSession, forceCloseActiveSession } from "@/actions/newPOSSession/pos/session-actions"
 import { useNotifications } from "@/components/notifications/NotificationProvider"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
@@ -33,9 +33,9 @@ export function useSessionManagement(terminalId: string) {
     queryKey: ["currentSession", terminalId],
     queryFn: () => getCurrentSession(terminalId),
     enabled: !!terminalId,
-    refetchInterval: 30000, // Reduced refetch interval for better performance
-    staleTime: 10000, // Added stale time to prevent unnecessary refetches
-    retry: 3, // Added retry logic for better reliability
+    refetchInterval: false, // Disable automatic refetching to prevent race conditions
+    staleTime: 5 * 60 * 1000, // 5 minutes stale time
+    retry: 1, // Reduce retry attempts to prevent issues
   })
 
   // Mutation to open session
@@ -48,13 +48,19 @@ export function useSessionManagement(terminalId: string) {
       return result
     },
     onSuccess: (data) => {
+      console.log("[Session] Session opened successfully:", data)
       notifications.success(
         "Session Opened Successfully",
         `POS session has been opened with $${data.data?.openingBalance || 0} opening balance.`
       )
-      queryClient.invalidateQueries({ queryKey: ["currentSession"] })
-      queryClient.invalidateQueries({ queryKey: ["cashDrawer"] })
-      queryClient.invalidateQueries({ queryKey: ["realTimeBalance"] })
+
+      // Delay query invalidation to ensure database changes are committed
+      setTimeout(() => {
+        console.log("[Session] Invalidating queries after session start")
+        queryClient.invalidateQueries({ queryKey: ["currentSession", terminalId] })
+        queryClient.invalidateQueries({ queryKey: ["cashDrawer"] })
+        queryClient.invalidateQueries({ queryKey: ["realTimeBalance"] })
+      }, 500)
     },
     onError: (error: Error) => {
       notifications.error(
@@ -96,11 +102,37 @@ export function useSessionManagement(terminalId: string) {
       throw new Error("Terminal ID is required to start a session")
     }
 
+    if (!userId) {
+      throw new Error("User ID is required to start a session")
+    }
+
+    if (!locationId) {
+      throw new Error("Location ID is required to start a session")
+    }
+
+    if (!organizationId) {
+      throw new Error("Organization ID is required to start a session")
+    }
+
+    console.log("[Session] Starting session with:", { terminalId, userId, locationId, organizationId, openingBalance })
+
+    // First, force close any existing active session for this terminal
+    const forceCloseResult = await forceCloseActiveSession(terminalId, organizationId)
+    if (!forceCloseResult.success) {
+      console.warn("[Session] Could not force close existing session:", forceCloseResult.error)
+    } else if (forceCloseResult.data) {
+      console.log("[Session] Force closed existing session:", forceCloseResult.data.id)
+      notifications.warning(
+        "Previous Session Closed",
+        "A previous active session was automatically closed before starting the new session."
+      )
+    }
+
     const sessionData: OpenSessionData = {
       stationId: terminalId,
       userId,
-      locationId: locationId || "",
-      organizationId: organizationId || "",
+      locationId,
+      organizationId,
       openingBalance,
     }
 
@@ -126,6 +158,16 @@ export function useSessionManagement(terminalId: string) {
   const sessionDuration = currentSession?.data?.startTime
     ? Math.floor((Date.now() - new Date(currentSession.data.startTime).getTime()) / (1000 * 60 * 60))
     : 0
+
+  // Debug session status
+  if (currentSession?.data) {
+    console.log("[Session] Current session data:", {
+      id: currentSession.data.id,
+      status: currentSession.data.status,
+      isActive: isSessionActive,
+      startTime: currentSession.data.startTime,
+    })
+  }
 
   return {
     // Session data

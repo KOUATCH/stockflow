@@ -7,6 +7,7 @@ import { CashReconciliationReport, getCashReconciliationReports } from "@/action
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { DatePicker } from "@/components/ui/date-picker"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { ScrollArea } from "@/components/ui/scroll-area"
@@ -35,8 +36,8 @@ export function CashReconciliationReportComponent({ locationId, organizationId }
   const [isLoading, setIsLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState("")
   const [statusFilter, setStatusFilter] = useState<string>("all")
-  const [startDate, setStartDate] = useState(format(subDays(new Date(), 7), "yyyy-MM-dd"))
-  const [endDate, setEndDate] = useState(format(new Date(), "yyyy-MM-dd"))
+  const [startDate, setStartDate] = useState<Date>(subDays(new Date(), 7))
+  const [endDate, setEndDate] = useState<Date>(new Date())
 
   const loadReports = async () => {
     if (!organizationId || !locationId) return
@@ -46,8 +47,8 @@ export function CashReconciliationReportComponent({ locationId, organizationId }
       const data = await getCashReconciliationReports(
         organizationId,
         locationId,
-        new Date(startDate),
-        new Date(endDate),
+        startDate,
+        endDate,
       )
       setReports(data)
       setFilteredReports(data)
@@ -230,8 +231,8 @@ export function CashReconciliationReportComponent({ locationId, organizationId }
         <Card className="relative overflow-hidden">
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
-              <div className="p-3 rounded-full bg-gradient-to-r from-purple-100 to-violet-100">
-                <TrendingUp className="h-6 w-6 text-purple-600" />
+              <div className="p-3 rounded-full bg-gradient-to-r from-teal-100 to-cyan-100">
+                <TrendingUp className="h-6 w-6 text-teal-600" />
               </div>
               <div className="flex-1">
                 <p className="text-sm text-muted-foreground">Accuracy Rate</p>
@@ -246,7 +247,7 @@ export function CashReconciliationReportComponent({ locationId, organizationId }
                 </p>
               </div>
             </div>
-            <div className="absolute top-0 right-0 w-16 h-16 bg-gradient-to-br from-purple-500/10 to-transparent rounded-bl-full" />
+            <div className="absolute top-0 right-0 w-16 h-16 bg-gradient-to-br from-teal-500/10 to-transparent rounded-bl-full" />
           </CardContent>
         </Card>
       </div>
@@ -277,12 +278,23 @@ export function CashReconciliationReportComponent({ locationId, organizationId }
 
             <div className="space-y-2">
               <Label htmlFor="startDate">Start Date</Label>
-              <Input id="startDate" type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+              <DatePicker
+                date={startDate}
+                onDateChange={(date) => setStartDate(date!)}
+                placeholder="Select start date"
+                maxDate={endDate}
+              />
             </div>
 
             <div className="space-y-2">
               <Label htmlFor="endDate">End Date</Label>
-              <Input id="endDate" type="date" value={endDate} onChange={(e) => setEndDate(e.target.value)} />
+              <DatePicker
+                date={endDate}
+                onDateChange={(date) => setEndDate(date!)}
+                placeholder="Select end date"
+                minDate={startDate}
+                maxDate={new Date()}
+              />
             </div>
 
             <div className="space-y-2">

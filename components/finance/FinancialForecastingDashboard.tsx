@@ -142,10 +142,10 @@ export function FinancialForecastingDashboard() {
     <div className="space-y-6">
       {/* Header Controls */}
       <Card className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-lg border-0 shadow-xl">
-        <CardHeader className="bg-gradient-to-r from-purple-50 to-indigo-50 dark:from-purple-900/20 dark:to-indigo-900/20 border-b border-opacity-60">
+        <CardHeader className="bg-gradient-to-r from-teal-50 to-cyan-50 dark:from-teal-900/20 dark:to-cyan-900/20 border-b border-opacity-60">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className="p-2 rounded-lg bg-gradient-to-br from-purple-500 to-indigo-600 shadow-lg">
+              <div className="p-2 rounded-lg bg-gradient-to-br from-teal-500 to-cyan-600 shadow-lg">
                 <Crystal className="w-5 h-5 text-white" />
               </div>
               <div>
@@ -180,7 +180,7 @@ export function FinancialForecastingDashboard() {
                   <SelectItem value="regression">Regression</SelectItem>
                 </SelectContent>
               </Select>
-              <Button onClick={handleGenerateForecast} disabled={isGenerating} className="bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-600 hover:to-indigo-700">
+              <Button onClick={handleGenerateForecast} disabled={isGenerating} className="bg-gradient-to-r from-teal-500 to-cyan-600 hover:from-teal-600 hover:to-cyan-700">
                 <Brain className="w-4 h-4 mr-2" />
                 {isGenerating ? "Generating..." : "Generate Forecast"}
               </Button>
@@ -191,16 +191,16 @@ export function FinancialForecastingDashboard() {
 
       <Tabs defaultValue="forecast" className="space-y-6">
         <TabsList className="grid w-full grid-cols-4 bg-white/60 dark:bg-slate-800/60 backdrop-blur-lg border-0 shadow-lg">
-          <TabsTrigger value="forecast" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-purple-500 data-[state=active]:to-indigo-600 data-[state=active]:text-white">
+          <TabsTrigger value="forecast" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-teal-500 data-[state=active]:to-cyan-600 data-[state=active]:text-white">
             Forecast Analysis
           </TabsTrigger>
-          <TabsTrigger value="scenarios" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-purple-500 data-[state=active]:to-indigo-600 data-[state=active]:text-white">
+          <TabsTrigger value="scenarios" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-teal-500 data-[state=active]:to-cyan-600 data-[state=active]:text-white">
             Scenario Planning
           </TabsTrigger>
-          <TabsTrigger value="accuracy" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-purple-500 data-[state=active]:to-indigo-600 data-[state=active]:text-white">
+          <TabsTrigger value="accuracy" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-teal-500 data-[state=active]:to-cyan-600 data-[state=active]:text-white">
             Model Accuracy
           </TabsTrigger>
-          <TabsTrigger value="trends" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-purple-500 data-[state=active]:to-indigo-600 data-[state=active]:text-white">
+          <TabsTrigger value="trends" className="data-[state=active]:bg-gradient-to-r data-[state=active]:from-teal-500 data-[state=active]:to-cyan-600 data-[state=active]:text-white">
             Trend Analysis
           </TabsTrigger>
         </TabsList>
@@ -210,7 +210,7 @@ export function FinancialForecastingDashboard() {
           <Card className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-lg border-0 shadow-xl">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <TrendingUp className="w-5 h-5 text-purple-600" />
+                <TrendingUp className="w-5 h-5 text-teal-600" />
                 Revenue Forecast with Confidence Intervals
               </CardTitle>
             </CardHeader>
@@ -315,7 +315,7 @@ export function FinancialForecastingDashboard() {
           <Card className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-lg border-0 shadow-xl">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <Target className="w-5 h-5 text-purple-600" />
+                <Target className="w-5 h-5 text-teal-600" />
                 Scenario Analysis
               </CardTitle>
               <CardDescription>
@@ -429,7 +429,7 @@ export function FinancialForecastingDashboard() {
           <Card className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-lg border-0 shadow-xl">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <BarChart3 className="w-5 h-5 text-purple-600" />
+                <BarChart3 className="w-5 h-5 text-teal-600" />
                 Forecast vs Actual Performance
               </CardTitle>
             </CardHeader>
@@ -456,7 +456,7 @@ export function FinancialForecastingDashboard() {
           <Card className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-lg border-0 shadow-xl">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <Activity className="w-5 h-5 text-purple-600" />
+                <Activity className="w-5 h-5 text-teal-600" />
                 Key Financial Trends
               </CardTitle>
             </CardHeader>
@@ -513,7 +513,7 @@ export function FinancialForecastingDashboard() {
           <Card className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-lg border-0 shadow-xl">
             <CardHeader>
               <CardTitle className="flex items-center gap-2">
-                <Zap className="w-5 h-5 text-purple-600" />
+                <Zap className="w-5 h-5 text-teal-600" />
                 Trend Insights & Recommendations
               </CardTitle>
             </CardHeader>

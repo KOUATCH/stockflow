@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
+import { DatePicker } from "@/components/ui/date-picker"
 import { Badge } from "@/components/ui/badge"
 import {
   Dialog,
@@ -66,6 +67,7 @@ export default function PurchaseOrdersManagement() {
   const [searchTerm, setSearchTerm] = useState("")
   const [statusFilter, setStatusFilter] = useState("all")
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
+  const [expectedDate, setExpectedDate] = useState<Date | undefined>(undefined)
   const { toast } = useToast()
 
   const getStatusColor = (status: string) => {
@@ -153,7 +155,12 @@ export default function PurchaseOrdersManagement() {
                 </div>
                 <div className="space-y-2">
                   <Label htmlFor="expected-date">Expected Delivery</Label>
-                  <Input type="date" />
+                  <DatePicker
+                    date={expectedDate}
+                    setDate={setExpectedDate}
+                    placeholder="Select expected delivery date"
+                    minDate={new Date()}
+                  />
                 </div>
               </div>
               <div className="space-y-2">

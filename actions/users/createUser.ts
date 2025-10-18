@@ -2,7 +2,7 @@
 
 import VerifyEmail from "@/components/email-templates/verify-email"
 // import { adminPermissions } from "@/config/permissions"
-import { hashPassword } from "@/lib/argon2-server"
+import { hashPassword } from "@/lib/password"
 import { generateOtp } from "@/lib/generateOtp"
 import { db } from "@/prisma/db"
 import type { OrgDataProps, UserProps } from "@/types/types"

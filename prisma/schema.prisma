@@ -530,7 +530,7 @@ model TaxRate {
   id             String       @id @default(cuid())
   taxRateName    String
   rate           Float
-  type           TaxType      @default(SALES)
+  taxType        TaxType // @default(SALES)
   isActive       Boolean      @default(true)
   organizationId String
   createdAt      DateTime     @default(now())

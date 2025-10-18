@@ -3,6 +3,7 @@
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
+import { DatePicker } from '@/components/ui/date-picker'
 import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
@@ -814,7 +815,12 @@ export default function ItemCreateForm({
                               <FormItem>
                                 <FormLabel>Expiry Date</FormLabel>
                                 <FormControl>
-                                  <Input type="date" value={field.value || ''} onChange={field.onChange} />
+                                  <DatePicker
+                                    date={field.value ? new Date(field.value) : undefined}
+                                    onDateChange={(date) => field.onChange(date?.toISOString().split('T')[0])}
+                                    placeholder="Select expiry date"
+                                    minDate={new Date()} // Can't expire in the past
+                                  />
                                 </FormControl>
                                 <FormMessage />
                               </FormItem>

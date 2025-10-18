@@ -155,7 +155,7 @@ export function ClockInOutPanel({ currentStatus, organizationId }: ClockInOutPan
   return (
     <div className="space-y-6">
       {/* Current Time Display */}
-      <Card className="bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200">
+      <Card className="bg-gradient-to-r from-teal-50 to-emerald-50 border-teal-200">
         <CardContent className="p-6 text-center">
           <div className="flex items-center justify-center space-x-2 mb-2">
             <Calendar className="h-5 w-5 text-blue-600" />

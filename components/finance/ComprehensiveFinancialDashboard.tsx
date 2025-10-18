@@ -166,7 +166,7 @@ const ComprehensiveFinancialDashboard = ({
       id: "cashflow",
       title: "Cash Flow Analysis",
       icon: Wallet,
-      color: "bg-purple-500",
+      color: "bg-teal-500",
       metrics: [
         { label: "Operating Cash Flow", value: `$${financialMetrics.cashFlow.operating.toLocaleString()}`, change: "+12.3%" },
         { label: "Net Cash Flow", value: `$${financialMetrics.cashFlow.netCashFlow.toLocaleString()}`, change: "+8.7%" },
@@ -190,7 +190,7 @@ const ComprehensiveFinancialDashboard = ({
       id: "ratios",
       title: "Financial Ratios",
       icon: Calculator,
-      color: "bg-indigo-500",
+      color: "bg-cyan-500",
       metrics: [
         { label: "Current Ratio", value: financialMetrics.ratios.currentRatio.toString(), change: "Excellent liquidity" },
         { label: "ROE", value: `${financialMetrics.ratios.roe}%`, change: "Strong returns" },
@@ -355,8 +355,8 @@ const ComprehensiveFinancialDashboard = ({
           <CardContent>
             <div className="text-2xl font-bold">${financialMetrics.cashFlow.netCashFlow.toLocaleString()}</div>
             <div className="flex items-center text-xs text-muted-foreground">
-              <Activity className="h-3 w-3 mr-1 text-purple-600" />
-              <span className="text-purple-600">Positive flow</span>
+              <Activity className="h-3 w-3 mr-1 text-teal-600" />
+              <span className="text-teal-600">Positive flow</span>
             </div>
           </CardContent>
         </Card>
@@ -580,9 +580,9 @@ const ComprehensiveFinancialDashboard = ({
                     <p className="text-xs text-blue-600">ROE</p>
                     <p className="text-xs text-gray-500">Strong</p>
                   </div>
-                  <div className="text-center p-3 bg-purple-50 rounded-lg">
-                    <p className="text-2xl font-bold text-purple-700">{financialMetrics.ratios.debtToEquity}</p>
-                    <p className="text-xs text-purple-600">Debt-to-Equity</p>
+                  <div className="text-center p-3 bg-teal-50 rounded-lg">
+                    <p className="text-2xl font-bold text-teal-700">{financialMetrics.ratios.debtToEquity}</p>
+                    <p className="text-xs text-teal-600">Debt-to-Equity</p>
                     <p className="text-xs text-gray-500">Low Risk</p>
                   </div>
                   <div className="text-center p-3 bg-orange-50 rounded-lg">

@@ -73,7 +73,6 @@ import {
 } from "lucide-react"
 import Link from "next/link"
 
-import ModernItemFormForEditing from "@/components/dashboard/items/ModernItemFormForEditing"
 import { Badge } from "@/components/ui/badge"
 import { Checkbox } from "@/components/ui/checkbox"
 import { Input } from "@/components/ui/input"
@@ -383,7 +382,7 @@ const ModernItemTable = ({
             <Plus className="mr-2 h-4 w-4" />
             Add Item (Quick)
           </Button>
-          <Button size="sm" asChild className="bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 text-white">
+          <Button size="sm" asChild className="bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-700 hover:to-emerald-700 text-white">
             <Link href="/dashboard/inventory/items/create">
               <Package className="mr-2 h-4 w-4" />
               Add Item (Full)
@@ -575,12 +574,8 @@ const ItemManagement = memo<ItemManagementProps>(
     const {
       formDialogOpen,
       setFormDialogOpen,
-      comprehensiveFormOpen,
-      setComprehensiveFormOpen,
       deleteDialogOpen,
       setDeleteDialogOpen,
-      itemToEdit,
-      setItemToEdit,
       itemToDelete,
       setItemToDelete,
       handleAddClick,
@@ -819,25 +814,6 @@ const ItemManagement = memo<ItemManagementProps>(
           />
         </EntityForm>
 
-        {/* Edit Item Form Dialog */}
-        <ModernItemFormForEditing
-          open={comprehensiveFormOpen}
-          onOpenChange={setComprehensiveFormOpen}
-          itemData={itemToEdit}
-          onSuccess={async () => {
-            await refetch()
-            setComprehensiveFormOpen(false)
-            toast.success("Item updated successfully")
-          }}
-          initialBrandData={initialBrandData}
-          initialCategoryData={initialCategoryData.map((cat) => ({
-            ...cat,
-            organizationId: cat.organizationId ?? "",
-            description: cat.description === null ? undefined : cat.description,
-          }))}
-          initialUnitData={initialUnitData}
-          initialTaxRateData={initialTaxRateData}
-        />
 
         {/* Delete Confirmation Dialog */}
         <ConfirmationDialog

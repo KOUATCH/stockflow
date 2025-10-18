@@ -2,7 +2,7 @@
 import { PasswordProps } from "@/components/Forms/ChangePasswordForm";
 import { adminPermissions } from "@/config/permissions";
 import { db } from "@/prisma/db";
-import { hashPassword, verifyPassword } from "@/lib/argon2-server";
+import { hashPassword, verifyPassword } from "@/lib/password";
 import { revalidatePath } from "next/cache";
 import { Resend } from "resend";
 

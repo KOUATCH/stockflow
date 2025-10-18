@@ -18,6 +18,11 @@ export async function createItemAction(
   input: unknown
 ): Promise<ActionResult<ItemWithRelations>> {
   try {
+    console.log('Server action received input:', {
+      input,
+      imageUrls: input?.imageUrls,
+      thumbnail: input?.thumbnail
+    });
     const data = createItemSchema.parse(input)
 
     // Enforce unique SKU within org
@@ -37,7 +42,7 @@ console.log(data)
           organizationId: data.organizationId,
           name: data.name,
           description: data.description ?? null,
-          imageUrls: data.thumbnail ?? "", // string or null
+          imageUrls: data.imageUrls ?? "", // string or null
           thumbnail: data.thumbnail ?? null,
           sku: generateSimpleSKU(12,"DBAKES"),
           barcode: data.barcode ?? null,

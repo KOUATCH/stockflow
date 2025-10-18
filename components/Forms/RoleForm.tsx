@@ -3,7 +3,7 @@
 import createRole from "@/actions/roles/createRole";
 import { updateRole } from "@/actions/roles/updateRole";
 import { Card, CardContent } from "@/components/ui/card";
-import { permissions } from "@/config/permissions";
+import { permissions } from "@/lib/permissions";
 import { RoleFormData } from "@/types/types";
 import { Role } from "@prisma/client";
 import { useRouter } from "next/navigation";

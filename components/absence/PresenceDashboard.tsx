@@ -72,7 +72,7 @@ export function PresenceDashboard({ organizationId, currentUserId, userRole = "e
 
       <PresenceStatusCard
         status={currentStatus || { status: "OFFLINE", session: null }}
-        className="bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200"
+        className="bg-gradient-to-r from-teal-50 to-emerald-50 border-teal-200"
       />
 
       {/* Main Content Tabs */}

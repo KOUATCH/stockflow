@@ -168,29 +168,42 @@ export default function HomePage() {
   const handleOpeningBalanceConfirm = useCallback(
     async (balance: number) => {
       try {
-        console.log("[v0] Starting session with opening balance:", balance)
+        console.log("[Session UI] Starting session with opening balance:", balance)
+        console.log("[Session UI] Session params:", {
+          balance,
+          userId,
+          selectedLocationId,
+          orgId,
+          selectedTerminalId,
+        })
 
-        await startSession(balance, userId, selectedLocationId, orgId)
+        const result = await startSession(balance, userId, selectedLocationId, orgId)
+        console.log("[Session UI] Session start result:", result)
 
         // Ensure we have a valid terminal selected
         const currentTerminal = availableTerminals.find((t) => t.id === selectedTerminalId)
         if (!currentTerminal && availableTerminals.length > 0) {
           const onlineTerminals = availableTerminals.filter((t) => t.status === "online")
           const terminalToSelect = onlineTerminals.length > 0 ? onlineTerminals[0] : availableTerminals[0]
+          console.log("[Session UI] Switching to terminal:", terminalToSelect.id)
           setSelectedTerminalId(terminalToSelect.id)
         }
 
-        console.log("[v0] Session started successfully, switching to POS tab")
+        console.log("[Session UI] Session started successfully, switching to POS tab")
         setActiveTab("pos")
-        // setActiveTab("pos")
         setShowOpeningBalanceDialog(false)
-      } catch (error) {
-        console.error("[v0] Failed to start session:", error)
-        // Error is handled by the hook's toast notification
 
+        // Force a session refetch after a short delay
+        setTimeout(() => {
+          console.log("[Session UI] Force refreshing session")
+          refetchSession()
+        }, 1000)
+      } catch (error) {
+        console.error("[Session UI] Failed to start session:", error)
+        // Error is handled by the hook's toast notification
       }
     },
-    [startSession, userId, selectedLocationId, orgId, availableTerminals, selectedTerminalId],
+    [startSession, userId, selectedLocationId, orgId, availableTerminals, selectedTerminalId, refetchSession],
   )
 
   const handleEndSession = useCallback(async () => {
@@ -215,13 +228,19 @@ export default function HomePage() {
   }, [currentSession?.startTime])
 
   useEffect(() => {
-    const interval = setInterval(() => {
-      if (isSessionActive) {
-        refetchSession()
-      }
-    }, 60000) // Refresh every minute when session is active
+    let interval: NodeJS.Timeout | null = null
 
-    return () => clearInterval(interval)
+    // Only start auto-refresh after session has been active for at least 30 seconds
+    if (isSessionActive) {
+      interval = setInterval(() => {
+        console.log("[Session] Auto-refreshing session status")
+        refetchSession()
+      }, 2 * 60 * 1000) // Refresh every 2 minutes when session is active
+    }
+
+    return () => {
+      if (interval) clearInterval(interval)
+    }
   }, [isSessionActive, refetchSession])
 
   return (

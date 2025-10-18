@@ -1,7 +1,7 @@
 "use server";
 import { db } from "@/prisma/db";
 import { InvitedUserProps } from "@/types/types";
-import { hashPassword } from "@/lib/argon2-server";
+import { hashPassword } from "@/lib/password";
 // import { Resend } from "resend";
 
 // // import { generateNumericToken } from "@/lib/token";

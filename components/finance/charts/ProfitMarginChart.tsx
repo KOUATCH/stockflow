@@ -37,7 +37,7 @@ export function ProfitMarginChart({ data }: ProfitMarginChartProps) {
       return (
         <div className="bg-white/95 dark:bg-slate-800/95 backdrop-blur-sm border border-slate-200 dark:border-slate-700 rounded-lg p-3 shadow-lg">
           <p className="text-sm font-medium text-slate-900 dark:text-white">{label}</p>
-          <p className="text-sm text-purple-600 dark:text-purple-400">
+          <p className="text-sm text-teal-600 dark:text-teal-400">
             Net Profit: {formatCurrency(payload[0]?.payload?.value)}
           </p>
           <p className="text-sm text-blue-600 dark:text-blue-400">
@@ -54,10 +54,10 @@ export function ProfitMarginChart({ data }: ProfitMarginChartProps) {
 
   return (
     <Card className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-lg border-0 shadow-xl">
-      <CardHeader className="bg-gradient-to-r from-purple-50 to-pink-50 dark:from-purple-900/20 dark:to-pink-900/20 border-b border-purple-200/60 dark:border-purple-700/60">
+      <CardHeader className="bg-gradient-to-r from-teal-50 to-cyan-50 dark:from-teal-900/20 dark:to-cyan-900/20 border-b border-teal-200/60 dark:border-teal-700/60">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-gradient-to-br from-purple-500 to-pink-600 shadow-lg">
+            <div className="p-2 rounded-lg bg-gradient-to-br from-teal-500 to-cyan-600 shadow-lg">
               <Target className="w-5 h-5 text-white" />
             </div>
             <div>

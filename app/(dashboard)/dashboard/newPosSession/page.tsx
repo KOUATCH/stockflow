@@ -119,7 +119,7 @@ export default function HomePage() {
   const { currentSession, sessionLoading } = useSessionManagement(selectedTerminal)
 
   // Real-time monitoring hooks
-  const { realTimeState, session, summary } = useRealTimeBalanceTracking(selectedTerminal, currentSession?.id || "")
+  const { realTimeState, session: balanceSession, summary } = useRealTimeBalanceTracking(selectedTerminal, currentSession?.id || "")
   const { lowStockCount, criticalStockCount, lowStockItems } = useLowStockMonitoring(selectedLocation, orgId)
   const { systemMetrics, systemHealth } = useSystemMonitoring(orgId, selectedLocation)
 

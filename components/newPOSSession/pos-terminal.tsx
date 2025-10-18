@@ -4,6 +4,7 @@ import { useNotifications } from "@/components/notifications/NotificationProvide
 import { useOrgCategories } from "@/hooks/useAllCategoriesqueries"
 import { useCustomers } from "@/hooks/useCustomers"
 import { useQueryClient } from "@tanstack/react-query"
+import { useSessionManagement } from "@/hooks/sessions"
 import type React from "react"
 import type { ReactElement } from "react"
 import { useMemo, useRef, useState } from "react"
@@ -60,10 +61,7 @@ enum PaymentMethod {
   DIGITAL = "DIGITAL",
 }
 
-enum POSSessionStatus {
-  ACTIVE = "ACTIVE",
-  INACTIVE = "INACTIVE",
-}
+// Removed enum - using types from unified session system
 
 interface pOSStationProps {
   organizationId: string
@@ -96,6 +94,21 @@ const getCategoryIcon = (categoryName: string) => {
 }
 
 export function pOSStation({ organizationId, locationId, terminalId, userId }: pOSStationProps): ReactElement {
+  // Unified session management
+  const {
+    currentSession,
+    isSessionActive,
+    sessionLoading,
+    startSession,
+    endSession,
+    sessionDuration
+  } = useSessionManagement({
+    stationId: terminalId,
+    organizationId,
+    enableAutoRefetch: true,
+    refetchInterval: 30000
+  })
+
   const [cart, setCart] = useState<CartItem[]>([])
   const [searchTerm, setSearchTerm] = useState("")
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null)
@@ -114,24 +127,11 @@ export function pOSStation({ organizationId, locationId, terminalId, userId }: p
   const [splitPayment, setSplitPayment] = useState(false)
   const [paymentProgress, setPaymentProgress] = useState(0)
   const [showCustomerDisplay, setShowCustomerDisplay] = useState(false)
+  const [isSessionDialogOpen, setIsSessionDialogOpen] = useState(false)
+  const [openingBalance, setOpeningBalance] = useState("100")
   // Carousel state
   const [carouselIndex, setCarouselIndex] = useState(0)
   const carouselRef = useRef<HTMLDivElement>(null)
-
-
-
-  const [currentSession, setCurrentSession] = useState<{
-    id: string
-    sessionNumber: string
-    status: POSSessionStatus
-    startTime: Date
-    openingBalance: number
-    totalSales: number
-    transactionCount: number
-    cashTotal: number
-    cardTotal: number
-    digitalTotal: number
-  } | null>(null)
 
   const [cashDrawerStatus, setCashDrawerStatus] = useState<{
     isOpen: boolean
@@ -154,6 +154,31 @@ export function pOSStation({ organizationId, locationId, terminalId, userId }: p
 
   const notifications = useNotifications()
   const queryClient = useQueryClient()
+
+  // Session management functions
+  const handleStartSession = async () => {
+    try {
+      const balance = parseFloat(openingBalance) || 100
+      await startSession(balance, userId, locationId, organizationId)
+      setIsSessionDialogOpen(false)
+      notifications.success("Session Started", `POS session started with opening balance: ${formatCurrency(balance)}`)
+    } catch (error) {
+      console.error("Failed to start session:", error)
+      notifications.error("Session Error", "Failed to start session. Please try again.")
+    }
+  }
+
+  const handleEndSession = async () => {
+    try {
+      const closingBalance = currentSession?.openingBalance || 0
+      await endSession(closingBalance)
+      setIsSessionDialogOpen(false)
+      notifications.success("Session Ended", `POS session closed with balance: ${formatCurrency(closingBalance)}`)
+    } catch (error) {
+      console.error("Failed to end session:", error)
+      notifications.error("Session Error", "Failed to end session. Please try again.")
+    }
+  }
 
   // ... existing mutations and effects ...
 
@@ -325,22 +350,40 @@ export function pOSStation({ organizationId, locationId, terminalId, userId }: p
             </div>
             POS Terminal
           </h1>
-          <p className="text-muted-foreground text-lg mt-1">Process sales and manage transactions new pos session pos-terminal </p>
-          {currentSession && (
-            <div className="flex items-center gap-4 mt-3">
-              <Badge variant="outline" className="flex items-center gap-2 px-3 py-1">
-                <CheckCircle className="h-4 w-4 text-green-500" />
-                Session: {currentSession.startTime.toLocaleTimeString()} - #{currentSession.sessionNumber}
+          <p className="text-muted-foreground text-lg mt-1">Process sales and manage transactions</p>
+
+          {/* Session Status Display */}
+          <div className="flex items-center gap-4 mt-3">
+            {isSessionActive && currentSession ? (
+              <>
+                <Badge variant="outline" className="flex items-center gap-2 px-3 py-1">
+                  <CheckCircle className="h-4 w-4 text-green-500" />
+                  Session: {new Date(currentSession.startTime).toLocaleTimeString()} - #{currentSession.sessionNumber}
+                </Badge>
+                <Badge variant="secondary" className="px-3 py-1 font-medium">
+                  Duration: {sessionDuration}h
+                </Badge>
+                <Badge variant="secondary" className="px-3 py-1 font-medium">
+                  Sales: {formatCurrency(currentSession.totalSales || 0)}
+                </Badge>
+              </>
+            ) : (
+              <Badge variant="destructive" className="flex items-center gap-2 px-3 py-1">
+                <Clock className="h-4 w-4" />
+                No Active Session
               </Badge>
-              <Badge variant={cashDrawerStatus.isOpen ? "default" : "destructive"} className="flex items-center gap-2 px-3 py-1">
-                <Wallet className="h-4 w-4" />
-                Cash Drawer: {cashDrawerStatus.isOpen ? "Open" : "Closed"}
-              </Badge>
-              <Badge variant="secondary" className="px-3 py-1 font-medium">
-                Balance: {formatCurrency(Number(cashDrawerStatus.currentBalance.toFixed(2)))}
-              </Badge>
-            </div>
-          )}
+            )}
+
+            {/* Session Management Button */}
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setIsSessionDialogOpen(true)}
+              disabled={sessionLoading}
+            >
+              {isSessionActive ? "End Session" : "Start Session"}
+            </Button>
+          </div>
         </div>
         <div className="flex items-center gap-3">
           <Button
@@ -459,7 +502,7 @@ export function pOSStation({ organizationId, locationId, terminalId, userId }: p
 
                         {/* Recent Items Card */}
                         <div
-                          className="flex-shrink-0 w-24 h-24 rounded-xl cursor-pointer transition-all duration-200 hover:scale-105 bg-purple-100 hover:bg-purple-200 text-purple-700"
+                          className="flex-shrink-0 w-24 h-24 rounded-xl cursor-pointer transition-all duration-200 hover:scale-105 bg-teal-100 hover:bg-teal-200 text-teal-700"
                           onClick={() => {
                             // Handle recent items filter
                             notifications.info("Recent Items", "Showing recently used items")
@@ -736,7 +779,7 @@ export function pOSStation({ organizationId, locationId, terminalId, userId }: p
                       <Button
                         type="submit"
                         className="w-full bg-gradient-to-r from-emerald-500 to-emerald-600 text-white hover:from-emerald-600 hover:to-emerald-700 shadow-lg"
-                        disabled={isProcessing || !currentSession}
+                        disabled={isProcessing || !isSessionActive}
                       >
                         <CreditCard className="mr-2 h-4 w-4" />
                         {isProcessing ? "Processing..." : `Complete Sale - $${cartTotal.toFixed(2)}`}
@@ -804,6 +847,73 @@ export function pOSStation({ organizationId, locationId, terminalId, userId }: p
                 className="flex-1"
               >
                 {isProcessing ? "Processing..." : "Complete Payment"}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Session Management Dialog */}
+      <Dialog open={isSessionDialogOpen} onOpenChange={setIsSessionDialogOpen}>
+        <DialogContent className="sm:max-w-md">
+          <DialogHeader>
+            <DialogTitle>
+              {isSessionActive ? "End Session" : "Start New Session"}
+            </DialogTitle>
+            <DialogDescription>
+              {isSessionActive
+                ? "Close the current POS session and calculate the final balance."
+                : "Start a new POS session with an opening cash balance."
+              }
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            {isSessionActive ? (
+              <div className="space-y-2">
+                <div className="text-sm text-muted-foreground">
+                  Current Session: #{currentSession?.sessionNumber}
+                </div>
+                <div className="text-sm text-muted-foreground">
+                  Opening Balance: {formatCurrency(currentSession?.openingBalance || 0)}
+                </div>
+                <div className="text-sm text-muted-foreground">
+                  Total Sales: {formatCurrency(currentSession?.totalSales || 0)}
+                </div>
+                <div className="text-sm text-muted-foreground">
+                  Duration: {sessionDuration} hours
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-2">
+                <Label htmlFor="openingBalance">Opening Balance</Label>
+                <Input
+                  id="openingBalance"
+                  type="number"
+                  step="0.01"
+                  value={openingBalance}
+                  onChange={(e) => setOpeningBalance(e.target.value)}
+                  placeholder="100.00"
+                />
+              </div>
+            )}
+
+            <div className="flex gap-2">
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => setIsSessionDialogOpen(false)}
+                className="flex-1"
+              >
+                Cancel
+              </Button>
+              <Button
+                type="button"
+                onClick={isSessionActive ? handleEndSession : handleStartSession}
+                disabled={sessionLoading}
+                className="flex-1"
+              >
+                {sessionLoading ? "Processing..." : (isSessionActive ? "End Session" : "Start Session")}
               </Button>
             </div>
           </div>

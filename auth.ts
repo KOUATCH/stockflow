@@ -79,7 +79,7 @@ const config = {
 
         try {
           // Use the dedicated API route for credential verification
-          const baseUrl = process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_BASE_URL || `http://localhost:3000`
+          const baseUrl = process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_BASE_URL || `http://localhost:3001`
 
           const response = await fetch(`${baseUrl}/api/auth/verify-credentials`, {
             method: 'POST',
@@ -119,8 +119,14 @@ const config = {
         token.email = user.email!
         token.organizationId = user.organizationId
         token.organizationName = user.organizationName
-        token.roles = user.roles
-        token.permissions = user.permissions
+        // Store only essential role info to reduce cookie size (remove permissions from roles)
+        token.roles = user.roles?.map(role => ({
+          id: role.id,
+          name: role.name,
+          code: role.code
+        })) || []
+        // Store only essential permissions to reduce cookie size
+        token.permissions = user.permissions?.slice(0, 5) || [] // Limit to first 5 permissions
       }
 
       // Return previous token if the access token has not expired yet
@@ -139,8 +145,8 @@ const config = {
           image: session.user.image,
           organizationId: token.organizationId,
           organizationName: token.organizationName,
-          roles: token.roles,
-          permissions: token.permissions
+          roles: token.roles, // Only essential role info (no permissions)
+          permissions: token.permissions // Limited to first 5 permissions
         }
       }
 

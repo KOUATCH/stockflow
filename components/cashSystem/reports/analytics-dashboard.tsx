@@ -232,8 +232,8 @@ export function AnalyticsDashboard({ locationId, organizationId }: AnalyticsDash
         <Card className="relative overflow-hidden">
           <CardContent className="p-4">
             <div className="flex items-center gap-3">
-              <div className="p-3 rounded-full bg-gradient-to-r from-purple-100 to-violet-100">
-                <Target className="h-6 w-6 text-purple-600" />
+              <div className="p-3 rounded-full bg-gradient-to-r from-teal-100 to-cyan-100">
+                <Target className="h-6 w-6 text-teal-600" />
               </div>
               <div className="flex-1">
                 <p className="text-sm text-muted-foreground">Avg Transaction</p>
@@ -243,7 +243,7 @@ export function AnalyticsDashboard({ locationId, organizationId }: AnalyticsDash
                 </p>
               </div>
             </div>
-            <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-purple-500/10 to-transparent rounded-bl-full" />
+            <div className="absolute top-0 right-0 w-20 h-20 bg-gradient-to-br from-teal-500/10 to-transparent rounded-bl-full" />
           </CardContent>
         </Card>
 

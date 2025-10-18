@@ -2,6 +2,7 @@
 
 import { db } from "@/prisma/db"
 import { startOfDay, endOfDay, startOfMonth, startOfYear, subMonths, subYears } from "date-fns"
+import { getPayrollSummary, getPayrollExpenseAllocation } from "@/actions/payroll/payrollManagement"
 
 export interface FinancialMetrics {
   revenue: {
@@ -247,17 +248,19 @@ export async function getComprehensiveFinancialAnalytics(
       : new Date(start.getTime() - 1)
 
     // Fetch financial data
-    const [currentData, comparisonData, budgetData, taxData] = await Promise.all([
+    const [currentData, comparisonData, budgetData, taxData, payrollData] = await Promise.all([
       fetchFinancialData(organizationId, start, end),
       fetchFinancialData(organizationId, comparisonStart, comparisonEnd),
       fetchBudgetData(organizationId, start, end),
-      fetchTaxData(organizationId, start, end)
+      fetchTaxData(organizationId, start, end),
+      getPayrollSummary(organizationId, start, end)
     ])
 
     // Calculate all metrics
     const revenue = calculateRevenueMetrics(currentData, comparisonData)
-    const profitability = calculateProfitabilityMetrics(currentData, comparisonData)
-    const expenses = calculateExpenseMetrics(currentData, comparisonData, budgetData)
+    const profitability = calculateProfitabilityMetrics(currentData, comparisonData, payrollData.data)
+    const expenses = calculateExpenseMetrics(currentData, comparisonData, budgetData, payrollData.data)
+    const payroll = calculatePayrollMetrics(payrollData.data)
     const cashFlow = calculateCashFlowMetrics(currentData, comparisonData)
     const assets = calculateAssetMetrics(currentData)
     const liabilities = calculateLiabilityMetrics(currentData)
@@ -274,6 +277,7 @@ export async function getComprehensiveFinancialAnalytics(
       revenue,
       profitability,
       expenses,
+      payroll,
       cashFlow,
       assets,
       liabilities,
@@ -427,7 +431,7 @@ function calculateRevenueMetrics(currentData: any, comparisonData: any) {
   }
 }
 
-function calculateProfitabilityMetrics(currentData: any, comparisonData: any) {
+function calculateProfitabilityMetrics(currentData: any, comparisonData: any, payrollData?: any) {
   const currentRevenue = currentData.sales.reduce((sum: number, sale: any) => sum + sale.total, 0)
   const currentCogs = currentData.sales.reduce((sum: number, sale: any) =>
     sum + sale.lines.reduce((lineSum: number, line: any) =>
@@ -467,7 +471,7 @@ function calculateProfitabilityMetrics(currentData: any, comparisonData: any) {
   }
 }
 
-function calculateExpenseMetrics(currentData: any, comparisonData: any, budgetData: any) {
+function calculateExpenseMetrics(currentData: any, comparisonData: any, budgetData: any, payrollData?: any) {
   const currentRevenue = currentData.sales.reduce((sum: number, sale: any) => sum + sale.total, 0)
 
   // Calculate COGS
@@ -477,7 +481,7 @@ function calculateExpenseMetrics(currentData: any, comparisonData: any, budgetDa
 
   // Mock other expenses
   const operational = currentRevenue * 0.126
-  const salaries = currentRevenue * 0.15
+  const salaries = payrollData?.totals?.totalGrossPay || currentRevenue * 0.15
   const rent = 45000
   const utilities = currentRevenue * 0.01
   const marketing = currentRevenue * 0.019
@@ -510,6 +514,44 @@ function calculateExpenseMetrics(currentData: any, comparisonData: any, budgetDa
       cogsChange: -1.8,
       operationalChange: 2.1
     }
+  }
+}
+
+function calculatePayrollMetrics(payrollData?: any) {
+  if (!payrollData) {
+    return {
+      totalPayrollExpense: 0,
+      totalEmployees: 0,
+      averageSalary: 0,
+      payrollGrowth: 0,
+      departmentBreakdown: [],
+      benefitsCost: 0,
+      payrollTaxes: 0,
+      overtimeCost: 0,
+      overtimePercentage: 0
+    }
+  }
+
+  const totalPayrollExpense = payrollData.totals.totalGrossPay + payrollData.totals.totalDeductions
+  const benefitsCost = totalPayrollExpense * 0.15
+  const payrollTaxes = totalPayrollExpense * 0.125
+  const overtimeCost = totalPayrollExpense * 0.05
+
+  return {
+    totalPayrollExpense,
+    totalEmployees: payrollData.totals.totalEmployees,
+    averageSalary: payrollData.totals.averageSalary,
+    payrollGrowth: 3.2, // Mock growth rate
+    departmentBreakdown: payrollData.breakdown.byDepartment.map((dept: any) => ({
+      department: dept.department,
+      employeeCount: dept.employeeCount,
+      totalCost: dept.totalGrossPay + (dept.totalGrossPay * 0.25), // Including benefits and taxes
+      averageSalary: dept.averageSalary
+    })),
+    benefitsCost,
+    payrollTaxes,
+    overtimeCost,
+    overtimePercentage: (overtimeCost / totalPayrollExpense) * 100
   }
 }
 

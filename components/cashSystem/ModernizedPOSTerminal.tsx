@@ -1000,7 +1000,7 @@ export function ModernizedPOSTerminalFinal({ organizationId, locationId, termina
                     </div>
 
                     {/* Enhanced Category Carousel */}
-                    <div className="relative overflow-hidden rounded-xl bg-gradient-to-r from-blue-50 via-indigo-50 to-purple-50 p-4">
+                    <div className="relative overflow-hidden rounded-xl bg-gradient-to-r from-blue-50 via-cyan-50 to-teal-50 p-4">
                       <div
                         ref={carouselRef}
                         className="flex gap-4 overflow-x-auto scroll-smooth pb-2 scrollbar-hide"
@@ -1134,15 +1134,15 @@ export function ModernizedPOSTerminalFinal({ organizationId, locationId, termina
                         >
                           <div
                             className={`p-3 rounded-xl border-2 transition-all duration-300 ${selectedCategory === "recent"
-                              ? "border-purple-500 bg-gradient-to-br from-purple-500 to-purple-600 text-white shadow-lg"
-                              : "border-gray-200 bg-white/80 backdrop-blur-sm hover:border-purple-300 hover:shadow-md"
+                              ? "border-teal-500 bg-gradient-to-br from-teal-500 to-teal-600 text-white shadow-lg"
+                              : "border-gray-200 bg-white/80 backdrop-blur-sm hover:border-teal-300 hover:shadow-md"
                               }`}
                           >
                             <div className="flex flex-col items-center text-center">
                               <div
                                 className={`p-3 rounded-full mb-3 ${selectedCategory === "recent"
                                   ? "bg-white/20"
-                                  : "bg-gradient-to-br from-purple-500 to-purple-600"
+                                  : "bg-gradient-to-br from-teal-500 to-teal-600"
                                   }`}
                               >
                                 <Clock
@@ -1604,7 +1604,7 @@ export function ModernizedPOSTerminalFinal({ organizationId, locationId, termina
                   variant={paymentMethod === PaymentMethod.DIGITAL ? "default" : "outline"}
                   onClick={() => setPaymentMethod(PaymentMethod.DIGITAL)}
                   className={`flex items-center gap-2 h-16 ${paymentMethod === PaymentMethod.DIGITAL
-                    ? "bg-gradient-to-r from-purple-500 to-purple-600 text-white"
+                    ? "bg-gradient-to-r from-teal-500 to-teal-600 text-white"
                     : ""
                     }`}
                 >

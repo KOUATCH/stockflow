@@ -2,6 +2,7 @@
 
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { DatePicker } from "@/components/ui/date-picker"
 import {
   Dialog,
   DialogContent,
@@ -52,7 +53,7 @@ export function CreateTransferModal({ open, onOpenChange, organizationId }: Crea
   const [priority, setPriority] = useState<TransferPriority>("NORMAL")
   const [notes, setNotes] = useState("")
   const [internalNotes, setInternalNotes] = useState("")
-  const [requestedDate, setRequestedDate] = useState("")
+  const [requestedDate, setRequestedDate] = useState<Date | undefined>(undefined)
   
   const [lines, setLines] = useState<TransferLineItem[]>([])
   const [itemSearch, setItemSearch] = useState("")
@@ -176,7 +177,7 @@ export function CreateTransferModal({ open, onOpenChange, organizationId }: Crea
       fromLocationId,
       toLocationId,
       priority,
-      requestedDate: requestedDate ? new Date(requestedDate) : undefined,
+      requestedDate: requestedDate || undefined,
       notes: notes.trim() || undefined,
       internalNotes: internalNotes.trim() || undefined,
       organizationId,
@@ -197,7 +198,7 @@ export function CreateTransferModal({ open, onOpenChange, organizationId }: Crea
       setPriority("NORMAL")
       setNotes("")
       setInternalNotes("")
-      setRequestedDate("")
+      setRequestedDate(undefined)
       setLines([])
     } catch (error) {
       // Error handled by mutation
@@ -329,11 +330,11 @@ export function CreateTransferModal({ open, onOpenChange, organizationId }: Crea
 
                 <div className="space-y-2">
                   <Label htmlFor="requestedDate">Requested Date</Label>
-                  <Input
-                    type="date"
-                    value={requestedDate}
-                    onChange={(e) => setRequestedDate(e.target.value)}
-                    min={new Date().toISOString().split('T')[0]}
+                  <DatePicker
+                    date={requestedDate}
+                    onDateChange={setRequestedDate}
+                    placeholder="Select requested date"
+                    minDate={new Date()}
                   />
                 </div>
               </div>

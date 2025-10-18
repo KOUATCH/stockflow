@@ -99,7 +99,7 @@ export function FinancialMetricsCard({
             </div>
             <div className="mt-2 w-full bg-slate-200 dark:bg-slate-700 rounded-full h-1.5">
               <div
-                className="bg-gradient-to-r from-blue-500 to-indigo-600 h-1.5 rounded-full transition-all duration-500"
+                className="bg-gradient-to-r from-teal-500 to-cyan-600 h-1.5 rounded-full transition-all duration-500"
                 style={{
                   width: `${Math.min(100, Math.max(0, (parseFloat(value.replace(/[^0-9.-]/g, '')) / target) * 100))}%`
                 }}

@@ -1,12 +1,15 @@
-//
 import CategoryFormForEditing from "@/components/dashboard/categories/CategoryFormForEditing";
 import { TableLoading } from "@/components/ui/data-table";
-import { AuthenticatedUser, getAuthenticatedUser } from "@/config/useAuth";
+import { AuthenticatedUser, getAuthenticatedUser, checkPermission } from "@/config/useAuth";
 import { getOrgCategories } from "@/services/categoryAPI";
+import { PERMISSIONS } from "@/lib/permissions";
 import { Suspense } from "react";
 
 
 export default async function CategoriesPage() {
+  // Check permission first
+  await checkPermission(PERMISSIONS.READ_CATEGORIES);
+
   // Fetch data on the server
   const user: AuthenticatedUser = await getAuthenticatedUser();
   const userOrgId: string = user?.organizationId;

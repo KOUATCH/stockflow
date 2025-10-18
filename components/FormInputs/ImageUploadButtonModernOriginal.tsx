@@ -16,6 +16,9 @@ interface ImageUploadButtonProps {
   maxFileSize?: string
   acceptedFileTypes?: string[]
   className?: string
+  onUploadStart?: () => void
+  onUploadComplete?: () => void
+  onUploadError?: () => void
 }
 
 const ImageUploadButtonModernOriginal = ({
@@ -26,6 +29,9 @@ const ImageUploadButtonModernOriginal = ({
   maxFileSize = "4MB",
   acceptedFileTypes = ["image/*"],
   className = "",
+  onUploadStart,
+  onUploadComplete,
+  onUploadError,
 }: ImageUploadButtonProps) => {
   const [isUploading, setIsUploading] = useState(false)
   const { toast } = useToast()
@@ -39,6 +45,7 @@ const ImageUploadButtonModernOriginal = ({
       })
     }
     setIsUploading(false)
+    onUploadComplete?.()
   }
 
   const handleUploadError = (error: Error) => {
@@ -49,6 +56,7 @@ const ImageUploadButtonModernOriginal = ({
       variant: "destructive",
     })
     setIsUploading(false)
+    onUploadError?.()
   }
 
   const handleRemoveImage = () => {
@@ -104,7 +112,10 @@ const ImageUploadButtonModernOriginal = ({
             endpoint={endpoint}
             onClientUploadComplete={handleUploadComplete}
             onUploadError={handleUploadError}
-            onUploadBegin={() => setIsUploading(true)}
+            onUploadBegin={() => {
+              setIsUploading(true)
+              onUploadStart?.()
+            }}
             appearance={{
               button:
                 "w-full bg-primary hover:bg-primary/90 text-primary-foreground font-medium py-2 px-4 rounded-md transition-colors duration-200 flex items-center justify-center gap-2 ut-ready:bg-primary ut-uploading:bg-primary/80 ut-uploading:cursor-not-allowed",

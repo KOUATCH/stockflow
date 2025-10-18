@@ -97,6 +97,10 @@ interface ModernCreateItemFormProps {
   units?: Array<{ id: string; name: string; abbreviation: string }>
   taxRate?: Array<{ id: string; rate: number; name: string }>
   organizationId: string
+  // Edit mode props
+  initialData?: Partial<ItemCreationFormData>
+  isEditMode?: boolean
+  itemId?: string
 }
 
 const DEFAULT_IMAGE_URL = "https://14J7oh8kso.ufs.sh/f/HLxTbDBCDLwfAXaapcezIN7vwylKf1PXSCqAuseUG0gx8mhd"
@@ -120,22 +124,53 @@ export function ModernCreateItemForm({
   brands = [],
   units = [],
   taxRate = [],
-  organizationId
+  organizationId,
+  initialData,
+  isEditMode = false,
+  itemId
 }: ModernCreateItemFormProps) {
   const router = useRouter()
   const [itemImageUrl, setItemImageUrl] = useState(DEFAULT_IMAGE_URL)
   const [currentStep, setCurrentStep] = useState<FormStep>('basic')
   const [completedSteps, setCompletedSteps] = useState<Set<FormStep>>(new Set())
+  const [isImageUploading, setIsImageUploading] = useState(false)
   const { success, error, warning, info, operationStart, operationComplete } = useNotifications()
 
-  // Welcome notification when component mounts
+  // Welcome notification when component mounts (only for create mode)
   useEffect(() => {
-    info("Get Started", "Complete each step to create your new product. Start with the basic information and work your way through!")
-  }, [info])
+    if (!isEditMode) {
+      info("Get Started", "Complete each step to create your new product. Start with the basic information and work your way through!")
+    }
+  }, [info, isEditMode])
+
+  // Debug image upload state changes
+  useEffect(() => {
+    console.log('isImageUploading changed:', isImageUploading)
+  }, [isImageUploading])
 
   const form = useForm<ItemCreationFormData>({
     resolver: zodResolver(itemCreationSchema),
-    defaultValues: {
+    defaultValues: initialData ? {
+      name: initialData.name || "",
+      description: initialData.description || "",
+      sku: initialData.sku || "",
+      barcode: initialData.barcode || "",
+      costPrice: initialData.costPrice || 0,
+      sellingPrice: initialData.sellingPrice || 0,
+      categoryId: initialData.categoryId || "",
+      brandId: initialData.brandId || "",
+      unitId: initialData.unitId || "",
+      taxRateId: initialData.taxRateId || "",
+      minStockLevel: initialData.minStockLevel || 0,
+      maxStockLevel: initialData.maxStockLevel || 0,
+      weight: initialData.weight || 0,
+      dimensions: initialData.dimensions || "",
+      isActive: initialData.isActive ?? true,
+      isSerialTracked: initialData.isSerialTracked ?? false,
+      thumbnail: initialData.thumbnail || DEFAULT_IMAGE_URL,
+      imageUrls: initialData.imageUrls || DEFAULT_IMAGE_URL,
+      organizationId: initialData.organizationId || organizationId,
+    } : {
       name: "",
       description: "",
       sku: "",
@@ -147,13 +182,13 @@ export function ModernCreateItemForm({
       unitId: "",
       taxRateId: "",
       minStockLevel: 0,
-      maxStockLevel: undefined,
-      weight: undefined,
+      maxStockLevel: 0,
+      weight: 0,
       dimensions: "",
       isActive: true,
       isSerialTracked: false,
-      thumbnail: "",
-      imageUrls: "",
+      thumbnail: DEFAULT_IMAGE_URL,
+      imageUrls: DEFAULT_IMAGE_URL,
       organizationId,
     },
     mode: "onChange"
@@ -174,25 +209,44 @@ export function ModernCreateItemForm({
   const profitAmount = sellingPrice && costPrice ? sellingPrice - costPrice : 0
 
   // Form validation by step
-  const validateStep = async (step: FormStep): Promise<boolean> => {
-    const operationId = operationStart(`Validating ${FORM_STEPS.find(s => s.id === step)?.title}`)
+  const validateStep = async (step: FormStep, silent = false): Promise<boolean> => {
+    const operationId = !silent ? operationStart(`Validating ${FORM_STEPS.find(s => s.id === step)?.title}`) : null
 
     const fieldsByStep: Record<FormStep, (keyof ItemCreationFormData)[]> = {
-      basic: ['name', 'description'],
-      details: ['sku', 'barcode', 'categoryId', 'brandId'],
-      pricing: ['costPrice', 'sellingPrice', 'unitId', 'taxRateId'],
-      inventory: ['minStockLevel', 'maxStockLevel', 'weight', 'dimensions'],
+      basic: ['name'],
+      details: ['sku'],
+      pricing: ['costPrice', 'sellingPrice'],
+      inventory: [], // No required fields in inventory step - all are optional
       media: []
     }
 
     const fieldsToValidate = fieldsByStep[step]
-    const result = await form.trigger(fieldsToValidate)
+
+    // If no fields to validate, consider step valid
+    const result = fieldsToValidate.length === 0 ? true : await form.trigger(fieldsToValidate)
+
+    // Debug logging (only if not silent)
+    if (!silent) {
+      console.log(`Step validation for ${step}:`, {
+        step,
+        fieldsToValidate,
+        result,
+        currentValues: fieldsToValidate.length > 0 ? fieldsToValidate.reduce((acc, field) => {
+          acc[field] = form.getValues(field);
+          return acc;
+        }, {} as any) : 'No fields to validate'
+      });
+    }
 
     if (result) {
       setCompletedSteps(prev => new Set(prev).add(step))
-      operationComplete("Step Validated", `${FORM_STEPS.find(s => s.id === step)?.title} section completed successfully`)
+      if (!silent) {
+        operationComplete("Step Validated", `${FORM_STEPS.find(s => s.id === step)?.title} section completed successfully`)
+      }
     } else {
-      warning("Validation Required", `Please complete all required fields in the ${FORM_STEPS.find(s => s.id === step)?.title} section`)
+      if (!silent) {
+        warning("Validation Required", `Please complete all required fields in the ${FORM_STEPS.find(s => s.id === step)?.title} section`)
+      }
     }
 
     return result
@@ -218,8 +272,9 @@ export function ModernCreateItemForm({
     const currentIndex = FORM_STEPS.findIndex(step => step.id === currentStep)
     const targetStep = FORM_STEPS.find(step => step.id === stepId)
 
-    // Only allow forward navigation if current step is valid
-    if (stepIndex > currentIndex) {
+    // In edit mode, allow free navigation between any steps
+    // In create mode, only allow forward navigation if current step is valid
+    if (!isEditMode && stepIndex > currentIndex) {
       const isValid = await validateStep(currentStep)
       if (!isValid) return
     }
@@ -231,13 +286,19 @@ export function ModernCreateItemForm({
   }
 
   const handleSubmit = async (data: ItemCreationFormData) => {
+    // Check if image is still uploading
+    if (isImageUploading) {
+      warning("Upload in Progress", "Please wait for the image upload to complete before creating the product.")
+      return
+    }
+
     const operationId = operationStart("Creating Product")
 
     try {
       const submitData = {
         ...data,
         thumbnail: itemImageUrl || DEFAULT_IMAGE_URL,
-        imageUrls: itemImageUrl || "",
+        imageUrls: itemImageUrl || DEFAULT_IMAGE_URL,
       }
 
       info("Processing Product", "Validating product information and saving to inventory...")
@@ -246,7 +307,12 @@ export function ModernCreateItemForm({
         // Server action approach
         const formData = new FormData()
         Object.entries(submitData).forEach(([key, value]) => {
-          if (value !== undefined && value !== null) {
+          // Special handling for imageUrls to ensure it's never undefined
+          if (key === 'imageUrls') {
+            const imageUrlValue = value || DEFAULT_IMAGE_URL
+            formData.append(key, String(imageUrlValue))
+            console.log(`Setting imageUrls: ${imageUrlValue}`)
+          } else if (value !== undefined && value !== null) {
             formData.append(key, String(value))
           }
         })
@@ -257,9 +323,9 @@ export function ModernCreateItemForm({
       }
 
       operationComplete("Product Created", `${data.name} has been successfully added to your inventory with SKU: ${data.sku}`)
-    } catch (error) {
-      console.log("Failed to create item:", error)
-      operationComplete("Creation Failed", "Failed to create product. Please check your information and try again.")
+    } catch (err) {
+      console.log("Failed to create item:", err)
+      error("Creation Failed", "Failed to create product. Please check your information and try again.")
     }
   }
 
@@ -320,9 +386,45 @@ export function ModernCreateItemForm({
   // Form completion notification
   useEffect(() => {
     if (completedSteps.size === FORM_STEPS.length - 1 && currentStep === 'media') {
-      success("Almost Done!", "You've completed all required sections. Add an image and you're ready to create the product!")
+      if (isEditMode) {
+        success("Ready to Update!", "Review your changes and update the product when ready!")
+      } else {
+        success("Almost Done!", "You've completed all required sections. Add an image and you're ready to create the product!")
+      }
     }
-  }, [completedSteps.size, currentStep, success])
+  }, [completedSteps.size, currentStep, success, isEditMode])
+
+  // Initialize edit mode: set image and silently validate completed steps
+  useEffect(() => {
+    if (isEditMode && initialData) {
+      // Set image URL if available
+      if (initialData.thumbnail || initialData.imageUrls) {
+        setItemImageUrl(initialData.thumbnail || initialData.imageUrls || DEFAULT_IMAGE_URL)
+      }
+
+      // Silently validate and mark completed steps without notifications
+      const initializeEditMode = async () => {
+        const completedStepsList: FormStep[] = []
+
+        // Check each step silently
+        for (const step of FORM_STEPS.slice(0, -1)) { // Exclude media step
+          const isValid = await validateStep(step.id, true) // silent = true
+          if (isValid) {
+            completedStepsList.push(step.id)
+          }
+        }
+
+        // Update completed steps without triggering notifications
+        if (completedStepsList.length > 0) {
+          setCompletedSteps(new Set(completedStepsList))
+        }
+      }
+
+      // Small delay to ensure form is mounted
+      const timeoutId = setTimeout(initializeEditMode, 50)
+      return () => clearTimeout(timeoutId)
+    }
+  }, [isEditMode, initialData])
 
   // Copy SKU to clipboard
   const copySKU = useCallback(async () => {
@@ -356,11 +458,11 @@ export function ModernCreateItemForm({
         return (
           <div className="space-y-6">
             <div className="text-center mb-8">
-              <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-blue-500 to-indigo-600 shadow-lg mb-4">
+              <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-emerald-500 via-teal-600 to-cyan-700 shadow-lg shadow-emerald-500/25 mb-4">
                 <Package className="w-8 h-8 text-white" />
               </div>
-              <h3 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">Basic Information</h3>
-              <p className="text-slate-600 dark:text-slate-400">Let's start with the essential details about your product</p>
+              <h3 className="text-2xl font-bold text-foreground mb-2">Basic Information</h3>
+              <p className="text-muted-foreground">Let's start with the essential details about your product</p>
             </div>
 
             <div className="space-y-6">
@@ -369,18 +471,18 @@ export function ModernCreateItemForm({
                 name="name"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="text-base font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-2">
-                      <Sparkles className="h-4 w-4 text-blue-500" />
+                    <FormLabel className="text-base font-semibold text-foreground flex items-center gap-2">
+                      <Sparkles className="h-4 w-4 text-emerald-600" />
                       Product Name *
                     </FormLabel>
                     <FormControl>
                       <Input
                         placeholder="Enter a catchy product name"
-                        className="h-12 text-lg bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm border-2 border-slate-200 dark:border-slate-700 focus:border-blue-500 dark:focus:border-blue-400 rounded-xl shadow-sm"
+                        className="h-12 text-lg bg-background border-2 border-border focus:border-emerald-500 rounded-xl shadow-sm"
                         {...field}
                       />
                     </FormControl>
-                    <FormDescription className="text-sm text-slate-500 dark:text-slate-400">
+                    <FormDescription className="text-sm text-muted-foreground">
                       This will be the main name customers see
                     </FormDescription>
                     <FormMessage />
@@ -393,15 +495,15 @@ export function ModernCreateItemForm({
                 name="description"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="text-base font-semibold text-slate-700 dark:text-slate-300">Product Description</FormLabel>
+                    <FormLabel className="text-base font-semibold text-foreground">Product Description</FormLabel>
                     <FormControl>
                       <Textarea
                         placeholder="Describe what makes this product special. Include key features, benefits, and any important details customers should know..."
-                        className="min-h-[120px] bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm border-2 border-slate-200 dark:border-slate-700 focus:border-blue-500 dark:focus:border-blue-400 rounded-xl shadow-sm resize-none"
+                        className="min-h-[120px] bg-background border-2 border-border focus:border-emerald-500 rounded-xl shadow-sm resize-none"
                         {...field}
                       />
                     </FormControl>
-                    <FormDescription className="text-sm text-slate-500 dark:text-slate-400">
+                    <FormDescription className="text-sm text-muted-foreground">
                       A good description helps customers understand your product better
                     </FormDescription>
                     <FormMessage />
@@ -410,12 +512,12 @@ export function ModernCreateItemForm({
               />
 
               {name && (
-                <div className="p-4 rounded-xl bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 border border-blue-200 dark:border-blue-700">
+                <div className="p-4 rounded-xl bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-900/20 dark:to-teal-900/20 border border-emerald-200 dark:border-emerald-700">
                   <div className="flex items-center gap-3">
-                    <CheckCircle className="h-5 w-5 text-blue-600 dark:text-blue-400" />
+                    <CheckCircle className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
                     <div>
-                      <p className="font-medium text-blue-900 dark:text-blue-100">Great! Your product name looks good</p>
-                      <p className="text-sm text-blue-700 dark:text-blue-200">SKU will be auto-generated based on this name</p>
+                      <p className="font-medium text-emerald-900 dark:text-emerald-100">Great! Your product name looks good</p>
+                      <p className="text-sm text-emerald-700 dark:text-emerald-200">SKU will be auto-generated based on this name</p>
                     </div>
                   </div>
                 </div>
@@ -428,11 +530,11 @@ export function ModernCreateItemForm({
         return (
           <div className="space-y-6">
             <div className="text-center mb-8">
-              <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-purple-500 to-violet-600 shadow-lg mb-4">
+              <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-emerald-500 via-teal-600 to-cyan-700 shadow-lg shadow-emerald-500/25 mb-4">
                 <Hash className="w-8 h-8 text-white" />
               </div>
-              <h3 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">Product Details</h3>
-              <p className="text-slate-600 dark:text-slate-400">Add unique identifiers and specifications</p>
+              <h3 className="text-2xl font-bold text-foreground mb-2">Product Details</h3>
+              <p className="text-muted-foreground">Add unique identifiers and specifications</p>
             </div>
 
             <div className="grid gap-6 md:grid-cols-2">
@@ -441,8 +543,8 @@ export function ModernCreateItemForm({
                 name="sku"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="text-base font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-2">
-                      <Hash className="h-4 w-4 text-purple-500" />
+                    <FormLabel className="text-base font-semibold text-foreground flex items-center gap-2">
+                      <Hash className="h-4 w-4 text-emerald-600" />
                       SKU (Stock Keeping Unit) *
                     </FormLabel>
                     <FormControl>
@@ -450,7 +552,7 @@ export function ModernCreateItemForm({
                         <div className="relative">
                           <Input
                             placeholder="AUTO-GENERATED"
-                            className="h-12 bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm border-2 border-slate-200 dark:border-slate-700 focus:border-purple-500 dark:focus:border-purple-400 rounded-xl shadow-sm font-mono text-center font-bold tracking-wider"
+                            className="h-12 bg-background border-2 border-border focus:border-emerald-500 rounded-xl shadow-sm font-mono text-center font-bold tracking-wider"
                             {...field}
                             value={field.value || ""}
                           />
@@ -472,7 +574,7 @@ export function ModernCreateItemForm({
                             onClick={generateSKU}
                             variant="outline"
                             size="sm"
-                            className="flex-1 border-purple-200 hover:border-purple-300 hover:bg-purple-50 dark:hover:bg-purple-900/20"
+                            className="flex-1 border-emerald-200 hover:border-emerald-300 hover:bg-emerald-50 dark:hover:bg-emerald-900/20"
                           >
                             <Zap className="h-4 w-4 mr-2" />
                             Generate New SKU
@@ -480,7 +582,7 @@ export function ModernCreateItemForm({
                         </div>
                       </div>
                     </FormControl>
-                    <FormDescription className="text-sm text-slate-500 dark:text-slate-400">
+                    <FormDescription className="text-sm text-muted-foreground">
                       Unique identifier for inventory tracking
                     </FormDescription>
                     <FormMessage />
@@ -493,18 +595,18 @@ export function ModernCreateItemForm({
                 name="barcode"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="text-base font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-2">
-                      <Barcode className="h-4 w-4 text-purple-500" />
+                    <FormLabel className="text-base font-semibold text-foreground flex items-center gap-2">
+                      <Barcode className="h-4 w-4 text-emerald-600" />
                       Barcode
                     </FormLabel>
                     <FormControl>
                       <Input
                         placeholder="UPC, EAN, or other barcode"
-                        className="h-12 bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm border-2 border-slate-200 dark:border-slate-700 focus:border-purple-500 dark:focus:border-purple-400 rounded-xl shadow-sm font-mono"
+                        className="h-12 bg-background border-2 border-border focus:border-emerald-500 rounded-xl shadow-sm font-mono"
                         {...field}
                       />
                     </FormControl>
-                    <FormDescription className="text-sm text-slate-500 dark:text-slate-400">
+                    <FormDescription className="text-sm text-muted-foreground">
                       Optional - for scanning and POS systems
                     </FormDescription>
                     <FormMessage />
@@ -519,13 +621,13 @@ export function ModernCreateItemForm({
                 name="categoryId"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="text-base font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-2">
-                      <Tags className="h-4 w-4 text-purple-500" />
+                    <FormLabel className="text-base font-semibold text-foreground flex items-center gap-2">
+                      <Tags className="h-4 w-4 text-emerald-600" />
                       Category
                     </FormLabel>
                     <Select onValueChange={field.onChange} defaultValue={field.value}>
                       <FormControl>
-                        <SelectTrigger className="h-12 bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm border-2 border-slate-200 dark:border-slate-700 focus:border-purple-500 dark:focus:border-purple-400 rounded-xl shadow-sm">
+                        <SelectTrigger className="h-12 bg-background border-2 border-border focus:border-emerald-500 rounded-xl shadow-sm">
                           <SelectValue placeholder="Choose a category" />
                         </SelectTrigger>
                       </FormControl>
@@ -537,7 +639,7 @@ export function ModernCreateItemForm({
                         ))}
                       </SelectContent>
                     </Select>
-                    <FormDescription className="text-sm text-slate-500 dark:text-slate-400">
+                    <FormDescription className="text-sm text-muted-foreground">
                       Helps organize your inventory
                     </FormDescription>
                     <FormMessage />
@@ -550,13 +652,13 @@ export function ModernCreateItemForm({
                 name="brandId"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="text-base font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-2">
-                      <Building className="h-4 w-4 text-purple-500" />
+                    <FormLabel className="text-base font-semibold text-foreground flex items-center gap-2">
+                      <Building className="h-4 w-4 text-emerald-600" />
                       Brand
                     </FormLabel>
                     <Select onValueChange={field.onChange} defaultValue={field.value}>
                       <FormControl>
-                        <SelectTrigger className="h-12 bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm border-2 border-slate-200 dark:border-slate-700 focus:border-purple-500 dark:focus:border-purple-400 rounded-xl shadow-sm">
+                        <SelectTrigger className="h-12 bg-background border-2 border-border focus:border-emerald-500 rounded-xl shadow-sm">
                           <SelectValue placeholder="Select a brand" />
                         </SelectTrigger>
                       </FormControl>
@@ -568,7 +670,7 @@ export function ModernCreateItemForm({
                         ))}
                       </SelectContent>
                     </Select>
-                    <FormDescription className="text-sm text-slate-500 dark:text-slate-400">
+                    <FormDescription className="text-sm text-muted-foreground">
                       Product manufacturer or brand
                     </FormDescription>
                     <FormMessage />
@@ -583,11 +685,11 @@ export function ModernCreateItemForm({
         return (
           <div className="space-y-6">
             <div className="text-center mb-8">
-              <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-emerald-500 to-teal-600 shadow-lg mb-4">
+              <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-emerald-500 via-teal-600 to-cyan-700 shadow-lg shadow-emerald-500/25 mb-4">
                 <DollarSign className="w-8 h-8 text-white" />
               </div>
-              <h3 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">Pricing & Units</h3>
-              <p className="text-slate-600 dark:text-slate-400">Set your costs, prices, and units of measurement</p>
+              <h3 className="text-2xl font-bold text-foreground mb-2">Pricing & Units</h3>
+              <p className="text-muted-foreground">Set your costs, prices, and units of measurement</p>
             </div>
 
             <div className="grid gap-6 md:grid-cols-2">
@@ -596,13 +698,13 @@ export function ModernCreateItemForm({
                 name="costPrice"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="text-base font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-2">
-                      <Calculator className="h-4 w-4 text-emerald-500" />
+                    <FormLabel className="text-base font-semibold text-foreground flex items-center gap-2">
+                      <Calculator className="h-4 w-4 text-emerald-600" />
                       Cost Price *
                     </FormLabel>
                     <FormControl>
                       <div className="relative">
-                        <DollarSign className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-slate-400" />
+                        <DollarSign className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-muted-foreground" />
                         <Input
                           type="number"
                           placeholder="0.00"
@@ -614,7 +716,7 @@ export function ModernCreateItemForm({
                         />
                       </div>
                     </FormControl>
-                    <FormDescription className="text-sm text-slate-500 dark:text-slate-400">
+                    <FormDescription className="text-sm text-muted-foreground">
                       Your cost to acquire this item
                     </FormDescription>
                     <FormMessage />
@@ -627,13 +729,13 @@ export function ModernCreateItemForm({
                 name="sellingPrice"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="text-base font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-2">
-                      <ShoppingCart className="h-4 w-4 text-emerald-500" />
+                    <FormLabel className="text-base font-semibold text-foreground flex items-center gap-2">
+                      <ShoppingCart className="h-4 w-4 text-emerald-600" />
                       Selling Price *
                     </FormLabel>
                     <FormControl>
                       <div className="relative">
-                        <DollarSign className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-slate-400" />
+                        <DollarSign className="absolute left-4 top-1/2 transform -translate-y-1/2 h-5 w-5 text-muted-foreground" />
                         <Input
                           type="number"
                           placeholder="0.00"
@@ -645,7 +747,7 @@ export function ModernCreateItemForm({
                         />
                       </div>
                     </FormControl>
-                    <FormDescription className="text-sm text-slate-500 dark:text-slate-400">
+                    <FormDescription className="text-sm text-muted-foreground">
                       Price customers will pay
                     </FormDescription>
                     <FormMessage />
@@ -701,8 +803,8 @@ export function ModernCreateItemForm({
                 name="unitId"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="text-base font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-2">
-                      <Scale className="h-4 w-4 text-emerald-500" />
+                    <FormLabel className="text-base font-semibold text-foreground flex items-center gap-2">
+                      <Scale className="h-4 w-4 text-emerald-600" />
                       Unit of Measure
                     </FormLabel>
                     <Select onValueChange={field.onChange} defaultValue={field.value}>
@@ -719,7 +821,7 @@ export function ModernCreateItemForm({
                         ))}
                       </SelectContent>
                     </Select>
-                    <FormDescription className="text-sm text-slate-500 dark:text-slate-400">
+                    <FormDescription className="text-sm text-muted-foreground">
                       How this product is counted/measured
                     </FormDescription>
                     <FormMessage />
@@ -732,8 +834,8 @@ export function ModernCreateItemForm({
                 name="taxRateId"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="text-base font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-2">
-                      <Percent className="h-4 w-4 text-emerald-500" />
+                    <FormLabel className="text-base font-semibold text-foreground flex items-center gap-2">
+                      <Percent className="h-4 w-4 text-emerald-600" />
                       Tax Rate
                     </FormLabel>
                     <Select onValueChange={field.onChange} defaultValue={field.value}>
@@ -750,7 +852,7 @@ export function ModernCreateItemForm({
                         ))}
                       </SelectContent>
                     </Select>
-                    <FormDescription className="text-sm text-slate-500 dark:text-slate-400">
+                    <FormDescription className="text-sm text-muted-foreground">
                       Applicable tax rate for this product
                     </FormDescription>
                     <FormMessage />
@@ -765,11 +867,11 @@ export function ModernCreateItemForm({
         return (
           <div className="space-y-6">
             <div className="text-center mb-8">
-              <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-amber-500 to-orange-600 shadow-lg mb-4">
+              <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-emerald-500 via-teal-600 to-cyan-700 shadow-lg shadow-emerald-500/25 mb-4">
                 <Boxes className="w-8 h-8 text-white" />
               </div>
-              <h3 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">Inventory Settings</h3>
-              <p className="text-slate-600 dark:text-slate-400">Configure stock levels and tracking options</p>
+              <h3 className="text-2xl font-bold text-foreground mb-2">Inventory Settings</h3>
+              <p className="text-muted-foreground">Configure stock levels and tracking options</p>
             </div>
 
             <div className="grid gap-6 md:grid-cols-2">
@@ -778,8 +880,8 @@ export function ModernCreateItemForm({
                 name="minStockLevel"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="text-base font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-2">
-                      <AlertTriangle className="h-4 w-4 text-amber-500" />
+                    <FormLabel className="text-base font-semibold text-foreground flex items-center gap-2">
+                      <AlertTriangle className="h-4 w-4 text-emerald-600" />
                       Minimum Stock Level
                     </FormLabel>
                     <FormControl>
@@ -787,12 +889,12 @@ export function ModernCreateItemForm({
                         type="number"
                         placeholder="0"
                         min="0"
-                        className="h-12 bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm border-2 border-slate-200 dark:border-slate-700 focus:border-amber-500 dark:focus:border-amber-400 rounded-xl shadow-sm"
+                        className="h-12 bg-background border-2 border-border focus:border-emerald-500 rounded-xl shadow-sm"
                         {...field}
                         onChange={(e) => field.onChange(Number(e.target.value) || 0)}
                       />
                     </FormControl>
-                    <FormDescription className="text-sm text-slate-500 dark:text-slate-400">
+                    <FormDescription className="text-sm text-muted-foreground">
                       Alert when stock falls below this level
                     </FormDescription>
                     <FormMessage />
@@ -805,8 +907,8 @@ export function ModernCreateItemForm({
                 name="maxStockLevel"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="text-base font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-2">
-                      <CheckCircle className="h-4 w-4 text-amber-500" />
+                    <FormLabel className="text-base font-semibold text-foreground flex items-center gap-2">
+                      <CheckCircle className="h-4 w-4 text-emerald-600" />
                       Maximum Stock Level
                     </FormLabel>
                     <FormControl>
@@ -814,12 +916,12 @@ export function ModernCreateItemForm({
                         type="number"
                         placeholder="0"
                         min="0"
-                        className="h-12 bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm border-2 border-slate-200 dark:border-slate-700 focus:border-amber-500 dark:focus:border-amber-400 rounded-xl shadow-sm"
+                        className="h-12 bg-background border-2 border-border focus:border-emerald-500 rounded-xl shadow-sm"
                         {...field}
-                        onChange={(e) => field.onChange(Number(e.target.value) || undefined)}
+                        onChange={(e) => field.onChange(Number(e.target.value) || 0)}
                       />
                     </FormControl>
-                    <FormDescription className="text-sm text-slate-500 dark:text-slate-400">
+                    <FormDescription className="text-sm text-muted-foreground">
                       Maximum stock to maintain
                     </FormDescription>
                     <FormMessage />
@@ -834,8 +936,8 @@ export function ModernCreateItemForm({
                 name="weight"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="text-base font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-2">
-                      <Scale className="h-4 w-4 text-amber-500" />
+                    <FormLabel className="text-base font-semibold text-foreground flex items-center gap-2">
+                      <Scale className="h-4 w-4 text-emerald-600" />
                       Weight (kg)
                     </FormLabel>
                     <FormControl>
@@ -844,9 +946,9 @@ export function ModernCreateItemForm({
                         placeholder="0.0"
                         min="0"
                         step="0.1"
-                        className="h-12 bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm border-2 border-slate-200 dark:border-slate-700 focus:border-amber-500 dark:focus:border-amber-400 rounded-xl shadow-sm"
+                        className="h-12 bg-background border-2 border-border focus:border-emerald-500 rounded-xl shadow-sm"
                         {...field}
-                        onChange={(e) => field.onChange(Number(e.target.value) || undefined)}
+                        onChange={(e) => field.onChange(Number(e.target.value) || 0)}
                       />
                     </FormControl>
                     <FormDescription className="text-sm text-slate-500 dark:text-slate-400">
@@ -862,18 +964,18 @@ export function ModernCreateItemForm({
                 name="dimensions"
                 render={({ field }) => (
                   <FormItem>
-                    <FormLabel className="text-base font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-2">
-                      <Ruler className="h-4 w-4 text-amber-500" />
+                    <FormLabel className="text-base font-semibold text-foreground flex items-center gap-2">
+                      <Ruler className="h-4 w-4 text-emerald-600" />
                       Dimensions
                     </FormLabel>
                     <FormControl>
                       <Input
                         placeholder="L x W x H (e.g., 10 x 5 x 3 cm)"
-                        className="h-12 bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm border-2 border-slate-200 dark:border-slate-700 focus:border-amber-500 dark:focus:border-amber-400 rounded-xl shadow-sm"
+                        className="h-12 bg-background border-2 border-border focus:border-emerald-500 rounded-xl shadow-sm"
                         {...field}
                       />
                     </FormControl>
-                    <FormDescription className="text-sm text-slate-500 dark:text-slate-400">
+                    <FormDescription className="text-sm text-muted-foreground">
                       Physical dimensions of the item
                     </FormDescription>
                     <FormMessage />
@@ -887,18 +989,18 @@ export function ModernCreateItemForm({
                 control={form.control}
                 name="isActive"
                 render={({ field }) => (
-                  <FormItem className="flex flex-row items-center justify-between rounded-2xl border-2 border-slate-200 dark:border-slate-700 p-6 bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm">
+                  <FormItem className="flex flex-row items-center justify-between rounded-2xl border-2 border-border p-6 bg-card">
                     <div className="space-y-1">
-                      <FormLabel className="text-lg text-slate-900 dark:text-white font-semibold flex items-center gap-2">
-                        <Activity className="h-5 w-5 text-green-500" />
+                      <FormLabel className="text-lg text-foreground font-semibold flex items-center gap-2">
+                        <Activity className="h-5 w-5 text-emerald-600" />
                         Active Product
                       </FormLabel>
-                      <FormDescription className="text-slate-600 dark:text-slate-400">
+                      <FormDescription className="text-muted-foreground">
                         Enable this product for sales and inventory tracking
                       </FormDescription>
                     </div>
                     <FormControl>
-                      <Switch checked={field.value} onCheckedChange={field.onChange} className="data-[state=checked]:bg-green-500" />
+                      <Switch checked={field.value} onCheckedChange={field.onChange} className="data-[state=checked]:bg-emerald-500" />
                     </FormControl>
                   </FormItem>
                 )}
@@ -908,18 +1010,18 @@ export function ModernCreateItemForm({
                 control={form.control}
                 name="isSerialTracked"
                 render={({ field }) => (
-                  <FormItem className="flex flex-row items-center justify-between rounded-2xl border-2 border-slate-200 dark:border-slate-700 p-6 bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm">
+                  <FormItem className="flex flex-row items-center justify-between rounded-2xl border-2 border-border p-6 bg-card">
                     <div className="space-y-1">
-                      <FormLabel className="text-lg text-slate-900 dark:text-white font-semibold flex items-center gap-2">
-                        <Hash className="h-5 w-5 text-blue-500" />
+                      <FormLabel className="text-lg text-foreground font-semibold flex items-center gap-2">
+                        <Hash className="h-5 w-5 text-emerald-600" />
                         Serial Number Tracking
                       </FormLabel>
-                      <FormDescription className="text-slate-600 dark:text-slate-400">
+                      <FormDescription className="text-muted-foreground">
                         Track individual serial numbers for this product
                       </FormDescription>
                     </div>
                     <FormControl>
-                      <Switch checked={field.value} onCheckedChange={field.onChange} className="data-[state=checked]:bg-blue-500" />
+                      <Switch checked={field.value} onCheckedChange={field.onChange} className="data-[state=checked]:bg-emerald-500" />
                     </FormControl>
                   </FormItem>
                 )}
@@ -932,11 +1034,11 @@ export function ModernCreateItemForm({
         return (
           <div className="space-y-6">
             <div className="text-center mb-8">
-              <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-pink-500 to-rose-600 shadow-lg mb-4">
+              <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-emerald-500 via-teal-600 to-cyan-700 shadow-lg shadow-emerald-500/25 mb-4">
                 <ImageIcon className="w-8 h-8 text-white" />
               </div>
-              <h3 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">Product Media</h3>
-              <p className="text-slate-600 dark:text-slate-400">Upload high-quality images to showcase your product</p>
+              <h3 className="text-2xl font-bold text-foreground mb-2">Product Media</h3>
+              <p className="text-muted-foreground">Upload high-quality images to showcase your product</p>
             </div>
 
             <div className="text-center space-y-6">
@@ -951,15 +1053,27 @@ export function ModernCreateItemForm({
                     }
                   }}
                   endpoint="itemImageUpload"
+                  onUploadStart={() => {
+                    console.log('Upload started - setting isImageUploading to true')
+                    setIsImageUploading(true)
+                  }}
+                  onUploadComplete={() => {
+                    console.log('Upload completed - setting isImageUploading to false')
+                    setIsImageUploading(false)
+                  }}
+                  onUploadError={() => {
+                    console.log('Upload error - setting isImageUploading to false')
+                    setIsImageUploading(false)
+                  }}
                 />
               </div>
 
-              <div className="p-6 rounded-2xl bg-gradient-to-r from-pink-50 to-rose-50 dark:from-pink-900/20 dark:to-rose-900/20 border-2 border-pink-200 dark:border-pink-700">
+              <div className="p-6 rounded-2xl bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-900/20 dark:to-teal-900/20 border-2 border-emerald-200 dark:border-emerald-700">
                 <div className="flex items-start gap-3">
-                  <Lightbulb className="h-6 w-6 text-pink-600 dark:text-pink-400 mt-1 flex-shrink-0" />
+                  <Lightbulb className="h-6 w-6 text-emerald-600 dark:text-emerald-400 mt-1 flex-shrink-0" />
                   <div className="text-left">
-                    <h4 className="font-semibold text-pink-900 dark:text-pink-100 mb-2">Image Tips for Better Sales</h4>
-                    <ul className="text-sm text-pink-800 dark:text-pink-200 space-y-1">
+                    <h4 className="font-semibold text-emerald-900 dark:text-emerald-100 mb-2">Image Tips for Better Sales</h4>
+                    <ul className="text-sm text-emerald-800 dark:text-emerald-200 space-y-1">
                       <li>• Use high-resolution images (1024x1024px or larger)</li>
                       <li>• Ensure good lighting and clear product visibility</li>
                       <li>• Show the product from multiple angles if possible</li>
@@ -980,7 +1094,7 @@ export function ModernCreateItemForm({
 
   return (
     <TooltipProvider>
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-800">
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-emerald-50 to-teal-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-800">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-8">
           {/* Header */}
           <div className="mb-8">
@@ -997,14 +1111,14 @@ export function ModernCreateItemForm({
             </div>
 
             <div className="flex items-center gap-4">
-              <div className="p-3 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 shadow-lg">
+              <div className="p-3 rounded-xl bg-gradient-to-br from-emerald-500 via-teal-600 to-cyan-700 shadow-lg shadow-emerald-500/25">
                 <Package className="w-8 h-8 text-white" />
               </div>
               <div>
-                <h1 className="text-3xl sm:text-4xl font-bold bg-gradient-to-r from-slate-900 to-slate-700 dark:from-white dark:to-slate-300 bg-clip-text text-transparent">
+                <h1 className="text-3xl sm:text-4xl font-bold bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 bg-clip-text text-transparent">
                   Create New Product
                 </h1>
-                <p className="text-slate-600 dark:text-slate-400 mt-1">
+                <p className="text-muted-foreground mt-1">
                   Add a new product to your inventory with comprehensive details
                 </p>
               </div>
@@ -1013,16 +1127,16 @@ export function ModernCreateItemForm({
             {/* Progress Bar */}
             <div className="mt-8">
               <div className="flex items-center justify-between mb-4">
-                <span className="text-sm font-medium text-slate-700 dark:text-slate-300">
+                <span className="text-sm font-medium text-foreground">
                   Step {currentStepIndex + 1} of {FORM_STEPS.length}
                 </span>
-                <span className="text-sm text-slate-500 dark:text-slate-400">
+                <span className="text-sm text-muted-foreground">
                   {Math.round(progressPercentage)}% Complete
                 </span>
               </div>
-              <div className="w-full bg-slate-200 dark:bg-slate-700 rounded-full h-2 overflow-hidden">
+              <div className="w-full bg-muted rounded-full h-2 overflow-hidden">
                 <div
-                  className="h-full bg-gradient-to-r from-violet-500 to-purple-600 rounded-full transition-all duration-500 ease-out"
+                  className="h-full bg-gradient-to-r from-emerald-500 via-teal-600 to-cyan-700 rounded-full transition-all duration-500 ease-out"
                   style={{ width: `${progressPercentage}%` }}
                 />
               </div>
@@ -1041,29 +1155,29 @@ export function ModernCreateItemForm({
                     onClick={() => isAccessible && handleStepClick(step.id)}
                     disabled={!isAccessible}
                     className={`p-3 rounded-xl border-2 transition-all duration-200 text-left ${isActive
-                      ? 'border-violet-500 bg-violet-50 dark:bg-violet-900/20'
+                      ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-900/20'
                       : isCompleted
-                        ? 'border-green-200 bg-green-50 dark:bg-green-900/20 hover:border-green-300'
+                        ? 'border-emerald-200 bg-emerald-50 dark:bg-emerald-900/20 hover:border-emerald-300'
                         : isAccessible
-                          ? 'border-slate-200 bg-white dark:bg-slate-800 hover:border-slate-300 dark:border-slate-700'
-                          : 'border-slate-100 bg-slate-50 dark:bg-slate-900 opacity-50 cursor-not-allowed dark:border-slate-800'
+                          ? 'border-border bg-background hover:border-emerald-300'
+                          : 'border-muted bg-muted opacity-50 cursor-not-allowed'
                       }`}
                   >
                     <div className="flex items-center gap-2 mb-1">
                       <div className={`p-1 rounded-lg ${isActive
-                        ? 'bg-violet-500 text-white'
+                        ? 'bg-emerald-500 text-white'
                         : isCompleted
-                          ? 'bg-green-500 text-white'
-                          : 'bg-slate-200 text-slate-600 dark:bg-slate-700 dark:text-slate-400'
+                          ? 'bg-emerald-500 text-white'
+                          : 'bg-muted text-muted-foreground'
                         }`}>
                         {isCompleted ? <CheckCheck className="h-3 w-3" /> : <step.icon className="h-3 w-3" />}
                       </div>
-                      <span className={`text-xs font-medium ${isActive ? 'text-violet-700 dark:text-violet-300' : 'text-slate-700 dark:text-slate-300'
+                      <span className={`text-xs font-medium ${isActive ? 'text-emerald-700 dark:text-emerald-300' : 'text-foreground'
                         }`}>
                         {step.title}
                       </span>
                     </div>
-                    <p className={`text-xs ${isActive ? 'text-violet-600 dark:text-violet-400' : 'text-slate-500 dark:text-slate-400'
+                    <p className={`text-xs ${isActive ? 'text-emerald-600 dark:text-emerald-400' : 'text-muted-foreground'
                       }`}>
                       {step.description}
                     </p>
@@ -1076,7 +1190,7 @@ export function ModernCreateItemForm({
           <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
             {/* Main Form */}
             <div className="lg:col-span-3">
-              <Card className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-lg border-0 shadow-2xl rounded-3xl overflow-hidden">
+              <Card className="bg-card backdrop-blur-lg border shadow-2xl rounded-3xl overflow-hidden">
                 <CardContent className="p-8">
                   <Form {...form}>
                     <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-8">
@@ -1089,7 +1203,7 @@ export function ModernCreateItemForm({
                           onClick={handlePrevious}
                           disabled={currentStepIndex === 0}
                           variant="outline"
-                          className="px-6 py-3 bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm border-2 border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600"
+                          className="px-6 py-3"
                         >
                           <ArrowLeft className="w-4 h-4 mr-2" />
                           Previous
@@ -1098,18 +1212,28 @@ export function ModernCreateItemForm({
                         {currentStepIndex === FORM_STEPS.length - 1 ? (
                           <Button
                             type="submit"
-                            disabled={form.formState.isSubmitting || isLoading}
-                            className="px-8 py-3 bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 text-white shadow-lg"
+                            disabled={form.formState.isSubmitting || isLoading || isImageUploading || (!isEditMode && itemImageUrl === DEFAULT_IMAGE_URL)}
+                            className="px-8 py-3 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white shadow-lg"
                           >
                             {form.formState.isSubmitting || isLoading ? (
                               <>
                                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                Creating Product...
+                                {isEditMode ? 'Updating Product...' : 'Creating Product...'}
+                              </>
+                            ) : isImageUploading ? (
+                              <>
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                Uploading Image...
+                              </>
+                            ) : (!isEditMode && itemImageUrl === DEFAULT_IMAGE_URL) ? (
+                              <>
+                                <ImageIcon className="mr-2 h-4 w-4" />
+                                Upload Image First
                               </>
                             ) : (
                               <>
                                 <Save className="mr-2 h-4 w-4" />
-                                Create Product
+                                {isEditMode ? 'Update Product' : 'Create Product'}
                               </>
                             )}
                           </Button>
@@ -1117,7 +1241,7 @@ export function ModernCreateItemForm({
                           <Button
                             type="button"
                             onClick={handleNext}
-                            className="px-6 py-3 bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 text-white shadow-lg"
+                            className="px-6 py-3 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white shadow-lg"
                           >
                             Next Step
                             <ChevronRight className="w-4 h-4 ml-2" />
@@ -1132,20 +1256,20 @@ export function ModernCreateItemForm({
 
             {/* Preview Panel */}
             <div className="lg:col-span-1">
-              <Card className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-lg border-0 shadow-2xl rounded-3xl overflow-hidden sticky top-8">
-                <div className="bg-gradient-to-r from-slate-50 to-violet-50/50 dark:from-slate-800 dark:to-slate-700 px-6 py-4 border-b border-slate-200/60 dark:border-slate-700/60">
-                  <CardTitle className="text-lg font-semibold text-slate-900 dark:text-white flex items-center gap-2">
-                    <Eye className="h-5 w-5 text-violet-600 dark:text-violet-400" />
+              <Card className="bg-card backdrop-blur-lg border shadow-2xl rounded-3xl overflow-hidden sticky top-8">
+                <div className="bg-gradient-to-r from-emerald-50/50 to-teal-50/50 dark:from-emerald-950/50 dark:to-teal-950/50 px-6 py-4 border-b border-border">
+                  <CardTitle className="text-lg font-semibold text-foreground flex items-center gap-2">
+                    <Eye className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
                     Live Preview
                   </CardTitle>
-                  <CardDescription className="text-slate-600 dark:text-slate-400 mt-1">
+                  <CardDescription className="text-muted-foreground mt-1">
                     See how your product will look
                   </CardDescription>
                 </div>
                 <CardContent className="p-6 space-y-6">
                   {/* Product Image and Name */}
                   <div className="text-center space-y-4">
-                    <div className="relative mx-auto w-32 h-32 rounded-2xl overflow-hidden border-4 border-slate-200 dark:border-slate-700 shadow-xl">
+                    <div className="relative mx-auto w-32 h-32 rounded-2xl overflow-hidden border-4 border-border shadow-xl">
                       <img
                         src={itemImageUrl || DEFAULT_IMAGE_URL}
                         alt={name || "Product preview"}
@@ -1154,11 +1278,11 @@ export function ModernCreateItemForm({
                       <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent" />
                     </div>
                     <div>
-                      <h3 className="font-bold text-slate-900 dark:text-white text-xl mb-1">
+                      <h3 className="font-bold text-foreground text-xl mb-1">
                         {name || "New Product"}
                       </h3>
                       {sku && (
-                        <p className="text-sm text-slate-500 dark:text-slate-400 font-mono bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-lg inline-block">
+                        <p className="text-sm text-muted-foreground font-mono bg-muted px-2 py-1 rounded-lg inline-block">
                           SKU: {sku}
                         </p>
                       )}
@@ -1170,11 +1294,11 @@ export function ModernCreateItemForm({
                     <Badge
                       variant={isActive ? "default" : "secondary"}
                       className={`px-3 py-1 ${isActive
-                        ? "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300 border-green-200 dark:border-green-700"
-                        : "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 border-slate-200 dark:border-slate-700"
+                        ? "bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300 border-emerald-200 dark:border-emerald-700"
+                        : "bg-muted text-muted-foreground border-border"
                         }`}
                     >
-                      <div className={`w-2 h-2 rounded-full mr-2 ${isActive ? 'bg-green-500' : 'bg-slate-400'}`}></div>
+                      <div className={`w-2 h-2 rounded-full mr-2 ${isActive ? 'bg-emerald-500' : 'bg-muted-foreground'}`}></div>
                       {isActive ? "Active Product" : "Inactive Product"}
                     </Badge>
                   </div>
@@ -1182,18 +1306,18 @@ export function ModernCreateItemForm({
                   {/* Pricing Preview */}
                   {(costPrice > 0 || sellingPrice > 0) && (
                     <div className="space-y-3">
-                      <h4 className="text-sm font-semibold text-slate-700 dark:text-slate-300 uppercase tracking-wide">
+                      <h4 className="text-sm font-semibold text-foreground uppercase tracking-wide">
                         Pricing Overview
                       </h4>
                       <div className="space-y-3">
-                        <div className="flex justify-between items-center p-3 rounded-xl bg-slate-50/80 dark:bg-slate-800/50">
-                          <span className="text-sm text-slate-600 dark:text-slate-400">Cost Price</span>
-                          <span className="font-semibold text-slate-900 dark:text-white">
+                        <div className="flex justify-between items-center p-3 rounded-xl bg-muted/50">
+                          <span className="text-sm text-muted-foreground">Cost Price</span>
+                          <span className="font-semibold text-foreground">
                             {formatCurrency(costPrice)}
                           </span>
                         </div>
-                        <div className="flex justify-between items-center p-3 rounded-xl bg-slate-50/80 dark:bg-slate-800/50">
-                          <span className="text-sm text-slate-600 dark:text-slate-400">Selling Price</span>
+                        <div className="flex justify-between items-center p-3 rounded-xl bg-muted/50">
+                          <span className="text-sm text-muted-foreground">Selling Price</span>
                           <span className="font-semibold text-emerald-600 dark:text-emerald-400">
                             {formatCurrency(sellingPrice)}
                           </span>
@@ -1214,17 +1338,17 @@ export function ModernCreateItemForm({
                   )}
 
                   {/* Progress Summary */}
-                  <div className="pt-4 border-t border-slate-200 dark:border-slate-700">
+                  <div className="pt-4 border-t border-border">
                     <div className="space-y-2">
                       <div className="flex justify-between text-sm">
-                        <span className="text-slate-600 dark:text-slate-400">Completion</span>
-                        <span className="font-medium text-slate-900 dark:text-white">
+                        <span className="text-muted-foreground">Completion</span>
+                        <span className="font-medium text-foreground">
                           {Math.round(progressPercentage)}%
                         </span>
                       </div>
                       <Progress value={progressPercentage} className="h-2" />
                     </div>
-                    <p className="text-xs text-slate-500 dark:text-slate-400 text-center mt-3">
+                    <p className="text-xs text-muted-foreground text-center mt-3">
                       Complete all steps to create your product
                     </p>
                   </div>

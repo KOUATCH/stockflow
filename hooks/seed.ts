@@ -1,6 +1,6 @@
 import { PrismaClient } from '@prisma/client';
 import { faker } from '@faker-js/faker';
-import { hashPassword } from '../lib/argon2-server';
+import { hashPassword } from '../lib/password';
 import fs from 'fs';
 import path from 'path';
 

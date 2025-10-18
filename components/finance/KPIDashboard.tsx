@@ -55,7 +55,7 @@ export function KPIDashboard({ metrics }: KPIDashboardProps) {
     {
       title: "Efficiency",
       icon: Zap,
-      color: "from-purple-500 to-pink-600",
+      color: "from-teal-500 to-cyan-600",
       metrics: [
         { name: "Inventory Turnover", value: metrics.efficiency.inventoryTurnover, target: 10, unit: "x" },
         { name: "Receivables Turnover", value: metrics.efficiency.receivablesTurnover, target: 15, unit: "x" },

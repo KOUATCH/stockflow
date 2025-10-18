@@ -4,6 +4,7 @@ import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { DatePicker } from "@/components/ui/date-picker"
 import { Skeleton } from "@/components/ui/skeleton"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -99,24 +100,24 @@ export function StockMovementDashboard() {
   const [selectedItem, setSelectedItem] = useState<string>("all")
   const [selectedLocation, setSelectedLocation] = useState<string>("all")
   const [selectedType, setSelectedType] = useState<TransactionType | "all">("all")
-  const [dateFrom, setDateFrom] = useState("")
-  const [dateTo, setDateTo] = useState("")
+  const [dateFrom, setDateFrom] = useState<Date | undefined>(undefined)
+  const [dateTo, setDateTo] = useState<Date | undefined>(undefined)
 
   // Fetch data
   const { data: transactions, isLoading: transactionsLoading } = useInventoryTransactions(orgId, {
     itemId: selectedItem === "all" ? undefined : selectedItem,
     locationId: selectedLocation === "all" ? undefined : selectedLocation,
     type: selectedType === "all" ? undefined : selectedType,
-    dateFrom: dateFrom || undefined,
-    dateTo: dateTo || undefined,
+    dateFrom: dateFrom ? dateFrom.toISOString().split('T')[0] : undefined,
+    dateTo: dateTo ? dateTo.toISOString().split('T')[0] : undefined,
     limit: 100,
   })
 
   const { data: summary, isLoading: summaryLoading } = useStockMovementSummary(orgId, {
     itemId: selectedItem === "all" ? undefined : selectedItem,
     locationId: selectedLocation === "all" ? undefined : selectedLocation,
-    dateFrom: dateFrom || undefined,
-    dateTo: dateTo || undefined,
+    dateFrom: dateFrom ? dateFrom.toISOString().split('T')[0] : undefined,
+    dateTo: dateTo ? dateTo.toISOString().split('T')[0] : undefined,
   })
 
   const { data: itemsResponse } = useOrgItemsNew(orgId, { enabled: !!orgId })
@@ -258,14 +259,20 @@ export function StockMovementDashboard() {
                   </SelectContent>
                 </Select>
 
-                <Input
-                  type="date"
+                <DatePicker
+                  date={dateFrom}
+                  setDate={setDateFrom}
                   placeholder="From Date"
-                  value={dateFrom}
-                  onChange={(e) => setDateFrom(e.target.value)}
+                  maxDate={dateTo || new Date()}
                 />
 
-                <Input type="date" placeholder="To Date" value={dateTo} onChange={(e) => setDateTo(e.target.value)} />
+                <DatePicker
+                  date={dateTo}
+                  setDate={setDateTo}
+                  placeholder="To Date"
+                  minDate={dateFrom}
+                  maxDate={new Date()}
+                />
               </div>
 
               {/* Transactions Table */}
