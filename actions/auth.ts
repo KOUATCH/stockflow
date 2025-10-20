@@ -94,10 +94,19 @@ export async function signInWithCredentials(data: LoginProps): Promise<AuthRespo
       redirect: false,
     })
 
-    // signIn with redirect: false returns undefined on success in NextAuth v5
+    // Check if sign in was successful
+    // In NextAuth v5, signIn returns null on success when redirect: false
+    if (result === null) {
+      return {
+        success: true,
+        message: "Login successful! Redirecting to dashboard...",
+      }
+    }
+
+    // If result is not null, it indicates an error
     return {
-      success: true,
-      message: "Login successful! Redirecting to dashboard...",
+      success: false,
+      error: "Authentication failed. Please check your credentials.",
     }
   } catch (error: any) {
     console.error("Login error:", error)

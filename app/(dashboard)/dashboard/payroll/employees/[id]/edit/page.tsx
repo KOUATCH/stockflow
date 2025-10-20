@@ -34,29 +34,27 @@ export default async function EditEmployeePage({ params }: EditEmployeePageProps
     redirect('/dashboard/payroll/employees')
   }
 
-  // Prepare employee data with mock salary info (same as in EmployeeManagement)
+  // Prepare employee data using basic fields for now
   const employeeWithSalary = {
     ...employee,
     firstName: employee.firstName || employee.name?.split(' ')[0] || 'Unknown',
     lastName: employee.lastName || employee.name?.split(' ').slice(1).join(' ') || 'User',
-    department: employee.department || employee.jobTitle || 'General',
+    department: 'General', // Default until payroll fields are working
     salaryInfo: {
-      baseSalary: Math.floor(Math.random() * 5000) + 3000,
+      baseSalary: 0, // Default until payroll fields are working
       payFrequency: 'MONTHLY' as const,
       currency: 'USD',
       effectiveDate: new Date()
     },
     bankInfo: {
-      bankName: 'Chase Bank',
-      accountNumber: '****1234',
-      routingNumber: '021000021',
+      bankName: '',
+      accountNumber: '',
+      routingNumber: '',
       accountType: 'CHECKING' as const
     },
     taxInfo: {
-      taxId: Math.floor(Math.random() * 900 + 100).toString() + '-' +
-             Math.floor(Math.random() * 90 + 10).toString() + '-' +
-             Math.floor(Math.random() * 9000 + 1000).toString(),
-      exemptions: Math.floor(Math.random() * 3),
+      taxId: '', // Default until payroll fields are working
+      exemptions: 0,
       additionalWithholding: 0
     }
   }
@@ -73,7 +71,7 @@ export default async function EditEmployeePage({ params }: EditEmployeePageProps
         phone: employeeWithSalary.phone || '',
         jobTitle: employeeWithSalary.jobTitle || '',
         department: employeeWithSalary.department || '',
-        hireDate: employeeWithSalary.hireDate ? new Date(employeeWithSalary.hireDate).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
+        hireDate: employeeWithSalary.hireDate ? new Date(employeeWithSalary.hireDate) : new Date(),
         baseSalary: employeeWithSalary.salaryInfo?.baseSalary || 0,
         payFrequency: employeeWithSalary.salaryInfo?.payFrequency || 'MONTHLY',
         currency: employeeWithSalary.salaryInfo?.currency || 'USD',

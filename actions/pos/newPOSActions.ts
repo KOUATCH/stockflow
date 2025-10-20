@@ -247,7 +247,7 @@ export async function createSale(
       const customerData: any = {
         orderNumber: saleNumber,
         sessionId: saleData.sessionId,
-        terminalId: saleData.terminalId,
+        stationId: saleData.terminalId,
         createdById: userId, // Use the passed userId parameter
         locationId: saleData.locationId,
         organizationId: saleData.organizationId,
@@ -414,7 +414,7 @@ export async function createSale(
         // Find the cash drawer for this session/terminal
         const cashDrawer = await tx.cashDrawer.findFirst({
           where: {
-            terminalId: saleData.terminalId,
+            stationId: saleData.terminalId,
             locationId: saleData.locationId,
             isOpen: true,
           },
@@ -614,7 +614,7 @@ export async function createPOSSession(data: {
       const session = await tx.pOSSession.create({
         data: {
           sessionNumber,
-          terminalId: data.terminalId,
+          stationId: data.terminalId,
           userId: data.userId,
           locationId: data.locationId,
           status: "ACTIVE",
@@ -633,7 +633,7 @@ export async function createPOSSession(data: {
       // Create or find existing cash drawer for this terminal
       let cashDrawer = await tx.cashDrawer.findFirst({
         where: {
-          terminalId: data.terminalId,
+          stationId: data.terminalId,
           locationId: data.locationId,
         },
       })
@@ -643,7 +643,7 @@ export async function createPOSSession(data: {
           data: {
             name: `Drawer-${data.terminalId}`,
             drawerNumber: `DRW-${data.terminalId}-${Date.now()}`,
-            terminalId: data.terminalId,
+            stationId: data.terminalId,
             locationId: data.locationId,
             currentBalance: openingBalance,
             expectedBalance: openingBalance,
@@ -703,7 +703,7 @@ export async function getActivePOSSession(terminalId: string) {
   try {
     const session = await db.pOSSession.findFirst({
       where: {
-        terminalId,
+        stationId: terminalId,
         status: "ACTIVE",
       },
       include: {
@@ -846,7 +846,7 @@ export async function closePOSSession(
 
       // Clear terminal's current session
       await tx.pOSStation.update({
-        where: { id: currentSession.terminalId },
+        where: { id: currentSession.stationId },
         data: { currentSessionId: null },
       })
 

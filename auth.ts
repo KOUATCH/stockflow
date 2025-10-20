@@ -74,33 +74,87 @@ const config = {
       },
       async authorize(credentials) {
         if (!credentials?.email || !credentials?.password) {
+          console.log('❌ Missing credentials in authorize function')
           return null
         }
 
         try {
-          // Use the dedicated API route for credential verification
-          const baseUrl = process.env.NEXTAUTH_URL || process.env.NEXT_PUBLIC_BASE_URL || `http://localhost:3001`
+          console.log('🔍 Authorizing credentials for:', credentials.email)
 
-          const response = await fetch(`${baseUrl}/api/auth/verify-credentials`, {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
+          // Find user with organization and roles directly
+          const user = await prisma.user.findUnique({
+            where: {
               email: credentials.email,
-              password: credentials.password,
-            }),
+              isActive: true
+            },
+            include: {
+              organization: true,
+              roles: {
+                include: {
+                  rolePermissions: {
+                    include: {
+                      permission: true
+                    }
+                  }
+                }
+              }
+            }
           })
 
-          if (!response.ok) {
-            console.error("Credential verification failed:", response.status, await response.text())
+          if (!user) {
+            console.log('❌ User not found or inactive for:', credentials.email)
             return null
           }
 
-          const { user } = await response.json()
-          return user
+          console.log('✅ User found:', user.email)
+
+          // Verify password using bcrypt
+          const { verifyPassword } = await import('@/lib/password')
+          const isPasswordValid = await verifyPassword(credentials.password, user.password)
+
+          if (!isPasswordValid) {
+            console.log('❌ Password verification failed for:', credentials.email)
+            return null
+          }
+
+          console.log('✅ Password verified successfully for:', credentials.email)
+
+          // Flatten all permissions from all roles
+          const allPermissions = user.roles.reduce((acc, role) => {
+            // Get permissions from role.permissions array (direct permissions)
+            // AND from rolePermissions relationship (linked permissions)
+            const directPermissions = role.permissions || []
+            const linkedPermissions = role.rolePermissions?.map(rp => rp.permission.code) || []
+            return [...acc, ...directPermissions, ...linkedPermissions]
+          }, [] as string[])
+
+          // Remove duplicates
+          const uniquePermissions = [...new Set(allPermissions)]
+
+          // Return user data for NextAuth
+          const userData = {
+            id: user.id,
+            email: user.email,
+            name: user.name,
+            firstName: user.firstName,
+            lastName: user.lastName,
+            phone: user.phone,
+            image: user.image,
+            organizationId: user.organizationId,
+            organizationName: user.organization?.name,
+            roles: user.roles.map(role => ({
+              id: role.id,
+              name: role.name,
+              code: role.code,
+              permissions: role.permissions
+            })),
+            permissions: uniquePermissions
+          }
+
+          console.log('🎉 Authentication successful for:', credentials.email)
+          return userData
         } catch (error) {
-          console.error("Auth error:", error)
+          console.error("❌ Authorization error:", error)
           return null
         }
       }

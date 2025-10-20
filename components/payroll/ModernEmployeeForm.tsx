@@ -202,7 +202,7 @@ export function ModernEmployeeForm({
       phone: "",
       jobTitle: "",
       department: "",
-      hireDate: undefined,
+      hireDate: new Date(),
       baseSalary: 0,
       payFrequency: 'MONTHLY',
       currency: 'USD',

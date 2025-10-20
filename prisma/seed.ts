@@ -6,6 +6,8 @@ const prisma = new PrismaClient();
 
 // Basic permissions needed for system access
 const BASIC_PERMISSIONS = [
+  // Wildcard permission for super admin
+  '*',
   // Organization & Users
   'MANAGE_ORGANIZATION',
   'VIEW_ORGANIZATION_SETTINGS',
@@ -249,6 +251,9 @@ async function createUsers(organizationId: string) {
     const lastName = faker.person.lastName();
     const email = `${firstName.toLowerCase()}.${lastName.toLowerCase()}.${i}@${faker.internet.domainName()}`;
 
+    const jobTitles = ['Sales Associate', 'Manager', 'Cashier', 'Supervisor', 'Assistant Manager', 'Store Manager', 'Customer Service Rep', 'Inventory Clerk'];
+    const departments = ['Sales', 'Management', 'Operations', 'Customer Service', 'Finance', 'HR', 'IT', 'Warehouse'];
+
     const user = await prisma.user.create({
       data: {
         firstName,
@@ -260,6 +265,12 @@ async function createUsers(organizationId: string) {
         emailVerified: faker.datatype.boolean(0.8) ? faker.date.past() : null,
         isActive: faker.datatype.boolean(0.95),
         image: faker.image.avatar(),
+        jobTitle: faker.helpers.arrayElement(jobTitles),
+        department: faker.helpers.arrayElement(departments),
+        hireDate: faker.date.past({ years: 3 }),
+        baseSalary: faker.number.int({ min: 30000, max: 120000 }),
+        payFrequency: faker.helpers.arrayElement(['WEEKLY', 'BIWEEKLY', 'MONTHLY']),
+        taxId: `${faker.string.numeric(3)}-${faker.string.numeric(2)}-${faker.string.numeric(4)}`,
         organizationId,
       },
     });
@@ -281,17 +292,32 @@ async function createPermissions() {
     });
 
     if (!permission) {
-      permission = await prisma.permission.create({
-        data: {
-          name: code.replace(/[._]/g, ' ').toLowerCase(),
-          code: code,
-          resource: code.split(/[._]/)[0].toLowerCase(),
-          action: code.split(/[._]/).slice(1).join('_').toLowerCase() || 'access',
-          description: `Permission for ${code.toLowerCase().replace(/[._]/g, ' ')}`,
-          category: code.split(/[._]/)[0].toLowerCase(),
-          isSystemPermission: true,
-        },
-      });
+      // Handle wildcard permission specially
+      if (code === '*') {
+        permission = await prisma.permission.create({
+          data: {
+            name: 'Super Admin Access',
+            code: '*',
+            resource: 'system',
+            action: 'all',
+            description: 'Wildcard permission granting access to all system resources',
+            category: 'system',
+            isSystemPermission: true,
+          },
+        });
+      } else {
+        permission = await prisma.permission.create({
+          data: {
+            name: code.replace(/[._]/g, ' ').toLowerCase(),
+            code: code,
+            resource: code.split(/[._]/)[0].toLowerCase(),
+            action: code.split(/[._]/).slice(1).join('_').toLowerCase() || 'access',
+            description: `Permission for ${code.toLowerCase().replace(/[._]/g, ' ')}`,
+            category: code.split(/[._]/)[0].toLowerCase(),
+            isSystemPermission: true,
+          },
+        });
+      }
     }
     permissions.push(permission);
   }
@@ -303,24 +329,25 @@ async function createRoles(organizationId: string, permissions: any[]) {
   console.log(`Creating roles for organization ${organizationId}...`);
   const roles = [];
 
-  // Create Super Admin role with all permissions
+  // Create Super Admin role with wildcard permission
   const superAdminRole = await prisma.role.create({
     data: {
       name: 'Super Administrator',
       code: 'super_admin',
       description: 'Full system access with all permissions',
-      permissions: BASIC_PERMISSIONS,
+      permissions: ['*'], // Only wildcard permission
       hierarchyLevel: 1,
       organizationId,
     },
   });
 
-  // Create role-permission relationships for super admin
-  for (const permission of permissions) {
+  // Create role-permission relationship only for wildcard permission
+  const wildcardPermission = permissions.find(p => p.code === '*');
+  if (wildcardPermission) {
     await prisma.rolePermission.create({
       data: {
         roleId: superAdminRole.id,
-        permissionId: permission.id,
+        permissionId: wildcardPermission.id,
         grantedAt: new Date(),
       },
     });

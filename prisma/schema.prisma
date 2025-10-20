@@ -82,6 +82,11 @@ model User {
   phone                  String?                 @unique
   image                  String?
   jobTitle               String?
+  department             String?
+  hireDate               DateTime?
+  baseSalary             Float?
+  payFrequency           String?
+  taxId                  String?
   password               String
   isActive               Boolean                 @default(true)
   isVerified             Boolean                 @default(false)
@@ -530,7 +535,7 @@ model TaxRate {
   id             String       @id @default(cuid())
   taxRateName    String
   rate           Float
-  taxType        TaxType // @default(SALES)
+  taxType        TaxType @default(SALES)
   isActive       Boolean      @default(true)
   organizationId String
   createdAt      DateTime     @default(now())

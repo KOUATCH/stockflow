@@ -53,6 +53,7 @@ export interface ItemWithInventory {
     id: string
     taxRateName: string
     rate: number
+    taxType: string
   } | null
   
   // Inventory level for the specific location
@@ -186,7 +187,7 @@ export async function fetchItemsWithInventoryLevels({
               id: true,
               taxRateName: true,
               rate: true,
-              type: true
+              taxType: true
             }
           },
           inventoryLevels: {
@@ -317,7 +318,7 @@ export async function fetchItemWithInventoryLevel(
             id: true,
             taxRateName: true,
             rate: true,
-            type: true
+            taxType: true
           }
         },
         inventoryLevels: {
