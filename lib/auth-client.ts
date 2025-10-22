@@ -93,8 +93,15 @@ export async function signOut(options?: { redirectTo?: string; redirect?: boolea
   // Use next-auth/react for client-side signOut
   const { signOut: nextSignOut } = await import("next-auth/react");
 
+  // Use absolute URL to ensure correct port
+  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000";
+  const redirectPath = options?.redirectTo || "/login";
+  const callbackUrl = redirectPath.startsWith('http') ? redirectPath : `${baseUrl}${redirectPath}`;
+
+  console.log("SignOut debug:", { baseUrl, redirectPath, callbackUrl, options });
+
   return nextSignOut({
-    callbackUrl: options?.redirectTo || "/login",
+    callbackUrl,
     redirect: options?.redirect === undefined ? true : options.redirect === true ? true : false
   });
 }

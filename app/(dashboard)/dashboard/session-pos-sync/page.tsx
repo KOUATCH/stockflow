@@ -2,13 +2,13 @@
 
 import { RealTimeStatusBar } from "@/components/newPOSSession/alerts/real-time-status-bar"
 // import { OpeningBalanceDialog } from "@/components/pos/opening-balance-dialog"
-import { ModernizedPOSTerminal } from "@/components/synchro/ModernizedPOSTerminal"
+import { POSTerminal } from "@/components/posSalesProcess/POSTerminal"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { usePosStations } from "@/hooks/posStation/use-pos-station-management"
+import { usePOSStations } from "@/hooks/posSalesProcess/usePOSHooks"
 import { useCallback, useEffect, useState } from "react"
 
 import { OpeningBalanceDialogModern } from "@/components/synchro/OpeningBalanceDialogModern"
@@ -18,6 +18,7 @@ import {
   useSystemMonitoring,
 } from "@/hooks/cashDrawer/useRealTimeTracking"
 import { useSessionManagement } from "@/hooks/newPOSSession/useSessionManagementModern"
+import { useClientAuth } from "@/hooks/useClientAuth"
 import {
   Activity,
   AlertTriangle,
@@ -40,7 +41,6 @@ import {
   Users,
   Zap,
 } from "lucide-react"
-import { useClientAuth } from "@/hooks/useClientAuth"
 // import { useCustomers } from "@/hooks/customers/useCustomers"
 import { useItemsWithInventory } from "@/hooks/inventoryHooks/useInventoryWithIinventoryHooks"
 import { useOrgLocationsNew } from "@/hooks/useAllLocationsQueries"
@@ -49,7 +49,7 @@ import { useCustomers } from "@/hooks/useCustomerQueries"
 export default function HomePage() {
   const [activeTab, setActiveTab] = useState("overview")
   const [selectedLocationId, setSelectedLocationId] = useState<string>("")
-  const [selectedTerminalId, setSelectedTerminalId] = useState<string>("")
+  const [selectedstationId, setSelectedstationId] = useState<string>("")
   const [selectedCategory, setSelectedCategory] = useState<string>("all")
   const [showOpeningBalanceDialog, setShowOpeningBalanceDialog] = useState(false)
 
@@ -62,17 +62,24 @@ export default function HomePage() {
     isSessionActive,
     sessionDuration,
     refetchSession,
-  } = useSessionManagement(selectedTerminalId)
+  } = useSessionManagement(selectedstationId)
 
 
   const { user, organizationId } = useClientAuth()
   // Get organization ID from session or props
   const orgId = organizationId || ""
   console.log("User Organization ID:", orgId)
-  const customers = useCustomers()
-  const customersData = customers?.data || []
+  const { data: customersData = [], isLoading: customersLoading, error: customersError } = useCustomers()
+
+  // Debug customers data
+  console.log("🔍 Customers debug:", {
+    customersData,
+    customersLoading,
+    customersError,
+    orgId
+  })
   const userId = user?.id || ""
-  const { realTimeState, session, summary } = useRealTimeBalanceTracking(selectedTerminalId, currentSession?.id || "")
+  const { realTimeState, session, summary } = useRealTimeBalanceTracking(selectedstationId, currentSession?.id || "")
   const { lowStockCount, criticalStockCount, lowStockItems } = useLowStockMonitoring(selectedLocationId, orgId)
   const { systemMetrics, systemHealth } = useSystemMonitoring(orgId, selectedLocationId)
 
@@ -88,14 +95,15 @@ export default function HomePage() {
   console.log(locationResponse)
 
   const {
-    data: terminalResponse,
-    isLoading: terminalsLoading,
+    stations: terminalsData,
+    loading: terminalsLoading,
     error: terminalsError,
     refetch: refetchTerminals,
-  } = usePosStations(orgId, { enabled: !!orgId })
-
-  const terminalsData = terminalResponse || []
-  console.log(terminalResponse)
+  } = usePOSStations(orgId)
+  const availableTerminals = (terminalsData || []).filter((terminal) => terminal.locationId === selectedLocationId)
+  console.log("Terminals data:", terminalsData)
+  console.log("Available terminals for location:", availableTerminals)
+  console.log("Selected location ID:", selectedLocationId)
 
   const { data, isLoading, error } = useItemsWithInventory({
     locationId: selectedLocationId,
@@ -116,25 +124,23 @@ export default function HomePage() {
     if (selectedLocationId && Array.isArray(terminalsData) && terminalsData.length > 0 && !terminalsLoading) {
       const locationTerminals = terminalsData.filter((terminal) => terminal.locationId === selectedLocationId)
 
-      if (locationTerminals.length > 0 && (!selectedTerminalId || !locationTerminals.find(t => t.id === selectedTerminalId))) {
+      if (locationTerminals.length > 0 && (!selectedstationId || !locationTerminals.find(t => t.id === selectedstationId))) {
         // Prefer online terminals, but select any available terminal if none are online
-        const onlineTerminals = locationTerminals.filter((t) => t.status === "online")
+        const onlineTerminals = locationTerminals.filter((t) => t?.currentSession?.status === "online")
         const terminalToSelect = onlineTerminals.length > 0 ? onlineTerminals[0] : locationTerminals[0]
 
         console.log("Auto-selecting terminal for location:", terminalToSelect)
-        setSelectedTerminalId(terminalToSelect.id)
+        setSelectedstationId(terminalToSelect.id)
       }
     }
-  }, [selectedLocationId, terminalsData, selectedTerminalId, terminalsLoading])
+  }, [selectedLocationId, terminalsData, selectedstationId, terminalsLoading])
 
   const locationName = locationsData?.find((loc) => loc.id === selectedLocationId)?.name || "Select Location"
   const organizationName = locationsData?.[0]?.organization?.name || "Demo Organization"
 
-  const availableTerminals = terminalsData.filter((terminal) => terminal.locationId === selectedLocationId)
 
-
-  const handleTerminalChange = (terminalId: string) => {
-    setSelectedTerminalId(terminalId)
+  const handleTerminalChange = (stationId: string) => {
+    setSelectedstationId(stationId)
     // If session is active and we're switching terminals, stay on POS tab
     if (isSessionActive && activeTab !== "pos") {
       setActiveTab("pos")
@@ -147,9 +153,9 @@ export default function HomePage() {
       const locationTerminals = terminalsData.filter((terminal) => terminal.locationId === locationId)
 
       if (locationTerminals.length > 0) {
-        const onlineTerminals = locationTerminals.filter((t) => t.status === "online")
+        const onlineTerminals = locationTerminals.filter((t) => t?.currentSession?.status === "online")
         const terminalToSelect = onlineTerminals.length > 0 ? onlineTerminals[0] : locationTerminals[0]
-        setSelectedTerminalId(terminalToSelect.id)
+        setSelectedstationId(terminalToSelect.id)
 
         // If session is active and we're switching locations, stay on POS tab
         if (isSessionActive && activeTab !== "pos") {
@@ -174,19 +180,19 @@ export default function HomePage() {
           userId,
           selectedLocationId,
           orgId,
-          selectedTerminalId,
+          selectedstationId,
         })
 
         const result = await startSession(balance, userId, selectedLocationId, orgId)
         console.log("[Session UI] Session start result:", result)
 
         // Ensure we have a valid terminal selected
-        const currentTerminal = availableTerminals.find((t) => t.id === selectedTerminalId)
+        const currentTerminal = availableTerminals.find((t) => t.id === selectedstationId)
         if (!currentTerminal && availableTerminals.length > 0) {
-          const onlineTerminals = availableTerminals.filter((t) => t.status === "online")
+          const onlineTerminals = availableTerminals.filter((t) => t?.currentSession?.status === "online")
           const terminalToSelect = onlineTerminals.length > 0 ? onlineTerminals[0] : availableTerminals[0]
           console.log("[Session UI] Switching to terminal:", terminalToSelect.id)
-          setSelectedTerminalId(terminalToSelect.id)
+          setSelectedstationId(terminalToSelect.id)
         }
 
         console.log("[Session UI] Session started successfully, switching to POS tab")
@@ -203,7 +209,7 @@ export default function HomePage() {
         // Error is handled by the hook's toast notification
       }
     },
-    [startSession, userId, selectedLocationId, orgId, availableTerminals, selectedTerminalId, refetchSession],
+    [startSession, userId, selectedLocationId, orgId, availableTerminals, selectedstationId, refetchSession],
   )
 
   const handleEndSession = useCallback(async () => {
@@ -248,7 +254,7 @@ export default function HomePage() {
       {/* Enhanced Header */}
       <header className="bg-card/95 backdrop-blur-sm border-b border-border sticky shadow-sm">
         <RealTimeStatusBar
-          terminalId={selectedTerminalId}
+          stationId={selectedstationId}
           sessionId={currentSession?.id || ""}
           locationId={selectedLocationId}
           organizationId={orgId}
@@ -295,7 +301,7 @@ export default function HomePage() {
                   </SelectContent>
                 </Select>
 
-                <Select value={selectedTerminalId} onValueChange={setSelectedTerminalId}>
+                <Select value={selectedstationId} onValueChange={setSelectedstationId}>
                   <SelectTrigger className="w-52 bg-card/80 backdrop-blur-sm border-2 hover:border-secondary/30 transition-colors">
                     <Terminal className="w-4 h-4 mr-2 text-secondary" />
                     <SelectValue placeholder="Select Terminal" />
@@ -305,11 +311,11 @@ export default function HomePage() {
                       <SelectItem key={terminal.id} value={terminal.id}>
                         <div className="flex items-center gap-2">
                           <div
-                            className={`w-2 h-2 rounded-full ${terminal.status === "online" ? "bg-green-500" : "bg-gray-400"}`}
+                            className={`w-2 h-2 rounded-full ${terminal?.currentSession?.status === "online" ? "bg-green-500" : "bg-gray-400"}`}
                           ></div>
                           <span>{terminal.name}</span>
-                          <Badge variant={terminal.status === "online" ? "default" : "secondary"} className="text-xs">
-                            {terminal.status}
+                          <Badge variant={terminal?.currentSession?.status === "online" ? "default" : "secondary"} className="text-xs">
+                            {terminal?.currentSession?.status === "online" ? "In Use" : "Available"}
                           </Badge>
                         </div>
                       </SelectItem>
@@ -370,7 +376,7 @@ export default function HomePage() {
         open={showOpeningBalanceDialog}
         onOpenChange={setShowOpeningBalanceDialog}
         onConfirm={handleOpeningBalanceConfirm}
-        terminalName={availableTerminals.find((t) => t.id === selectedTerminalId)?.name}
+        terminalName={availableTerminals.find((t) => t.id === selectedstationId)?.name}
         locationName={locationName}
       />
 
@@ -397,7 +403,7 @@ export default function HomePage() {
                 <span>•</span>
                 <Badge variant="outline" className="flex items-center gap-1">
                   <Terminal className="w-3 h-3" />
-                  {availableTerminals.find((t) => t.id === selectedTerminalId)?.name || "Main Counter"}
+                  {availableTerminals.find((t) => t.id === selectedstationId)?.name || "Main Counter"}
                 </Badge>
               </p>
             </div>
@@ -706,12 +712,11 @@ export default function HomePage() {
 
             <TabsContent value="pos">
               {isSessionActive ? (
-                <ModernizedPOSTerminal
+                <POSTerminal
                   locationId={selectedLocationId}
-                  terminalId={selectedTerminalId}
+                  stationId={selectedstationId}
                   organizationId={orgId}
                   userId={userId}
-
                 />
               ) : (
                 <div className="text-center py-16 bg-gradient-to-br from-muted/20 to-muted/10 rounded-xl border border-border">

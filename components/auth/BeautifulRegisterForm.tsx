@@ -159,7 +159,7 @@ export default function BeautifulRegisterForm() {
     isValid = await trigger(fieldsToValidate);
 
     if (isValid && !completedSteps.has(currentStep)) {
-      setCompletedSteps(prev => new Set([...prev, currentStep]));
+      setCompletedSteps(prev => new Set([...Array.from(prev), currentStep]));
       formSuccess("Step Completed! ✨", `${FORM_STEPS.find(s => s.id === currentStep)?.title} completed successfully!`);
     }
 

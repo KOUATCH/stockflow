@@ -9,7 +9,7 @@ import {
 import type { Customer } from "@/lib/cashSystem/db"
 import type { CartItem } from "@/lib/cashSystem/types"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
-import type React from "react"
+import React from "react"
 import type { ReactElement } from "react"
 import { useCallback, useEffect, useMemo, useRef, useState } from "react"
 
@@ -49,9 +49,10 @@ import {
 } from "lucide-react"
 
 import { useNotifications } from "@/components/notifications/NotificationProvider"
+import { useCustomers } from "@/hooks/posSalesProcess/usePOSHooks"
 import { useOrgCategories } from "@/hooks/useAllCategoriesqueries"
 import { useOrgItemsWithInventoryLevelsLocation } from "@/hooks/useAllItemQueries"
-import { useCustomers } from "@/hooks/useCustomers"
+import { useAuth } from "@/hooks/useAuth"
 import {
   BookOpen,
   Briefcase,
@@ -75,7 +76,6 @@ import {
   Zap,
   ZapIcon,
 } from "lucide-react"
-import { useAuth } from "@/hooks/useAuth"
 
 
 import { cn } from "@/lib/utils"
@@ -160,20 +160,20 @@ interface CashDrawerStatus {
 interface POSStationProps {
   organizationId: string
   locationId: string
-  terminalId: string
+  stationId: string
   userId: string
 }
 
 export function ModernizedPOSTerminal({
   organizationId,
   locationId,
-  terminalId,
+  stationId,
   userId,
 }: POSStationProps): ReactElement {
-  return POSTerminalFinal({ organizationId, locationId, terminalId, userId })
+  return POSTerminalFinal({ organizationId, locationId, stationId, userId })
 }
 
-export function POSTerminalFinal({ organizationId, locationId, terminalId, userId }: POSStationProps): ReactElement {
+export function POSTerminalFinal({ organizationId, locationId, stationId, userId }: POSStationProps): ReactElement {
 
   // const { data: sessionData } = useSession()
   const [cart, setCart] = useState<CartItem[]>([])
@@ -196,7 +196,7 @@ export function POSTerminalFinal({ organizationId, locationId, terminalId, userI
   const [isReceiptPreviewOpen, setIsReceiptPreviewOpen] = useState(false)
 
   const [selectedLocationId, setSelectedLocationId] = useState<string>(locationId)
-  const [selectedTerminalId, setSelectedTerminalId] = useState<string>(terminalId)
+  const [selectedstationId, setSelectedstationId] = useState<string>(stationId)
   const [availableTerminals, setAvailableTerminals] = useState<any[]>([])
 
   // Carousel state
@@ -313,14 +313,14 @@ export function POSTerminalFinal({ organizationId, locationId, terminalId, userI
   }, [categories])
 
   const customersData = useCustomers(organizationId)
-  const customers = customersData?.data || []
+  const customers = customersData?.data?.data || []
 
   const customersArray = useMemo(() => {
     return Array.isArray(customers) ? customers : customers || []
   }, [customers])
 
-  // Debug logging for customers
-  console.log("🔍 Customers debug:", {
+  // Debug customers data
+  console.log("🛒 POSTerminal Customers debug:", {
     organizationId,
     customersData,
     customers,
@@ -451,147 +451,6 @@ export function POSTerminalFinal({ organizationId, locationId, terminalId, userI
       setTimeout(() => setShowSuccessAnimation(false), PAYMENT_PROCESSING_CONSTANTS.SUCCESS_ANIMATION_DURATION)
     }, PAYMENT_PROCESSING_CONSTANTS.ITEM_LOADING_DELAY)
   }, [cart, info, success])
-
-  // // Update the processPayment function:
-  // const processPayment = useCallback(async () => {
-  //   const validation = validatePayment()
-  //   if (!validation.valid) {
-  //     if (validation.message.includes("stock")) {
-  //       warning("Inventory Issue", validation.message)
-  //     } else {
-  //       error("Payment Validation Failed", validation.message)
-  //     }
-  //     return
-  //   }
-  //   setIsProcessing(true)
-  //   setPaymentProgress(0)
-
-  //   try {
-  //     operationStart("Payment Processing")
-
-  //     // Simulate payment progress
-  //     const progressInterval = setInterval(() => {
-  //       setPaymentProgress((prev) => {
-  //         if (prev >= PAYMENT_PROCESSING_CONSTANTS.MAX_PROGRESS_BEFORE_COMPLETION) {
-  //           clearInterval(progressInterval)
-  //           return PAYMENT_PROCESSING_CONSTANTS.MAX_PROGRESS_BEFORE_COMPLETION
-  //         }
-  //         return prev + PAYMENT_PROCESSING_CONSTANTS.PROGRESS_INCREMENT
-  //       })
-  //     }, PAYMENT_PROCESSING_CONSTANTS.PROGRESS_INTERVAL)
-
-
-  //     // FIXED: Updated saleData structure to match backend interface
-  //     const saleData = {
-  //       organizationId, // Moved to top level as expected by backend
-  //       locationId: selectedLocationId,
-  //       terminalId: selectedTerminalId,
-  //       createdById: userId,
-  //       customerId: selectedCustomer?.id || undefined, // Handle optional customer
-  //       sessionId: currentSession?.id,
-  //       lines: cart.map((item) => ({
-  //         itemId: item.itemId,
-  //         quantity: item.quantity,
-  //         unitPrice: item.price,
-  //         discount: item.discount || 0,
-  //         taxRate: item.taxRate,
-  //         taxAmount: (item.price * item.quantity * item.taxRate) / 100,
-  //         lineTotal: item.lineTotal,
-  //       })),
-  //       subtotal: calculateSubtotal(),
-  //       taxAmount: calculateTax(),
-  //       discount: calculateDiscount(),
-  //       totalAmount: calculateTotal(),
-  //       payments: [
-  //         {
-  //           method: paymentMethod,
-  //           amount: calculateTotal(),
-  //         },
-  //       ],
-  //       notes: undefined, // Optional notes
-  //     }
-
-
-  //     // FIXED: Call createSale with proper parameters and error handling
-  //     const saleResult = await createSaleMutation.mutateAsync(saleData)
-
-
-  //     if (!saleResult?.success) {
-  //       const errorMessage = saleResult?.error || "Failed to create sales - unknown error"
-  //       error("Sales Failed", errorMessage)
-  //       throw new Error(errorMessage)
-  //     }
-
-  //     if (!saleResult?.data?.id) {
-  //       error("Sales Failed", "Sales creation failed - no sales ID returned")
-  //       throw new Error("Sales creation failed - no sales ID returned")
-  //     }
-
-  //     const salesId = saleResult.data?.id || saleResult.saleId
-
-  //     clearInterval(progressInterval)
-  //     setPaymentProgress(100)
-
-  //     // Success notification with action
-  //     success("Sales Completed!", `Transaction total: ${formatCurrency(calculateTotal())}`, {
-  //       duration: 8000,
-  //       action: {
-  //         label: "Print Receipt",
-  //         onClick: () => setIsReceiptPreviewOpen(true),
-  //       },
-  //     })
-
-  //     // Reset cart and close dialogs
-  //     setCart([])
-  //     setIsPaymentDialogOpen(false)
-  //     setCashTendered("")
-  //     setSelectedCustomer(null)
-  //     setDiscountPercent(0)
-  //     setSplitPayment(false)
-  //     // Update session stats
-  //     if (currentSession) {
-  //       setCurrentSession((prev) =>
-  //         prev
-  //           ? {
-  //             ...prev,
-  //             totalSales: prev.totalSales + calculateTotal(),
-  //             transactionCount: prev.transactionCount + 1,
-  //           }
-  //           : null,
-  //       )
-  //     }
-
-  //   } catch (err) {
-  //     const errorMessage = err instanceof Error ? err.message : "An unexpected error occurred"
-  //     error("Payment Failed", errorMessage, {
-  //       duration: 10000,
-  //     })
-  //   } finally {
-  //     setIsProcessing(false)
-  //     refetchDBItems?.()
-  //     setPaymentProgress(0)
-  //   }
-  // }, [
-  //   validatePayment,
-  //   warning,
-  //   error,
-  //   operationStart,
-  //   organizationId,
-  //   selectedLocationId,
-  //   selectedTerminalId,
-  //   userId,
-  //   selectedCustomer?.id,
-  //   currentSession,
-  //   cart,
-  //   calculateSubtotal,
-  //   calculateTax,
-  //   calculateDiscount,
-  //   calculateTotal,
-  //   paymentMethod,
-  //   createSaleMutation,
-  //   success,
-  //   refetchDBItems,
-  // ])
 
   const removeFromCart = useCallback((cartItemId: string) => {
     const item = cart.find((item) => item.id === cartItemId)
@@ -724,8 +583,8 @@ export function POSTerminalFinal({ organizationId, locationId, terminalId, userI
       }
 
       try {
-        console.log("Attempting to get active session for terminal:", selectedTerminalId)
-        const existingSessionResult = await getActivePOSSession(selectedTerminalId)
+        console.log("Attempting to get active session for terminal:", selectedstationId)
+        const existingSessionResult = await getActivePOSSession(selectedstationId)
         console.log("Session retrieval result:", existingSessionResult)
 
         if (existingSessionResult.success && existingSessionResult.data) {
@@ -756,14 +615,14 @@ export function POSTerminalFinal({ organizationId, locationId, terminalId, userI
           success("Session Restored", `Continuing session ${session.sessionNumber}`)
         } else {
           console.log("No existing session found, creating new session with params:", {
-            terminalId: selectedTerminalId,
+            stationId: selectedstationId,
             userId: userId || "",
             locationId: selectedLocationId,
             organizationId,
             openingBalance: 200.0,
           })
           const newSessionResult = await createPOSSession({
-            terminalId: selectedTerminalId,
+            stationId: selectedstationId,
             userId: userId || "",
             locationId: selectedLocationId,
             organizationId,
@@ -804,15 +663,15 @@ export function POSTerminalFinal({ organizationId, locationId, terminalId, userI
       }
     }
 
-    if (selectedTerminalId && userId && selectedLocationId && organizationId) {
+    if (selectedstationId && userId && selectedLocationId && organizationId) {
       initializeSession()
     }
-  }, [selectedTerminalId, userId, selectedLocationId, organizationId, success, error])
+  }, [selectedstationId, userId, selectedLocationId, organizationId, success, error])
 
   const createSessionMutation = useMutation({
     mutationFn: createPOSSession,
-    onSuccess: (result) => {
-      if (result.success && result.data) {
+    onSuccess: (result: any) => {
+      if (result?.success && result?.data) {
         const session = result.data
         setCurrentSession({
           id: session.id,
@@ -920,7 +779,7 @@ export function POSTerminalFinal({ organizationId, locationId, terminalId, userI
       const saleData = {
         organizationId, // Moved to top level as expected by backend
         locationId: selectedLocationId,
-        terminalId: selectedTerminalId,
+        stationId: selectedstationId,
         createdById: userId,
         customerId: selectedCustomer?.id || undefined, // Handle optional customer
         sessionId: currentSession?.id,
@@ -1013,7 +872,7 @@ export function POSTerminalFinal({ organizationId, locationId, terminalId, userI
     operationStart,
     organizationId,
     selectedLocationId,
-    selectedTerminalId,
+    selectedstationId,
     userId,
     selectedCustomer?.id,
     currentSession,
@@ -1029,7 +888,7 @@ export function POSTerminalFinal({ organizationId, locationId, terminalId, userI
   ])
   return (
     <div
-      className={`min-h-screen bg-gradient-to-br from-slate-50 via-emerald-50 to-teal-50 p-6 space-y-6 transition-colors duration-300 ${isDarkMode ? "dark bg-gradient-to-br from-slate-950 via-slate-900 to-slate-800" : ""
+      className={`min-h-screen bg-gradient-to-br from-slate-50 via-emerald-50 to-teal-50 p-4 space-y-4 transition-colors duration-300 ${isDarkMode ? "dark bg-gradient-to-br from-slate-950 via-slate-900 to-slate-800" : ""
         }`}
     >
 
@@ -1100,7 +959,7 @@ export function POSTerminalFinal({ organizationId, locationId, terminalId, userI
       <Card className="bg-gradient-to-r from-emerald-500 via-teal-600 to-cyan-600 border-0 shadow-xl text-white overflow-hidden relative">
         <div className="absolute inset-0 bg-gradient-to-r from-emerald-400/20 to-cyan-500/20 backdrop-blur-3xl"></div>
         <CardContent className="p-2 relative z-10">
-          <div className="grid grid-cols-4 gap-6">
+          <div className="grid grid-cols-6 gap-4">
             <div className="text-center">
               <div className="text-xl font-bold mb-1">${currentSession?.totalSales.toFixed(2) || "0.00"}</div>
               <div className="text-teal-100 font-medium">Session Sales</div>
@@ -1117,6 +976,14 @@ export function POSTerminalFinal({ organizationId, locationId, terminalId, userI
               <div className="text-xl font-bold mb-1">{formatCurrency(cashDrawerStatus.currentBalance)}</div>
               <div className="text-teal-100 font-medium">Cash Balance</div>
             </div>
+            <div className="text-center">
+              <div className="text-xl font-bold mb-1">{cart.length}</div>
+              <div className="text-teal-100 font-medium">Cart Items</div>
+            </div>
+            <div className="text-center">
+              <div className="text-xl font-bold mb-1">{formatCurrency(calculateSubtotal())}</div>
+              <div className="text-teal-100 font-medium">Current Sale</div>
+            </div>
           </div>
         </CardContent>
       </Card>
@@ -1131,8 +998,8 @@ export function POSTerminalFinal({ organizationId, locationId, terminalId, userI
       )}
 
       <form onSubmit={handleSubmit}>
-        <div className="grid gap-6 lg:grid-cols-3">
-          <div className="lg:col-span-2 space-y-6">
+        <div className="grid gap-4 lg:grid-cols-5">
+          <div className="lg:col-span-4 space-y-6">
             <Card className="bg-white/80 backdrop-blur-xl border-white/20 shadow-2xl">
               <CardHeader className="bg-gradient-to-r from-emerald-50 via-teal-50 to-cyan-50 border-b border-white/20">
                 <CardTitle className="flex items-center gap-3 text-xl">
@@ -1415,7 +1282,7 @@ export function POSTerminalFinal({ organizationId, locationId, terminalId, userI
                   )}
 
                   {/* Items Grid */}
-                  <div className="grid grid-cols-4 gap-4 max-h-96 overflow-y-auto pr-2">
+                  <div className="grid grid-cols-6 gap-3 max-h-[500px] overflow-y-auto pr-2">
                     {filteredItems && filteredItems.length > 0 ? (
                       filteredItems.map((item: any) => {
                         const inventory = item.inventoryLevels?.[0]
@@ -1591,7 +1458,7 @@ export function POSTerminalFinal({ organizationId, locationId, terminalId, userI
                                 min="1"
                                 value={item.quantity}
                                 onChange={(e) => handleQuantityChange(item.id, e.target.value)}
-                                className="w-18 h-8 text-center bg-white"
+                                className="w-12 h-8 text-center bg-white"
                               />
                             </div>
                             <div className="text-sm font-bold text-emerald-600">${item.lineTotal.toFixed(2)}</div>
@@ -1734,7 +1601,7 @@ export function POSTerminalFinal({ organizationId, locationId, terminalId, userI
       {/* Customer Dialog */}
       {/* Customer Dialog */}
       <Dialog open={isCustomerDialogOpen} onOpenChange={setIsCustomerDialogOpen}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle className="text-xl">Select Customer</DialogTitle>
             <DialogDescription>Choose a customer for this transaction</DialogDescription>
@@ -1771,7 +1638,7 @@ export function POSTerminalFinal({ organizationId, locationId, terminalId, userI
 
       {/* Payment Dialog */}
       <Dialog open={isPaymentDialogOpen} onOpenChange={setIsPaymentDialogOpen}>
-        <DialogContent className="max-w-lg">
+        <DialogContent className="max-w-2xl">
           <DialogHeader>
             <DialogTitle className="text-xl">Process Payment</DialogTitle>
             <DialogDescription>
@@ -1902,5 +1769,8 @@ export function POSTerminalFinal({ organizationId, locationId, terminalId, userI
     </div>
   )
 }
+
+// Named export for consistency with import usage
+export const POSTerminal = ModernizedPOSTerminal
 
 export default ModernizedPOSTerminal

@@ -11,7 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useEffect, useMemo, useState } from "react"
 
 import { useCustomers } from "@/hooks/newPOSSession/useCustomerQueries"
-import { usePosStations } from "@/hooks/posStation/use-pos-station-management"
+import { usePOSStations } from "@/hooks/posSalesProcess/usePOSHooks"
 import { useOrgLocationsNew } from "@/hooks/useAllLocationsQueries"
 // import { useSessionManagement } from "@/hooks/cashDrawer/useSessionManagement"
 import { useSessionManagement } from "@/hooks/cashDrawer/useSessionManagement"

@@ -827,8 +827,8 @@ model SalesOrder {
   createdBy   User?   @relation("SalesOrderCreatedBy", fields: [createdById], references: [id])
 
   // POS specific
-  terminalId String?
-  terminal   pOSStation? @relation(fields: [terminalId], references: [id])
+  stationId String?
+  terminal  pOSStation? @relation(fields: [stationId], references: [id])
 
   sessionId String?
   session   POSSession? @relation(fields: [sessionId], references: [id])
@@ -1041,10 +1041,10 @@ model StockTransferLine {
 
 // ===== POS SYSTEM =====
 model pOSStation {
-  id             String  @id @default(cuid())
-  terminalNumber String  @unique
-  name           String
-  isActive       Boolean @default(true)
+  id            String  @id @default(cuid())
+  stationNumber String  @unique
+  name          String
+  isActive      Boolean @default(true)
 
   // Hardware settings
   hasCashDrawer     Boolean @default(true)
@@ -1080,8 +1080,8 @@ model POSSession {
   startTime     DateTime         @default(now())
   endTime       DateTime?
 
-  terminalId      String
-  terminal        pOSStation  @relation("TerminalSessions", fields: [terminalId], references: [id])
+  stationId       String
+  terminal        pOSStation  @relation("TerminalSessions", fields: [stationId], references: [id])
   currentTerminal pOSStation? @relation("CurrentSession")
 
   userId String
@@ -1112,7 +1112,7 @@ model POSSession {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  @@index([terminalId])
+  @@index([stationId])
   @@index([userId])
   @@index([status])
   @@map("pos_sessions")

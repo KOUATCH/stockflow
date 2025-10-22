@@ -18,7 +18,7 @@ export type UpdatePosStationInput = z.infer<typeof updatePosStationSchema>
 // Response types
 export type PosStationWithRelations = {
   id: string
-  terminalNumber: string
+  stationNumber: string
   name: string
   isActive: boolean
   hasCashDrawer: boolean

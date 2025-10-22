@@ -1,8 +1,8 @@
 "use client"
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import CompleteIntegratedDailySalesDashboard from "@/components/sales/CompleteIntegratedDailySalesDashboard"
-import ComprehensiveSalesDashboard from "@/components/sales/ComprehensiveSalesDashboard"
+import CompleteIntegratedDailySalesDashboard from "@/components/analytics/CompleteIntegratedDailySalesDashboard"
+import ComprehensiveSalesDashboard from "@/components/analytics/ComprehensiveSalesDashboard"
 import ComprehensiveFinancialDashboard from "@/components/finance/ComprehensiveFinancialDashboard"
 
 export default function SalesPage() {

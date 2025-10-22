@@ -4,7 +4,7 @@ import { db } from "@/prisma/db"
 // import { POSSessionStatus } from "@/types"
 
 export async function openPOSSession(data: {
-  terminalId: string
+  stationId: string
   userId: string
   locationId: string
   organizationId: string
@@ -16,7 +16,7 @@ export async function openPOSSession(data: {
     // Check if there's already an active session for this terminal
     const existingSession = await db.pOSSession.findFirst({
       where: {
-        terminalId: data.terminalId,
+        stationId: data.stationId,
         status: "ACTIVE",
       },
     })
@@ -31,7 +31,7 @@ export async function openPOSSession(data: {
     // Create new session
     const session = await db.pOSSession.create({
       data: {
-        terminalId: data.terminalId,
+        stationId: data.stationId,
         userId: data.userId,
         locationId: data.locationId,
         openingBalance: data.openingBalance,
@@ -46,9 +46,9 @@ export async function openPOSSession(data: {
     // Create cash drawer entry
     await db.cashDrawer.create({
       data: {
-        terminalId: data.terminalId,
+        stationId: data.stationId,
         locationId: data.locationId,
-        name: `Drawer-${data.terminalId}`,
+        name: `Drawer-${data.stationId}`,
         drawerNumber: " 1",
         currentBalance: data.openingBalance,
         expectedBalance: data.openingBalance,
@@ -59,7 +59,7 @@ export async function openPOSSession(data: {
     // Find the cash drawer for this terminal and location
     const cashDrawer = await db.cashDrawer.findFirst({
       where: {
-        terminalId: data.terminalId,
+        stationId: data.stationId,
         locationId: data.locationId,
         isOpen: true,
       },
@@ -99,7 +99,7 @@ export async function openPOSSession(data: {
 
 export async function closePOSSession(data: {
   sessionId: string
-  terminalId: string
+  stationId: string
   closingBalance: number
   userId: string
 }) {
@@ -119,7 +119,7 @@ export async function closePOSSession(data: {
     // Find the open cash drawer for this terminal
     const cashDrawer = await db.cashDrawer.findFirst({
       where: {
-        terminalId: data.terminalId,
+        stationId: data.stationId,
         isOpen: true,
       },
     })
@@ -165,11 +165,11 @@ export async function closePOSSession(data: {
   }
 }
 
-export async function getCurrentSession(terminalId: string) {
+export async function getCurrentSession(stationId: string) {
   try {
     const session = await db.pOSSession.findFirst({
       where: {
-        terminalId,
+        stationId,
         status: "ACTIVE",
       },
       include: {

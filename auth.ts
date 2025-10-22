@@ -2,7 +2,7 @@ import NextAuth from "next-auth"
 import CredentialsProvider from "next-auth/providers/credentials"
 import GoogleProvider from "next-auth/providers/google"
 import { PrismaAdapter } from "@auth/prisma-adapter"
-import { prisma } from "@/prisma/db"
+import { db as prisma } from "./prisma/db"
 // Password verification will be done server-side in API routes
 import type { NextAuthConfig } from "next-auth"
 
@@ -47,7 +47,7 @@ declare module "next-auth" {
   }
 }
 
-declare module "next-auth/jwt" {
+declare module "@auth/core/jwt" {
   interface JWT {
     id: string
     email: string
@@ -84,7 +84,7 @@ const config = {
           // Find user with organization and roles directly
           const user = await prisma.user.findUnique({
             where: {
-              email: credentials.email,
+              email: credentials.email as string,
               isActive: true
             },
             include: {
@@ -109,8 +109,8 @@ const config = {
           console.log('✅ User found:', user.email)
 
           // Verify password using bcrypt
-          const { verifyPassword } = await import('@/lib/password')
-          const isPasswordValid = await verifyPassword(credentials.password, user.password)
+          const { verifyPassword } = await import('./lib/password')
+          const isPasswordValid = await verifyPassword(credentials.password as string, user.password)
 
           if (!isPasswordValid) {
             console.log('❌ Password verification failed for:', credentials.email)
@@ -120,7 +120,7 @@ const config = {
           console.log('✅ Password verified successfully for:', credentials.email)
 
           // Flatten all permissions from all roles
-          const allPermissions = user.roles.reduce((acc, role) => {
+          const allPermissions = (user.roles || []).reduce((acc, role) => {
             // Get permissions from role.permissions array (direct permissions)
             // AND from rolePermissions relationship (linked permissions)
             const directPermissions = role.permissions || []
@@ -129,7 +129,7 @@ const config = {
           }, [] as string[])
 
           // Remove duplicates
-          const uniquePermissions = [...new Set(allPermissions)]
+          const uniquePermissions = Array.from(new Set(allPermissions))
 
           // Return user data for NextAuth
           const userData = {
@@ -142,13 +142,13 @@ const config = {
             image: user.image,
             organizationId: user.organizationId,
             organizationName: user.organization?.name,
-            roles: user.roles.map(role => ({
+            roles: (user.roles || []).map(role => ({
               id: role.id,
               name: role.name,
               code: role.code,
-              permissions: role.permissions
+              permissions: role.permissions as string[]
             })),
-            permissions: uniquePermissions
+            permissions: uniquePermissions as string[]
           }
 
           console.log('🎉 Authentication successful for:', credentials.email)
@@ -169,18 +169,19 @@ const config = {
     async jwt({ token, user, account }) {
       // Initial sign in
       if (account && user) {
-        token.id = user.id
-        token.email = user.email!
-        token.organizationId = user.organizationId
-        token.organizationName = user.organizationName
+        token.id = user.id as string
+        token.email = user.email as string
+        token.organizationId = user.organizationId as string
+        token.organizationName = user.organizationName as string | null
         // Store only essential role info to reduce cookie size (remove permissions from roles)
         token.roles = user.roles?.map(role => ({
           id: role.id,
           name: role.name,
-          code: role.code
+          code: role.code,
+          permissions: role.permissions
         })) || []
         // Store only essential permissions to reduce cookie size
-        token.permissions = user.permissions?.slice(0, 5) || [] // Limit to first 5 permissions
+        token.permissions = user.permissions?.slice(0, 10) || [] // Limit to first 10 permissions
       }
 
       // Return previous token if the access token has not expired yet
@@ -190,17 +191,23 @@ const config = {
       // Use data from JWT token instead of fresh database fetch to avoid edge runtime issues
       if (token.id) {
         session.user = {
-          id: token.id,
-          email: token.email,
-          name: session.user.name, // Keep name from session as it might be updated
-          firstName: session.user.firstName,
-          lastName: session.user.lastName,
-          phone: session.user.phone,
-          image: session.user.image,
-          organizationId: token.organizationId,
-          organizationName: token.organizationName,
-          roles: token.roles, // Only essential role info (no permissions)
-          permissions: token.permissions // Limited to first 5 permissions
+          id: token.id as string,
+          email: token.email as string,
+          emailVerified: null,
+          name: session.user?.name || null,
+          firstName: session.user?.firstName || null,
+          lastName: session.user?.lastName || null,
+          phone: session.user?.phone || null,
+          image: session.user?.image || null,
+          organizationId: token.organizationId as string,
+          organizationName: token.organizationName as string | null,
+          roles: (token.roles as Array<{
+            id: string
+            name: string
+            code: string
+            permissions: string[]
+          }>) || [],
+          permissions: (token.permissions as string[]) || []
         }
       }
 
@@ -230,6 +237,12 @@ const config = {
       }
 
       return true
+    },
+    async redirect({ url, baseUrl }) {
+      // Fixes logout redirect port issue
+      if (url.startsWith("/")) return `${baseUrl}${url}`
+      else if (new URL(url).origin === baseUrl) return url
+      return baseUrl
     },
   },
   pages: {

@@ -6,7 +6,7 @@ import {
   type InventoryStats,
   type InventoryTransaction
 } from "@/actions/inventory/AllInventoryActionsOriginal"
-import { createInventoryTransactions } from "@/actions/pos/POSActionFinal"
+import { createInventoryTransactions } from "@/actions/posSalesProcess/posActions"
 import { useCallback, useEffect, useState } from "react"
 
 // export function useInventoryDataHooks(organizationId:string,locationId?: string | undefined) {

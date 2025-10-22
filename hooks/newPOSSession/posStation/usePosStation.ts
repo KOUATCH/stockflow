@@ -8,8 +8,8 @@ import {
   getPosStationById,
   getPosStations,
   updatePosStation,
-} from "@/actions/posStation/pos-station-actions"
-import { toast } from "@/hooks/posStation/use-toast"
+} from "@/actions/posSalesProcess/posActions"
+import { useNotifications } from "@/components/notifications/NotificationProvider"
 import type { CreatePosStationInput, UpdatePosStationInput } from "@/lib/validations/pos-station"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 
@@ -62,37 +62,34 @@ export function useLocationsByOrganization(organizationId: string) {
 // Mutation hooks
 export function useCreatePosStation() {
   const queryClient = useQueryClient()
+  const { success, error } = useNotifications()
 
   return useMutation({
     mutationFn: (input: CreatePosStationInput) => createPosStation(input),
     onSuccess: (result) => {
       if (result.success) {
         queryClient.invalidateQueries({ queryKey: posStationKeys.lists() })
-        toast({
-          title: "Success",
-          description: `POS Station "${result.data?.name}" created successfully with terminal number ${result.data?.terminalNumber}`,
-        })
+        success(
+          "Station Created",
+          `POS Station "${result.data?.name}" created successfully with terminal number ${result.data?.terminalNumber}`
+        )
       } else {
-        toast({
-          title: "Error",
-          description: result.error || "Failed to create POS station",
-          variant: "destructive",
-        })
+        error(
+          "Creation Failed",
+          result.error || "Failed to create POS station"
+        )
       }
     },
-    onError: (error) => {
-      toast({
-        title: "Error",
-        description: "Failed to create POS station",
-        variant: "destructive",
-      })
-      console.error("Create POS station error:", error)
+    onError: (err) => {
+      error("Creation Failed", "Failed to create POS station")
+      console.error("Create POS station error:", err)
     },
   })
 }
 
 export function useUpdatePosStation() {
   const queryClient = useQueryClient()
+  const { success, error } = useNotifications()
 
   return useMutation({
     mutationFn: (input: UpdatePosStationInput) => updatePosStation(input),
@@ -100,56 +97,44 @@ export function useUpdatePosStation() {
       if (result.success) {
         queryClient.invalidateQueries({ queryKey: posStationKeys.lists() })
         queryClient.invalidateQueries({ queryKey: posStationKeys.detail(variables.id) })
-        toast({
-          title: "Success",
-          description: `POS Station "${result.data?.name}" updated successfully`,
-        })
+        success(
+          "Station Updated",
+          `POS Station "${result.data?.name}" updated successfully`
+        )
       } else {
-        toast({
-          title: "Error",
-          description: result.error || "Failed to update POS station",
-          variant: "destructive",
-        })
+        error(
+          "Update Failed",
+          result.error || "Failed to update POS station"
+        )
       }
     },
-    onError: (error) => {
-      toast({
-        title: "Error",
-        description: "Failed to update POS station",
-        variant: "destructive",
-      })
-      console.error("Update POS station error:", error)
+    onError: (err) => {
+      error("Update Failed", "Failed to update POS station")
+      console.error("Update POS station error:", err)
     },
   })
 }
 
 export function useDeletePosStation() {
   const queryClient = useQueryClient()
+  const { success, error } = useNotifications()
 
   return useMutation({
     mutationFn: (id: string) => deletePosStation(id),
     onSuccess: (result) => {
       if (result.success) {
         queryClient.invalidateQueries({ queryKey: posStationKeys.lists() })
-        toast({
-          title: "Success",
-          description: "POS Station deleted successfully",
-        })
+        success("Station Deleted", "POS Station deleted successfully")
       } else {
-        toast({
-          title: "Error",
-          description: result.error || "Failed to delete POS station",
-          variant: "destructive",
-        })
+        error(
+          "Deletion Failed",
+          result.error || "Failed to delete POS station"
+        )
       }
     },
-    onError: (error) => {
-      toast({
-        title: "Error",
-        description: "Failed to delete POS station",
-        variant: "destructive",
-      })
-      console.error("Delete POS station error:", error)
+    onError: (err) => {
+      error("Deletion Failed", "Failed to delete POS station")
+      console.error("Delete POS station error:", err)
     },
   })
 }

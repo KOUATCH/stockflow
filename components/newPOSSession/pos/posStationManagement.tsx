@@ -61,7 +61,7 @@ interface PosStationFormData {
   hasCashDrawer: boolean
   locationId: string
   organizationId: string
-  terminalNumber: string
+  stationNumber: string
 }
 
 export function PosStationManagement() {
@@ -78,7 +78,7 @@ export function PosStationManagement() {
     hasCashDrawer: true,
     locationId: "",
     organizationId: "",
-    terminalNumber: "",
+    stationNumber: "",
   })
 
   // Queries
@@ -97,7 +97,7 @@ export function PosStationManagement() {
   const filteredStations = stations.filter((station) => {
     const matchesSearch =
       station.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      station.terminalNumber?.toLowerCase().includes(searchTerm.toLowerCase())
+      station.stationNumber?.toLowerCase().includes(searchTerm.toLowerCase())
     const matchesOrganization = organizationFilter === "all" || station.organizationId === organizationFilter
     const matchesLocation = locationFilter === "all" || station.locationId === locationFilter
     const matchesStatus =
@@ -146,7 +146,7 @@ export function PosStationManagement() {
       hasCashDrawer: true,
       locationId: "",
       organizationId: "",
-      terminalNumber: "",
+      stationNumber: "",
     })
   }
 
@@ -158,7 +158,7 @@ export function PosStationManagement() {
       hasCashDrawer: station.hasCashDrawer,
       locationId: station.locationId,
       organizationId: station.organizationId,
-      terminalNumber: station.terminalNumber,
+      stationNumber: station.stationNumber,
     })
     setIsEditDialogOpen(true)
   }
@@ -176,7 +176,7 @@ export function PosStationManagement() {
       hasCashDrawer: true,
       locationId: "",
       organizationId: "",
-      terminalNumber: "",
+      stationNumber: "",
     })
     setEditingStation(null)
   }
@@ -491,7 +491,7 @@ export function PosStationManagement() {
                           </div>
                           <div>
                             <div className="font-medium text-card-foreground">{station.name || "Unknown Station"}</div>
-                            <div className="text-sm text-muted-foreground">#{station.terminalNumber || "N/A"}</div>
+                            <div className="text-sm text-muted-foreground">#{station.stationNumber || "N/A"}</div>
                           </div>
                         </div>
                       </TableCell>

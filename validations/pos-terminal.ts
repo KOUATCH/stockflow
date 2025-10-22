@@ -1,7 +1,7 @@
 import { z } from "zod"
 
 export const pOSStationSchema = z.object({
-  terminalNumber: z.string().min(1, "Terminal number is required"),
+  stationNumber: z.string().min(1, "Terminal number is required"),
   name: z.string().min(1, "Terminal name is required"),
   isActive: z.boolean().default(true),
   hasCashDrawer: z.boolean().default(true),

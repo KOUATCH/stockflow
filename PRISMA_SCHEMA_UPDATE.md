@@ -52,7 +52,7 @@ model EmployeePresenceSession {
   userId                String
   locationId            String
   organizationId        String
-  terminalId            String?
+  stationId            String?
   status                PresenceStatus @default(CLOCKED_IN)
   clockInTime           DateTime  @default(now())
   clockOutTime          DateTime?
@@ -76,7 +76,7 @@ model EmployeePresenceSession {
   user           User                    @relation(fields: [userId], references: [id], onDelete: Cascade)
   location       Location                @relation(fields: [locationId], references: [id], onDelete: Cascade)
   organization   Organization            @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  terminal       POSStation?             @relation(fields: [terminalId], references: [id], onDelete: SetNull)
+  terminal       POSStation?             @relation(fields: [stationId], references: [id], onDelete: SetNull)
   approver       User?                   @relation("PresenceApprover", fields: [approvedById], references: [id])
   activityLogs   EmployeeActivityLog[]
   breakSessions  EmployeeBreakSession[]

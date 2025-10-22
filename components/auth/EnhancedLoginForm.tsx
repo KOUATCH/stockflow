@@ -70,6 +70,8 @@ export default function EnhancedLoginForm() {
       // Use custom auth action
       const result = await signInWithCredentials(data);
 
+      console.log("Login result:", result); // Debug log
+
       if (result.error) {
         setLoading(false);
         formError(
@@ -83,6 +85,15 @@ export default function EnhancedLoginForm() {
         setLoading(false);
         // Redirect will be handled by middleware
         window.location.href = returnUrl;
+      } else {
+        // This should not happen, but let's log it for debugging
+        console.error("Unexpected login result:", result);
+        setLoading(false);
+        formError(
+          "Unexpected Error",
+          "An unexpected error occurred during login",
+          "Please try again"
+        );
       }
     } catch (error) {
       setLoading(false);

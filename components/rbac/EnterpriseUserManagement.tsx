@@ -52,7 +52,7 @@ import {
   Award,
   Zap
 } from "lucide-react";
-import { getUsers, createUser, updateUser, toggleUserStatus, deleteUser } from "@/actions/users";
+import { getUsers, createUser, updateUser, toggleUserStatus, deleteUser, inviteUser } from "@/actions/users";
 import { getRoles, assignRoleToUser, removeRoleFromUser } from "@/actions/roles";
 import { PERMISSIONS } from "@/lib/permissions";
 
@@ -124,6 +124,7 @@ export function EnterpriseUserManagement() {
   const [loading, setLoading] = useState(true);
   const [selectedUser, setSelectedUser] = useState<User | null>(null);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [showInviteDialog, setShowInviteDialog] = useState(false);
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [showRoleDialog, setShowRoleDialog] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
@@ -232,10 +233,7 @@ export function EnterpriseUserManagement() {
       const result = await updateUser(selectedUser.id, editForm);
 
       if (result.success) {
-        toast({
-          title: "User Updated",
-          description: `${editForm.firstName} ${editForm.lastName} has been updated successfully`,
-        });
+        formSuccess("User Updated", `${editForm.firstName} ${editForm.lastName} has been updated successfully`);
         setShowEditDialog(false);
         resetEditForm();
         loadData();

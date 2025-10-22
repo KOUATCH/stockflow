@@ -7,7 +7,7 @@ import { revalidatePath } from "next/cache"
 export interface CashDrawerSession {
   id: string
   sessionNumber: string
-  terminalId: string
+  stationId: string
   userId: string
   locationId: string
   status: POSSessionStatus
@@ -28,7 +28,7 @@ export interface CashDrawerSession {
   terminal: {
     id: string
     name: string
-    terminalNumber: string
+    stationNumber: string
   }
   user: {
     id: string
@@ -66,14 +66,14 @@ export interface CashDrawerSummary {
 }
 
 export async function openPosSession(
-  terminalId: string,
+  stationId: string,
   userId: string,
   locationId: string,
   openingBalance: number,
 ): Promise<{ success: boolean; sessionId?: string; error?: string }> {
   try {
     const terminal = await db.pOSStation.findUnique({
-      where: { id: terminalId },
+      where: { id: stationId },
     })
 
     if (!terminal) {
@@ -87,7 +87,7 @@ export async function openPosSession(
     // Check if there's already an active session for this terminal
     const existingSession = await db.pOSSession.findFirst({
       where: {
-        terminalId,
+       stationId,
         status: "ACTIVE",
       },
     })
@@ -102,7 +102,7 @@ export async function openPosSession(
     const session = await db.pOSSession.create({
       data: {
         sessionNumber,
-        terminalId,
+        stationId,
         userId,
         locationId,
         status: "ACTIVE",
@@ -119,7 +119,7 @@ export async function openPosSession(
     if (!cashDrawer) {
       cashDrawer = await db.cashDrawer.create({
         data: {
-          name: `Cash Drawer - Terminal ${terminalId}`,
+          name: `Cash Drawer - Terminal ${stationId}`,
           locationId,
           currentBalance: openingBalance,
           isOpen: true,
@@ -151,7 +151,7 @@ export async function openPosSession(
 
     // Update terminal's current session
     await db.pOSStation.update({
-      where: { id: terminalId },
+      where: { id: stationId },
       data: { currentSessionId: session.id },
     })
 
@@ -227,7 +227,7 @@ export async function closePosSession(
 
     // Clear terminal's current session
     await db.pOSStation.update({
-      where: { id: session.terminalId },
+      where: { id: session.stationId },
       data: { currentSessionId: null },
     })
 
@@ -373,11 +373,11 @@ export async function removeCashFromDrawer(
   }
 }
 
-export async function getCurrentSession(terminalId: string): Promise<CashDrawerSession | null> {
+export async function getCurrentSession(stationId: string): Promise<CashDrawerSession | null> {
   try {
     const session = await db.pOSSession.findFirst({
       where: {
-        terminalId,
+        stationId,
         status: "ACTIVE",
       },
       include: {
@@ -385,7 +385,7 @@ export async function getCurrentSession(terminalId: string): Promise<CashDrawerS
           select: {
             id: true,
             name: true,
-            terminalNumber: true,
+            stationNumber: true,
           },
         },
         user: {

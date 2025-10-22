@@ -21,7 +21,7 @@ const cashDrawerTransactionType = {
 } as const
 
 export interface OpenSessionData {
-  terminalId: string
+  stationId: string
   userId: string
   locationId: string
   organizationId: string
@@ -56,7 +56,7 @@ export async function openPosSession(data: OpenSessionData) {
   try {
     // Validate terminal exists and is active
     const terminal = await db.pOSStation.findUnique({
-      where: { id: data.terminalId },
+      where: { id: data.stationId },
       include: {
         location: true,
         organization: true,
@@ -82,7 +82,7 @@ export async function openPosSession(data: OpenSessionData) {
     // Check for existing active session
     const existingSession = await db.pOSSession.findFirst({
       where: {
-        terminalId: data.terminalId,
+        stationId: data.stationId,
         status: POSSessionStatus.ACTIVE,
       },
     })
@@ -113,7 +113,7 @@ export async function openPosSession(data: OpenSessionData) {
     const today = new Date().toISOString().slice(0, 10)
     const sessionCount = await db.pOSSession.count({
       where: {
-        terminalId: data.terminalId,
+        stationId: data.stationId,
         startTime: {
           gte: new Date(today + "T00:00:00.000Z"),
           lt: new Date(today + "T23:59:59.999Z"),
@@ -121,7 +121,7 @@ export async function openPosSession(data: OpenSessionData) {
       },
     })
 
-    const sessionNumber = `SES-${today}-${data.terminalId.slice(-4)}-${String(sessionCount + 1).padStart(3, "0")}`
+    const sessionNumber = `SES-${today}-${data.stationId.slice(-4)}-${String(sessionCount + 1).padStart(3, "0")}`
 
     // Create session and cash drawer in transaction
     const result = await db.$transaction(async (tx) => {
@@ -129,7 +129,7 @@ export async function openPosSession(data: OpenSessionData) {
       const session = await tx.pOSSession.create({
         data: {
           sessionNumber,
-          terminalId: data.terminalId,
+          stationId: data.stationId,
           userId: data.userId,
           locationId: data.locationId,
           status: POSSessionStatus.ACTIVE,
@@ -148,9 +148,9 @@ export async function openPosSession(data: OpenSessionData) {
       })
 
       // Create or update cash drawer
-      const drawerNumber = `DRW-${data.terminalId}-${Date.now()}`
+      const drawerNumber = `DRW-${data.stationId}-${Date.now()}`
       const cashDrawer = await tx.cashDrawer.upsert({
-        where: { terminalId: data.terminalId },
+        where: { stationId: data.stationId },
         update: {
           currentBalance: data.openingBalance,
           expectedBalance: data.openingBalance,
@@ -159,7 +159,7 @@ export async function openPosSession(data: OpenSessionData) {
         create: {
           name: `Cash Drawer - ${terminal.name}`,
           drawerNumber,
-          terminalId: data.terminalId,
+          stationId: data.stationId,
           locationId: data.locationId,
           organizationId: data.organizationId,
           currentBalance: data.openingBalance,
@@ -215,7 +215,7 @@ export async function closePosSession(data: CloseSessionData) {
     const session = await db.pOSSession.findUnique({
       where: { id: data.sessionId },
       include: {
-        terminal: true,
+        station: true,
         user: true,
         cashDrawerTransactions: {
           include: { cashDrawer: true },
@@ -328,15 +328,15 @@ export async function closePosSession(data: CloseSessionData) {
   }
 }
 
-export async function getActiveSession(terminalId: string) {
+export async function getActiveSession(stationId: string) {
   try {
     const session = await db.pOSSession.findFirst({
       where: {
-        terminalId,
+        stationId,
         status: POSSessionStatus.ACTIVE,
       },
       include: {
-        terminal: true,
+        station: true,
         user: true,
         cashDrawerTransactions: {
           include: { cashDrawer: true },

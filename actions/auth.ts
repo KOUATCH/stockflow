@@ -2,9 +2,8 @@
 
 import type { AuthResponse, LoginProps, OrgDataProps, RegisterUserProps } from "@/types/types"
 // import createUser from "./create-user"
-import { signIn } from "@/auth"
+import { signIn } from "../auth"
 import { generateSlug } from "@/lib/generateSlug"
-import { createUser } from "./users"
 
 /**
  * Register a new user with organization
@@ -27,46 +26,111 @@ export async function registerUser(data: RegisterUserProps): Promise<AuthRespons
       }
     }
 
-    // Prepare organization data with unique slug
-    const orgData: OrgDataProps = {
-      name: data.companyName,
-      slug: generateSlug(data.companyName),
-      email: data.email,
-      phone: data.phone,
-      address: "",
-      logo: "",
-    }
+    const { db } = await import("../prisma/db")
+    const { hashPassword } = await import("../lib/password")
 
-    // Prepare user data with required properties
-    const userData = {
-      email: data.email,
-      password: data.password,
-      firstName: data.firstName,
-      lastName: data.lastName,
-      name: `${data.firstName} ${data.lastName}`,
-      phone: data.phone,
-      image: "",
-      organizationId: orgData.slug, // or another unique identifier for the organization
-      roleId: "user", // default role for new users
-    }
+    // Check if user already exists
+    const existingUser = await db.user.findUnique({
+      where: { email: data.email },
+    })
 
-    // Create user and organization
-    const result = await createUser(userData)
-
-    if (result.error) {
+    if (existingUser) {
       return {
         success: false,
-        error: result.error,
+        error: "User with this email already exists",
       }
     }
+
+    // Hash the password
+    const hashedPassword = await hashPassword(data.password)
+
+    // Generate unique slug for organization
+    const orgSlug = generateSlug(data.companyName)
+
+    // Create organization and user in a transaction
+    const result = await db.$transaction(async (tx) => {
+      // Create organization
+      const organization = await tx.organization.create({
+        data: {
+          name: data.companyName,
+          slug: orgSlug,
+          email: data.email,
+          phone: data.phone,
+          address: "",
+          logo: "",
+          isActive: true,
+        },
+      })
+
+      // Create default admin role for the organization
+      const adminRole = await tx.role.create({
+        data: {
+          name: "Administrator",
+          code: "administrator",
+          description: "Organization administrator with full access",
+          permissions: ["*"], // Full permissions
+          isSystemRole: false,
+          organizationId: organization.id,
+        },
+      })
+
+      // Create the user
+      const user = await tx.user.create({
+        data: {
+          firstName: data.firstName,
+          lastName: data.lastName,
+          name: `${data.firstName} ${data.lastName}`,
+          email: data.email,
+          phone: data.phone,
+          password: hashedPassword,
+          image: "",
+          organizationId: organization.id,
+          isActive: true,
+          isVerified: false, // User needs to verify email
+        },
+      })
+
+      // Assign admin role to the user (many-to-many relationship)
+      await tx.user.update({
+        where: { id: user.id },
+        data: {
+          roles: {
+            connect: { id: adminRole.id }
+          }
+        }
+      })
+
+      return { user, organization, role: adminRole }
+    })
 
     return {
       success: true,
       message: "Account created successfully! Please check your email to verify your account.",
-      data: result.data,
+      data: {
+        userId: result.user.id,
+        organizationId: result.organization.id,
+        email: result.user.email,
+      },
     }
-  } catch (error) {
+  } catch (error: any) {
     console.error("Registration error:", error)
+
+    // Handle specific database errors
+    if (error.code === 'P2002') {
+      if (error.meta?.target?.includes('email')) {
+        return {
+          success: false,
+          error: "An account with this email already exists",
+        }
+      }
+      if (error.meta?.target?.includes('slug')) {
+        return {
+          success: false,
+          error: "Organization name already exists, please choose a different name",
+        }
+      }
+    }
+
     return {
       success: false,
       error: "An unexpected error occurred during registration. Please try again.",
@@ -87,26 +151,47 @@ export async function signInWithCredentials(data: LoginProps): Promise<AuthRespo
       }
     }
 
-    // Attempt sign in using Auth.js
-    const result = await signIn("credentials", {
-      email: data.email,
-      password: data.password,
-      redirect: false,
-    })
+    try {
+      // Attempt sign in using Auth.js
+      const result = await signIn("credentials", {
+        email: data.email,
+        password: data.password,
+        redirect: false,
+      })
 
-    // Check if sign in was successful
-    // In NextAuth v5, signIn returns null on success when redirect: false
-    if (result === null) {
+      console.log("SignIn result:", result) // Debug log
+
+      // In NextAuth v5, successful signIn with redirect: false typically returns:
+      // - null/undefined for success
+      // - an object with error property for failures
+      // - or throws an error
+
+      // If we reach here without throwing, it means authentication was successful
       return {
         success: true,
         message: "Login successful! Redirecting to dashboard...",
       }
-    }
+    } catch (signInError: any) {
+      console.log("SignIn error caught:", signInError)
 
-    // If result is not null, it indicates an error
-    return {
-      success: false,
-      error: "Authentication failed. Please check your credentials.",
+      // Check if this is a redirect (which means success in some cases)
+      if (signInError.type === "Redirect") {
+        return {
+          success: true,
+          message: "Login successful! Redirecting to dashboard...",
+        }
+      }
+
+      // Handle other specific error types
+      if (signInError.type === "CredentialsSignin") {
+        return {
+          success: false,
+          error: "Invalid email or password. Please check your credentials and try again.",
+        }
+      }
+
+      // Re-throw unexpected errors to be caught by outer catch
+      throw signInError
     }
   } catch (error: any) {
     console.error("Login error:", error)

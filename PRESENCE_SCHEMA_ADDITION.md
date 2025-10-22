@@ -9,7 +9,7 @@ model EmployeePresenceSession {
   userId                String
   locationId            String
   organizationId        String
-  terminalId            String?
+  stationId            String?
   status                PresenceStatus @default(CLOCKED_IN)
   clockInTime           DateTime  @default(now())
   clockOutTime          DateTime?

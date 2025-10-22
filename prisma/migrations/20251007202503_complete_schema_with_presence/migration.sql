@@ -703,7 +703,7 @@ CREATE TABLE "sales_orders" (
     "locationId" TEXT NOT NULL,
     "organizationId" TEXT NOT NULL,
     "createdById" TEXT,
-    "terminalId" TEXT,
+    "stationId" TEXT,
     "sessionId" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
@@ -880,7 +880,7 @@ CREATE TABLE "stock_transfer_lines" (
 -- CreateTable
 CREATE TABLE "pos_terminals" (
     "id" TEXT NOT NULL,
-    "terminalNumber" TEXT NOT NULL,
+    "stationNumber" TEXT NOT NULL,
     "name" TEXT NOT NULL,
     "isActive" BOOLEAN NOT NULL DEFAULT true,
     "hasCashDrawer" BOOLEAN NOT NULL DEFAULT true,
@@ -901,7 +901,7 @@ CREATE TABLE "pos_sessions" (
     "status" "POSSessionStatus" NOT NULL DEFAULT 'ACTIVE',
     "startTime" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "endTime" TIMESTAMP(3),
-    "terminalId" TEXT NOT NULL,
+    "stationId" TEXT NOT NULL,
     "locationId" TEXT NOT NULL,
     "userId" TEXT NOT NULL,
     "openingBalance" DOUBLE PRECISION NOT NULL DEFAULT 0,
@@ -931,7 +931,7 @@ CREATE TABLE "cash_drawers" (
     "expectedBalance" DOUBLE PRECISION NOT NULL DEFAULT 0,
     "isOpen" BOOLEAN NOT NULL DEFAULT false,
     "locationId" TEXT NOT NULL,
-    "terminalId" TEXT NOT NULL,
+    "stationId" TEXT NOT NULL,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
@@ -1007,7 +1007,7 @@ CREATE TABLE "employee_presence_sessions" (
     "userId" TEXT NOT NULL,
     "locationId" TEXT NOT NULL,
     "organizationId" TEXT NOT NULL,
-    "terminalId" TEXT,
+    "stationId" TEXT,
     "status" "PresenceStatus" NOT NULL DEFAULT 'CLOCKED_OUT',
     "clockInTime" TIMESTAMP(3) NOT NULL,
     "clockOutTime" TIMESTAMP(3),
@@ -1577,7 +1577,7 @@ CREATE INDEX "pos_terminals_organizationId_idx" ON "pos_terminals"("organization
 CREATE UNIQUE INDEX "pos_sessions_sessionNumber_key" ON "pos_sessions"("sessionNumber");
 
 -- CreateIndex
-CREATE INDEX "pos_sessions_terminalId_idx" ON "pos_sessions"("terminalId");
+CREATE INDEX "pos_sessions_stationId_idx" ON "pos_sessions"("stationId");
 
 -- CreateIndex
 CREATE INDEX "pos_sessions_userId_idx" ON "pos_sessions"("userId");
@@ -1919,7 +1919,7 @@ ALTER TABLE "sales_orders" ADD CONSTRAINT "sales_orders_organizationId_fkey" FOR
 ALTER TABLE "sales_orders" ADD CONSTRAINT "sales_orders_sessionId_fkey" FOREIGN KEY ("sessionId") REFERENCES "pos_sessions"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "sales_orders" ADD CONSTRAINT "sales_orders_terminalId_fkey" FOREIGN KEY ("terminalId") REFERENCES "pos_terminals"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+ALTER TABLE "sales_orders" ADD CONSTRAINT "sales_orders_stationId_fkey" FOREIGN KEY ("stationId") REFERENCES "pos_terminals"("id") ON DELETE SET NULL ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "sales_order_lines" ADD CONSTRAINT "sales_order_lines_itemId_fkey" FOREIGN KEY ("itemId") REFERENCES "items"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
@@ -2003,7 +2003,7 @@ ALTER TABLE "pos_terminals" ADD CONSTRAINT "pos_terminals_pOSSessionId_fkey" FOR
 ALTER TABLE "pos_sessions" ADD CONSTRAINT "pos_sessions_locationId_fkey" FOREIGN KEY ("locationId") REFERENCES "locations"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "pos_sessions" ADD CONSTRAINT "pos_sessions_terminalId_fkey" FOREIGN KEY ("terminalId") REFERENCES "pos_terminals"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "pos_sessions" ADD CONSTRAINT "pos_sessions_stationId_fkey" FOREIGN KEY ("stationId") REFERENCES "pos_terminals"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "pos_sessions" ADD CONSTRAINT "pos_sessions_userId_fkey" FOREIGN KEY ("userId") REFERENCES "users"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
@@ -2012,7 +2012,7 @@ ALTER TABLE "pos_sessions" ADD CONSTRAINT "pos_sessions_userId_fkey" FOREIGN KEY
 ALTER TABLE "cash_drawers" ADD CONSTRAINT "cash_drawers_locationId_fkey" FOREIGN KEY ("locationId") REFERENCES "locations"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "cash_drawers" ADD CONSTRAINT "cash_drawers_terminalId_fkey" FOREIGN KEY ("terminalId") REFERENCES "pos_terminals"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "cash_drawers" ADD CONSTRAINT "cash_drawers_stationId_fkey" FOREIGN KEY ("stationId") REFERENCES "pos_terminals"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "cash_drawer_transactions" ADD CONSTRAINT "cash_drawer_transactions_cashDrawerId_fkey" FOREIGN KEY ("cashDrawerId") REFERENCES "cash_drawers"("id") ON DELETE RESTRICT ON UPDATE CASCADE;

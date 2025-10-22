@@ -5,7 +5,7 @@ export const posStationSchema = z.object({
   isActive: z.boolean().default(true),
   hasCashDrawer: z.boolean().default(true),
   locationId: z.string().min(1, "Location is required"),
-  terminalNumber: z.string().min(1, "Terminal is required"),
+  stationNumber: z.string().min(1, "Terminal is required"),
   organizationId: z.string().min(1, "Organization is required"),
 })
 
@@ -19,7 +19,7 @@ export type UpdatePosStationInput = z.infer<typeof updatePosStationSchema>
 // Response types
 export type   PosStationWithRelations = {
   id: string
-  terminalNumber: string
+  stationNumber: string
   name: string
   isActive: boolean
   hasCashDrawer: boolean

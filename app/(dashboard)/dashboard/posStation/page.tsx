@@ -1,16 +1,12 @@
 "use client"
 
-import { CacheBuster } from "@/components/posStation/diagnostic/cache-buster"
-import { InputTest } from "@/components/posStation/diagnostic/input-test"
-import { PosStationForm } from "@/components/posStation/pos-station-form"
-import { PosStationList } from "@/components/posStation/pos-station-list"
-import { PosStationManagement } from "@/components/posStation/pos/pos-station-management"
-import { PosStationWithSession } from "@/components/posStation/pos/pos-terminal-with-session"
+import { POSStationManagement } from "@/components/posSalesProcess/POSStationManagement"
+import { ModernizedPOSTerminal } from "@/components/posSalesProcess/POSTerminal"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { usePosStations } from "@/hooks/posStation/use-pos-terminals"
+import { usePOSStations } from "@/hooks/posSalesProcess/usePOSHooks"
 import { useOrgLocationsNew } from "@/hooks/useAllLocationsQueries"
 import { POSSessionStatus } from "@/lib/newPOSSession/types"
 import { Activity, Bug, Database, Monitor, Settings, Terminal } from "lucide-react"
@@ -168,26 +164,28 @@ export default function HomePage() {
               </CardTitle>
             </CardHeader>
             <CardContent>
-              <PosStationWithSession
+              <ModernizedPOSTerminal
                 organizationId={orgId}
                 locationId={selectedLocationId ?? ""}
                 terminalId={selectedTerminalId ?? ""}
                 userId={userId ?? ""}
-                userName={userName ?? ""}
               />
             </CardContent>
           </Card>
         </TabsContent>
 
         <TabsContent value="stations" className="space-y-6">
-          <PosStationForm />
-          <div className="border-t pt-8">
-            <PosStationList />
-          </div>
+          <POSStationManagement
+            organizationId={orgId}
+            userId={userId ?? ""}
+          />
         </TabsContent>
 
         <TabsContent value="comprehensive" className="space-y-6">
-          <PosStationManagement />
+          <POSStationManagement
+            organizationId={orgId}
+            userId={userId ?? ""}
+          />
         </TabsContent>
 
         <TabsContent value="monitoring" className="space-y-6">

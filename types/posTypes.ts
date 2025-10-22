@@ -1,6 +1,6 @@
 export interface pOSStationDTO {
   id: string
-  terminalNumber: string
+  stationNumber: string
   name: string
   locationId: string
   location: {
@@ -27,10 +27,10 @@ export interface pOSStationDTO {
 export interface POSSessionDTO {
   id: string
   sessionNumber: string
-  terminalId: string
+  stationId: string
   terminal: {
     id: string
-    terminalNumber: string
+    stationNumber: string
     name: string
   }
   userId: string
@@ -171,7 +171,7 @@ export interface POSCart {
 }
 
 export interface CreatePOSSessionPayload {
-  terminalId: string
+  stationId: string
   userId: string
   openingBalance: number
   notes?: string
@@ -211,7 +211,7 @@ export interface ProcessPaymentPayload {
 export interface POSFilters {
   organizationId: string
   locationId?: string
-  terminalId?: string
+  stationId?: string
   sessionId?: string
   status?: POSSessionStatus | POSSessionStatus[]
   dateFrom?: string

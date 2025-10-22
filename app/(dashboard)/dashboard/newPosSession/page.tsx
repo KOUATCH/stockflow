@@ -39,7 +39,7 @@ import {
   Zap,
 } from "lucide-react"
 
-import { usePosStations } from "@/hooks/posStation/use-pos-terminals"
+import { usePOSStations } from "@/hooks/posSalesProcess/usePOSHooks"
 import { useOrgLocationsNew } from "@/hooks/useAllLocationsQueries"
 import { useClientAuth } from "@/hooks/useClientAuth"
 import { useEffect, useMemo, useState } from "react"
