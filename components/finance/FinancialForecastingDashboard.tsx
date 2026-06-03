@@ -38,7 +38,7 @@ import {
   Clock,
   Zap,
   Brain,
-  Crystal
+  Gem
 } from "lucide-react"
 import { useNotifications } from "@/hooks/useNotifications"
 
@@ -75,7 +75,7 @@ export function FinancialForecastingDashboard() {
   const [forecastPeriod, setForecastPeriod] = useState("12")
   const [selectedModel, setSelectedModel] = useState("arima")
   const [isGenerating, setIsGenerating] = useState(false)
-  const { success, info, warning } = useNotifications()
+  const { success, info } = useNotifications()
 
   const forecastData: ForecastData[] = [
     { period: "Jan 2024", actualRevenue: 125000, forecastRevenue: 123500, actualProfit: 25000, forecastProfit: 24200, actualCashFlow: 18000, forecastCashFlow: 17800, confidence: 95, lowerBound: 115000, upperBound: 132000 },
@@ -105,11 +105,11 @@ export function FinancialForecastingDashboard() {
 
   const handleGenerateForecast = async () => {
     setIsGenerating(true)
-    info("Generating financial forecast...")
+    info("Generating Forecast", "Financial forecast generation is in progress.")
 
     setTimeout(() => {
       setIsGenerating(false)
-      success("Financial forecast generated successfully!")
+      success("Forecast Generated", "Financial forecast generated successfully.")
     }, 2000)
   }
 
@@ -146,7 +146,7 @@ export function FinancialForecastingDashboard() {
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               <div className="p-2 rounded-lg bg-gradient-to-br from-teal-500 to-cyan-600 shadow-lg">
-                <Crystal className="w-5 h-5 text-white" />
+                <Gem className="w-5 h-5 text-white" />
               </div>
               <div>
                 <CardTitle className="text-lg font-semibold text-slate-900 dark:text-white">

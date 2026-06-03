@@ -7,6 +7,25 @@ import type { SupplierResponse, SupplierWithRelations } from "@/types/supplier"
 // import { supplierInclude } from '@/lib/suppliers/includes'
 import type { Prisma } from "@prisma/client"
 
+function itemDisplayName(item: { nameEn?: string | null; nameFr?: string | null; sku?: string | null }) {
+  return item.nameEn ?? item.nameFr ?? item.sku ?? "Unnamed item"
+}
+
+function mapSupplierWithItemNames(
+  supplier: Prisma.SupplierGetPayload<{ include: typeof supplierInclude }>
+): SupplierWithRelations {
+  return {
+    ...supplier,
+    supplierItems: supplier.supplierItems.map((supplierItem) => ({
+      ...supplierItem,
+      item: {
+        ...supplierItem.item,
+        name: itemDisplayName(supplierItem.item),
+      },
+    })),
+  }
+}
+
 /**
  * Fetch suppliers by organization ID.
  */
@@ -16,7 +35,7 @@ export async function getSuppliersByOrgId(organizationId?: string): Promise<Supp
     const where: Prisma.SupplierWhereInput = { organizationId }
     if (organizationId) where.organizationId = organizationId
 
-    const suppliers: SupplierWithRelations[] = await db.supplier.findMany({
+    const suppliers = await db.supplier.findMany({
       where,
       include: supplierInclude,
     })
@@ -24,7 +43,7 @@ export async function getSuppliersByOrgId(organizationId?: string): Promise<Supp
       throw new Error("Suppliers not found")
     }
     return {
-      data: suppliers,
+      data: suppliers.map(mapSupplierWithItemNames),
       success: true,
       error: null,
     }

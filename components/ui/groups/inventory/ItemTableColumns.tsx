@@ -1,8 +1,8 @@
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import type { Column } from "@/components/ui/data-table"
+import { Link } from "@/i18n/navigation"
 import { ItemWithInventoryLevelsPayload } from "@/types/itemTypes"
-import Link from "next/link"
 
 interface ItemTableColumnsProps {
   formatCurrency: (amount: number) => string

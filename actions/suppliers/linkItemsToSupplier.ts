@@ -92,6 +92,7 @@ export async function linkItemsToSupplier(
 
     return {
       success: true,
+      error: null,
       message: 'Items linked to supplier successfully',
       data: result as SupplierWithRelations,
     }

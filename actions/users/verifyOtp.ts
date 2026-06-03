@@ -13,7 +13,11 @@ import { db } from "@/prisma/db";
      
     })
 console.log({user})
-    if(user?.token!==otp){
+    if(
+      !user?.verificationToken ||
+      user.verificationToken !== otp ||
+      (user.verificationTokenExpires && user.verificationTokenExpires < new Date())
+    ){
  return{
 status:403
  }}
@@ -22,7 +26,10 @@ status:403
     id:userId
   },
   data:{
-    isVerified:true
+    isVerified:true,
+    emailVerified: new Date(),
+    verificationToken: null,
+    verificationTokenExpires: null
   }
  })
     

@@ -1,4 +1,6 @@
 "use client";
+
+import { notify } from "@/lib/notifications/notify"
 import {
   Dialog,
   DialogContent,
@@ -12,7 +14,6 @@ import { RoleOption, UserWithRoles } from "@/types/types";
 import { Pencil } from "lucide-react";
 import React, { useEffect, useState } from "react";
 import { Options } from "react-tailwindcss-select/dist/components/type";
-import { toast } from "sonner";
 import FormSelectInput from "../FormInputs/FormSelectInput";
 import SubmitButton from "../FormInputs/SubmitButton";
 ;
@@ -32,7 +33,7 @@ export default function UserRoleBtn({ user }: UserRoleBtnProps) {
   const currentRole = user.roles[0]; // Assuming user has at least one role
 
   const [selectedRole, setSelectedRole] = useState<RoleOption>({
-    label: currentRole?.name || "No Role",
+    label: currentRole?.nameEn || "No Role",
     value: currentRole?.id || "",
   });
 
@@ -42,14 +43,14 @@ export default function UserRoleBtn({ user }: UserRoleBtnProps) {
         const { data: rolesData } = await getOrgRoles(user?.organizationId);
         if (rolesData) {
           const dataOptions = rolesData.map((role) => ({
-            label: role.name,
+            label: role.nameEn,
             value: role.id,
           }));
           setRoles(dataOptions);
         }
       } catch (error) {
         console.error("Error fetching roles:", error);
-        toast.error("Failed to load roles");
+        notify.error("Failed to load roles");
       }
     }
     fetchRoles();
@@ -66,11 +67,11 @@ export default function UserRoleBtn({ user }: UserRoleBtnProps) {
         throw new Error(res.error);
       }
 
-      toast.success("Role Updated Successfully");
+      notify.success("Role Updated Successfully");
       // Optionally close dialog or refresh data
     } catch (error) {
       console.error(error);
-      toast.error(
+      notify.error(
         error instanceof Error ? error.message : "Failed to update role"
       );
     } finally {

@@ -1,7 +1,7 @@
 "use client"
 
+import { notify } from "@/lib/notifications/notify"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { toast } from "sonner"
 import {
   getInventoryLevels,
   getInventoryTransactions,
@@ -104,37 +104,39 @@ export function useInventoryIntegration(organizationId?: string) {
 
   // Reserve inventory for purchase order
   const reserveInventoryMutation = useMutation({
+    meta: { operation: 'reserve', entity: 'Inventory', suppressSuccessNotification: true, suppressErrorNotification: true },
     mutationFn: async (reservations: { itemId: string; locationId: string; quantity: number }[]) => {
       return await reserveInventory(reservations)
     },
     onSuccess: (result) => {
       if (result.success) {
-        toast.success("Inventory reserved successfully")
+        notify.success("Inventory reserved successfully")
         invalidateInventoryQueries()
       } else {
-        toast.error(`Failed to reserve inventory: ${result.error}`)
+        notify.error(`Failed to reserve inventory: ${result.error}`)
       }
     },
     onError: (error) => {
-      toast.error(`Failed to reserve inventory: ${error.message}`)
+      notify.error(`Failed to reserve inventory: ${error.message}`)
     },
   })
 
   // Release inventory reservations
   const releaseInventoryMutation = useMutation({
+    meta: { operation: 'release', entity: 'Inventory', suppressSuccessNotification: true, suppressErrorNotification: true },
     mutationFn: async (reservations: { itemId: string; locationId: string; quantity: number }[]) => {
       return await releaseInventory(reservations)
     },
     onSuccess: (result) => {
       if (result.success) {
-        toast.success("Inventory reservations released")
+        notify.success("Inventory reservations released")
         invalidateInventoryQueries()
       } else {
-        toast.error(`Failed to release inventory: ${result.error}`)
+        notify.error(`Failed to release inventory: ${result.error}`)
       }
     },
     onError: (error) => {
-      toast.error(`Failed to release inventory: ${error.message}`)
+      notify.error(`Failed to release inventory: ${error.message}`)
     },
   })
 

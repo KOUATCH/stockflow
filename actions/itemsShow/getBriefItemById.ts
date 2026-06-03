@@ -9,15 +9,17 @@ import { db } from "@/prisma/db";
         id,
       },
       select:{
-        name:true,
+        nameEn:true,
+        nameFr:true,
         sku:true,
         updatedAt:true,
         id:true,
       }
     });
+    const data = item ? { ...item, name: item.nameEn } : null;
     return { 
       success: true,
-      data: item,
+      data,
       error: null, 
      };
   } catch (error) {

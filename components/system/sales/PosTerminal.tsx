@@ -7,7 +7,7 @@ import { createPayment, createSale } from "@/actions/cashSystem/sales/sales-acti
 import {
   createInventoryTransactions,
   updateInventoryLevels,
-} from "@/actions/pos/POSActionFinal"
+} from "@/actions/newPOSSession/pos/POSActionFinal"
 
 import { useNotifications } from "@/components/notifications/NotificationProvider"
 import { useOrgLocationsNew } from "@/hooks/useAllLocationsQueries"
@@ -91,7 +91,7 @@ interface CartItem {
 
 // Example mock customers for selection dialog
 
-export function pOSStation({ organizationId }: { organizationId?: string }) {
+export function POSStation({ organizationId }: { organizationId?: string }) {
   const [cart, setCart] = useState<CartItem[]>([])
   const [searchTerm, setSearchTerm] = useState("")
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null)
@@ -151,7 +151,7 @@ export function pOSStation({ organizationId }: { organizationId?: string }) {
   //   refetch: refetchItems,
   // } = useOrgItemsWithInventoryLevelsLocation(orgId, selectedLocation)
 
-  const { data, isLoading, error } = useItemsWithInventory({
+  const { data, isLoading, error: itemsError } = useItemsWithInventory({
     locationId: selectedLocation,
     organizationId: orgId,
     trackInventory: true,
@@ -199,6 +199,7 @@ export function pOSStation({ organizationId }: { organizationId?: string }) {
   // Add mutations for server actions
 
   const createSalesOrderMutation = useMutation({
+    meta: { operation: 'create', entity: 'Sales Order' , suppressSuccessNotification: true, suppressErrorNotification: true },
     mutationFn: createSale,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["sales-orders"] })
@@ -211,6 +212,7 @@ export function pOSStation({ organizationId }: { organizationId?: string }) {
   })
 
   const createPaymentMutation = useMutation({
+    meta: { operation: 'create', entity: 'Payment' },
     mutationFn: createPayment,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["payments"] })
@@ -218,6 +220,7 @@ export function pOSStation({ organizationId }: { organizationId?: string }) {
   })
 
   const updateInventoryMutation = useMutation({
+    meta: { operation: 'update', entity: 'Inventory' },
     mutationFn: updateInventoryLevels,
     onSuccess: () => {
       // Invalidate and refetch items to update inventory levels
@@ -228,6 +231,7 @@ export function pOSStation({ organizationId }: { organizationId?: string }) {
   })
 
   const createTransactionsMutation = useMutation({
+    meta: { operation: 'create', entity: 'Transactions' },
     mutationFn: createInventoryTransactions,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["inventory-transactions"] })
@@ -266,7 +270,7 @@ export function pOSStation({ organizationId }: { organizationId?: string }) {
   //   try {
   //     const inventoryCheck = validateInventory()
   //     if (!inventoryCheck.valid) {
-  //       toast({
+  //       notify({
   //         variant: "destructive",
   //         title: "Inventory Error",
   //         description: inventoryCheck.message,
@@ -275,7 +279,7 @@ export function pOSStation({ organizationId }: { organizationId?: string }) {
   //       return
   //     }
 
-  //     toast({
+  //     notify({
   //       title: "Processing Payment",
   //       description: "Please wait while we process your transaction...",
   //     })
@@ -388,7 +392,7 @@ export function pOSStation({ organizationId }: { organizationId?: string }) {
   //     setIsPaymentDialogOpen(false)
   //     setCashTendered("")
 
-  //     toast({
+  //     notify({
   //       title: "Sale Completed Successfully!",
   //       description: `Receipt #${salesOrder.orderNumber} - Total: $${calculateTotal().toFixed(2)}`,
   //     })
@@ -411,7 +415,7 @@ export function pOSStation({ organizationId }: { organizationId?: string }) {
 
   //     if (lowStockItems && lowStockItems.length > 0) {
   //       setTimeout(() => {
-  //         toast({
+  //         notify({
   //           title: "Low Stock Alert",
   //           description: `${lowStockItems.length} item(s) are running low on stock`,
   //         })
@@ -423,7 +427,7 @@ export function pOSStation({ organizationId }: { organizationId?: string }) {
   //     }, 1000)
   //   } catch (error) {
   //     console.error("Error processing payment:", error)
-  //     toast({
+  //     notify({
   //       variant: "destructive",
   //       title: "Payment Failed",
   //       description: error instanceof Error ? error.message : "Error processing payment. Please try again.",
@@ -436,7 +440,7 @@ export function pOSStation({ organizationId }: { organizationId?: string }) {
 
   const processPayment = async () => {
     // if (!currentSession) {
-    //   toast({
+    //   notify({
     //     variant: "destructive",
     //     title: "No Active Session",
     //     description: "Please start a POS session before processing payments.",
@@ -445,7 +449,7 @@ export function pOSStation({ organizationId }: { organizationId?: string }) {
     // }
 
     // if (!cashDrawerStatus.isOpen && paymentMethod === PaymentMethod.CASH) {
-    //   toast({
+    //   notify({
     //     variant: "destructive",
     //     title: "Cash Drawer Closed",
     //     description: "Please open the cash drawer before processing cash payments.",
@@ -778,7 +782,7 @@ export function pOSStation({ organizationId }: { organizationId?: string }) {
   // const toggleVoiceCommand = () => {
   //   setIsVoiceActive(!isVoiceActive)
   //   if (!isVoiceActive) {
-  //     toast({
+  //     notify({
   //       title: "Voice Commands Active",
   //       description: "Say 'add [product name]' or 'checkout' to use voice commands",
   //     })
@@ -1449,3 +1453,5 @@ export function pOSStation({ organizationId }: { organizationId?: string }) {
   )
   // ... (rest of the component)
 }
+
+export { POSStation as pOSStation }

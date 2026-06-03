@@ -11,8 +11,10 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Separator } from "@/components/ui/separator";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import countries from "@/contries";
+import { getLocaleFromPathname, localizePath } from "@/i18n/routing";
 import { generateSlug } from "@/lib/generateSlug";
 import { cn } from "@/lib/utils";
+import { DEFAULT_LOCALE } from "@/types/bilingual";
 import { UserProps } from "@/types/types";
 import {
   AlertCircle,
@@ -39,7 +41,7 @@ import {
   Zap
 } from "lucide-react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import Logo from "../global/Logo";
@@ -217,6 +219,9 @@ export default function EnhancedRegisterForm() {
   } = useForm<UserProps>();
 
   const router = useRouter();
+  const pathname = usePathname();
+  const locale = getLocaleFromPathname(pathname) ?? DEFAULT_LOCALE;
+  const localizedHref = (href: string) => localizePath(href, locale);
   const { formError, formSuccess, info } = useNotifications();
 
   // Watch form values
@@ -272,11 +277,11 @@ export default function EnhancedRegisterForm() {
 
       if (res.status === 409) {
         setLoading(false);
-        formError("Registration Failed", res.error, "This email address is already registered");
+        formError("Registration Failed", res.error ?? "This email address is already registered", "This email address is already registered");
       } else if (res.status === 200) {
         setLoading(false);
         formSuccess("Account Created", "Registration successful! Please check your email for verification.");
-        router.push(`/verify/${res?.data?.id}?email=${res?.data?.email}`);
+        router.push(localizedHref(`/verify/${res?.data?.id}?email=${res?.data?.email}`));
       } else {
         setLoading(false);
         formError("Registration Failed", "Something went wrong during registration", "Please try again");
@@ -539,11 +544,11 @@ export default function EnhancedRegisterForm() {
                           />
                           <label htmlFor="terms" className="text-sm text-gray-600">
                             I agree to the{" "}
-                            <Link href="/terms" className="text-violet-600 hover:text-violet-500">
+                            <Link href={localizedHref("/terms")} className="text-violet-600 hover:text-violet-500">
                               Terms of Service
                             </Link>{" "}
                             and{" "}
-                            <Link href="/privacy" className="text-violet-600 hover:text-violet-500">
+                            <Link href={localizedHref("/privacy")} className="text-violet-600 hover:text-violet-500">
                               Privacy Policy
                             </Link>
                           </label>
@@ -624,7 +629,7 @@ export default function EnhancedRegisterForm() {
                   <p className="text-gray-600">
                     Already have an account?{" "}
                     <Link
-                      href="/login"
+                      href={localizedHref("/login")}
                       className="text-violet-600 hover:text-violet-500 font-semibold transition-colors"
                     >
                       Sign In

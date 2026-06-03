@@ -1,41 +1,41 @@
+import { auth } from "@/auth";
 import { db } from "@/prisma/db";
+import { NextResponse } from "next/server";
 
 export async function GET(request: Request) {
     try {
+        const session = await auth();
+        const organizationId = session?.user?.organizationId;
 
-        const organizations = await db.organization.findMany({
-           
-            orderBy: {
-                name: "desc",
+        if (!session?.user || !organizationId) {
+            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        }
+
+        const organization = await db.organization.findFirst({
+            where: { id: organizationId },
+            select: {
+                id: true,
+                name: true,
+                slug: true,
+                industry: true,
+                country: true,
+                state: true,
+                currency: true,
+                timezone: true,
+                defaultLocale: true,
+                isActive: true,
+                createdAt: true,
+                updatedAt: true,
             },
         });
-        return new Response(JSON.stringify(organizations), {
-            status: 200,
-            headers: { 'Content-Type': 'application/json' }
-        });
+        return NextResponse.json(organization ? [organization] : []);
     } catch (error) {
         console.error("Error fetching the count:", error);
-        if (typeof error === 'object' && error !== null) {
-            console.log(Object.keys(error));
-        }
-        return {
-            status: 500,
-            body: JSON.stringify({ error: "Internal Server Error" })
-        };
+        return NextResponse.json({ error: "Internal Server Error" }, { status: 500 });
 
     }
 }
 
 export async function POST(request: Request) {
-    // Parse the request body
-    const body = await request.json();
-    const { name } = body;
-
-    // e.g. Insert new user into your DB
-    const newUser = { id: Date.now(), name };
-
-    return new Response(JSON.stringify(newUser), {
-        status: 201,
-        headers: { 'Content-Type': 'application/json' }
-    });
+    return NextResponse.json({ error: "Method not allowed" }, { status: 405 });
 }

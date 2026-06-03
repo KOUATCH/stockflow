@@ -36,7 +36,7 @@ export const CategoryKeys = {
 }
 
 export const UnitKeys = {
-  all: ["categories"] as const,
+  all: ["units"] as const,
   lists: () => [...UnitKeys.all, "list"] as const,
   list: (filters: string) => [...UnitKeys.lists(), { filters }] as const,
   details: () => [...UnitKeys.all, "detail"] as const,

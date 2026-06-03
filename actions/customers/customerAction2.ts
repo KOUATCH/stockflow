@@ -1,18 +1,91 @@
-
-
 "use server"
 
-import { getAuthenticatedUser } from "@/lib/auth-server"
-import { db } from "@/prisma/db"
-import type { Customer, CustomerWithStats } from "@/types/customerTypes"
-import type { CustomerEditFormData, CustomerFormData } from "@/validations/customer"
+import { randomUUID } from "crypto"
 
-export async function getCustomers(): Promise<CustomerWithStats[]> {
+import { getAuthenticatedUser } from "@/lib/auth-server"
+import type { ServerActionResult } from "@/lib/error-handling/types"
+import { db } from "@/prisma/db"
+import type {
+  Customer,
+  CustomerOrder,
+  CustomerOrderPayment,
+  CustomerWithStats,
+} from "@/types/customerTypes"
+import type { CustomerEditFormData, CustomerFormData } from "@/validations/customer"
+import type { Customer as PrismaCustomer, Payment } from "@prisma/client"
+
+type DecimalLike = { toNumber?: () => number; toString: () => string } | number | string | null | undefined
+
+function toNumber(value: DecimalLike): number {
+  if (value == null) return 0
+  if (typeof value === "number") return value
+  if (typeof value === "string") return Number(value) || 0
+  if (typeof value.toNumber === "function") return value.toNumber()
+  return Number(value.toString()) || 0
+}
+
+function emptyToNull(value: string | null | undefined): string | null {
+  const trimmed = value?.trim()
+  return trimmed ? trimmed : null
+}
+
+function mapCustomer(customer: PrismaCustomer): Customer {
+  return {
+    id: customer.id,
+    name: customer.name,
+    code: customer.code,
+    email: customer.email,
+    phone: customer.phone,
+    address: customer.address,
+    taxId: customer.taxId,
+    creditLimit: customer.creditLimit == null ? null : toNumber(customer.creditLimit),
+    paymentTerms: customer.paymentTerms ?? 30,
+    notes: customer.notes,
+    isActive: customer.isActive,
+    organizationId: customer.organizationId,
+    createdAt: customer.createdAt,
+    updatedAt: customer.updatedAt,
+  }
+}
+
+function mapPayment(payment: Payment): CustomerOrderPayment {
+  return {
+    id: payment.id,
+    paymentNumber: payment.paymentNumber,
+    amount: toNumber(payment.amount),
+    method: payment.method,
+    status: payment.status,
+    processedAt: payment.processedAt,
+    createdAt: payment.createdAt,
+  }
+}
+
+async function getUserOrganizationId(organizationId?: string): Promise<string> {
+  if (organizationId) return organizationId
+
   const user = await getAuthenticatedUser()
-  const userOrgId = user.organizationId
+  if (!user.organizationId) {
+    throw new Error("Organization ID is required")
+  }
+
+  return user.organizationId
+}
+
+async function nextCustomerCode(organizationId: string): Promise<string> {
+  const customerCount = await db.customer.count({
+    where: { organizationId },
+  })
+
+  return `CUST-${String(customerCount + 1).padStart(4, "0")}`
+}
+
+export async function getCustomers(): Promise<ServerActionResult<CustomerWithStats[]>> {
+  const organizationId = await getUserOrganizationId()
+
   const customers = await db.customer.findMany({
     where: {
-      organizationId:userOrgId,
+      organizationId,
+      deletedAt: null,
     },
     include: {
       salesOrders: {
@@ -21,6 +94,9 @@ export async function getCustomers(): Promise<CustomerWithStats[]> {
           total: true,
           createdAt: true,
         },
+        orderBy: {
+          createdAt: "desc",
+        },
       },
     },
     orderBy: {
@@ -28,88 +104,109 @@ export async function getCustomers(): Promise<CustomerWithStats[]> {
     },
   })
 
-  return customers.map((customer) => ({
-    ...customer,
-    paymentTerms: customer.paymentTerms ?? 0,
-    totalOrders: customer.salesOrders.length,
-    totalRevenue: customer.salesOrders.reduce((sum, order) => sum + (order.total || 0), 0),
-    lastOrderDate:
-      customer.salesOrders.length > 0
-        ? customer.salesOrders.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())[0].createdAt
-        : null,
-  }))
+  const result = customers.map((customer): CustomerWithStats => {
+    const totalOrders = customer.salesOrders.length
+    const totalRevenue = customer.salesOrders.reduce((sum, order) => sum + toNumber(order.total), 0)
+
+    return {
+      ...mapCustomer(customer),
+      totalOrders,
+      totalRevenue,
+      totalOrderValue: totalRevenue,
+      averageOrderValue: totalOrders > 0 ? totalRevenue / totalOrders : 0,
+      lastOrderDate: customer.salesOrders[0]?.createdAt ?? null,
+    }
+  })
+
+  return { success: true, data: result }
 }
 
-export async function getCustomer(id: string, organizationId?: string): Promise<Customer | null> {
-  const user = await getAuthenticatedUser()
-  const userOrgId = organizationId || user.organizationId
-
-  if (!userOrgId) {
-    throw new Error("Organization ID is required")
+export async function getCustomer(id: string, organizationId?: string): Promise<ServerActionResult<Customer | null>> {
+  if (!id) {
+    throw new Error("Customer ID is required")
   }
 
   const customer = await db.customer.findFirst({
     where: {
       id,
-      organizationId: userOrgId,
+      organizationId: await getUserOrganizationId(organizationId),
+      deletedAt: null,
     },
   })
 
-  if (!customer) return null
-
-  return {
-    ...customer,
-    paymentTerms: customer.paymentTerms ?? 0,
-  }
+  return { success: true, data: customer ? mapCustomer(customer) : null }
 }
 
-export async function createCustomer(data: CustomerFormData): Promise<Customer> {
+export async function createCustomer(data: CustomerFormData): Promise<ServerActionResult<Customer>> {
+  if (!data.name) {
+    throw new Error("Customer name is required")
+  }
 
-  const user = await getAuthenticatedUser()
-  const userOrgId = user.organizationId
+  const organizationId = await getUserOrganizationId()
+  const now = new Date()
+
   const customer = await db.customer.create({
     data: {
-      ...data,
-      organizationId:userOrgId,
-      code: data.code || `CUST-${Date.now()}`,
+      id: randomUUID(),
+      name: data.name.trim(),
+      code: emptyToNull(data.code) ?? await nextCustomerCode(organizationId),
+      email: emptyToNull(data.email),
+      phone: emptyToNull(data.phone),
+      address: emptyToNull(data.address),
+      taxId: emptyToNull(data.taxId),
+      creditLimit: data.creditLimit ?? null,
+      paymentTerms: data.paymentTerms ?? 30,
+      notes: emptyToNull(data.notes),
+      isActive: data.isActive ?? true,
+      organizationId,
+      updatedAt: now,
     },
   })
 
-  return {
-    ...customer,
-    paymentTerms: customer.paymentTerms ?? 0,
-  }
+  return { success: true, data: mapCustomer(customer) }
 }
 
-export async function updateCustomer(data: CustomerEditFormData): Promise<Customer> {
-  
-  const user = await getAuthenticatedUser()
-  const userOrgId = user.organizationId
+export async function updateCustomer(data: CustomerEditFormData): Promise<ServerActionResult<Customer>> {
+  if (!data.id) {
+    throw new Error("Customer ID is required")
+  }
+
+  if (!data.name) {
+    throw new Error("Customer name is required")
+  }
+
+  const organizationId = await getUserOrganizationId()
+
   const updated = await db.customer.updateMany({
     where: {
       id: data.id,
-      organizationId:userOrgId,
+      organizationId,
+      deletedAt: null,
     },
     data: {
-      name: data.name,
-      code: data.code,
-      email: data.email,
-      phone: data.phone,
-      address: data.address,
-      taxId: data.taxId,
-      creditLimit: data.creditLimit,
+      name: data.name.trim(),
+      code: emptyToNull(data.code),
+      email: emptyToNull(data.email),
+      phone: emptyToNull(data.phone),
+      address: emptyToNull(data.address),
+      taxId: emptyToNull(data.taxId),
+      creditLimit: data.creditLimit ?? null,
       paymentTerms: data.paymentTerms,
-      notes: data.notes,
+      notes: emptyToNull(data.notes),
       isActive: data.isActive,
+      updatedAt: new Date(),
     },
   })
 
-  // Optionally, fetch and return the updated customer
+  if (updated.count === 0) {
+    throw new Error("Customer not found or update failed")
+  }
+
   const customer = await db.customer.findFirst({
-    
     where: {
       id: data.id,
-      organizationId:userOrgId,
+      organizationId,
+      deletedAt: null,
     },
   })
 
@@ -117,35 +214,33 @@ export async function updateCustomer(data: CustomerEditFormData): Promise<Custom
     throw new Error("Customer not found after update")
   }
 
-  return {
-    ...customer,
-    paymentTerms: customer.paymentTerms ?? 0,
-  }
+  return { success: true, data: mapCustomer(customer) }
 }
 
-export async function getCustomerOrders(customerId: string) {
-  const user = await getAuthenticatedUser()
-  const userOrgId = user.organizationId
-
-  if (!userOrgId) {
-    throw new Error("Organization ID is required")
+export async function getCustomerOrders(customerId: string): Promise<ServerActionResult<CustomerOrder[]>> {
+  if (!customerId) {
+    throw new Error("Customer ID is required")
   }
+
+  const organizationId = await getUserOrganizationId()
 
   const orders = await db.salesOrder.findMany({
     where: {
       customerId,
-      organizationId: userOrgId,
+      organizationId,
+      deletedAt: null,
     },
     include: {
       lines: {
         include: {
           item: {
             select: {
-              name: true,
+              nameEn: true,
+              nameFr: true,
               sku: true,
-            }
-          }
-        }
+            },
+          },
+        },
       },
       payments: true,
     },
@@ -154,39 +249,51 @@ export async function getCustomerOrders(customerId: string) {
     },
   })
 
-  return orders.map(order => ({
+  const result = orders.map((order): CustomerOrder => ({
     id: order.id,
     orderNumber: order.orderNumber,
     status: order.status,
-    totalAmount: order.totalAmount,
-    subtotal: order.subtotal,
-    taxAmount: order.taxAmount,
-    discountAmount: order.discountAmount,
-    itemCount: order.lines.reduce((sum, line) => sum + line.quantity, 0),
+    totalAmount: toNumber(order.total),
+    subtotal: toNumber(order.subtotal),
+    taxAmount: toNumber(order.taxAmount),
+    discountAmount: toNumber(order.discount),
+    itemCount: order.lines.reduce((sum, line) => sum + toNumber(line.quantity), 0),
     lineItems: order.lines.length,
     createdAt: order.createdAt,
     updatedAt: order.updatedAt,
-    deliveredAt: order.deliveredAt,
-    lines: order.lines.map(line => ({
+    lines: order.lines.map((line) => ({
       id: line.id,
-      itemName: line.item?.name || 'Unknown Item',
-      sku: line.item?.sku || '',
-      quantity: line.quantity,
-      unitPrice: line.unitPrice,
-      lineTotal: line.lineTotal,
+      itemName: line.item?.nameEn || line.item?.nameFr || "Unknown Item",
+      sku: line.item?.sku || "",
+      quantity: toNumber(line.quantity),
+      unitPrice: toNumber(line.unitPrice),
+      lineTotal: toNumber(line.lineTotal),
     })),
-    payments: order.payments,
+    payments: order.payments.map(mapPayment),
   }))
+
+  return { success: true, data: result }
 }
 
-export async function deleteCustomer(id: string): Promise<void> {
-  const user = await getAuthenticatedUser()
-  const userOrgId = user.organizationId
+export async function deleteCustomer(id: string): Promise<ServerActionResult<void>> {
+  if (!id) {
+    throw new Error("Customer ID is required")
+  }
 
-  await db.customer.delete({
+  const organizationId = await getUserOrganizationId()
+
+  await db.customer.updateMany({
     where: {
       id,
-      organizationId:userOrgId,
+      organizationId,
+      deletedAt: null,
+    },
+    data: {
+      deletedAt: new Date(),
+      isActive: false,
+      updatedAt: new Date(),
     },
   })
+
+  return { success: true, data: undefined }
 }

@@ -4,6 +4,7 @@ declare global {
   var prisma: PrismaClient | undefined;
 }
 
+// Standard Prisma client for Node.js runtime (API routes, server actions)
 export const db =
   globalThis.prisma ||
   new PrismaClient({
@@ -16,5 +17,7 @@ export const db =
 
 // Export as both 'db' and 'prisma' for compatibility
 export const prisma = db;
+
+export default db;
 
 if (process.env.NODE_ENV !== "production") globalThis.prisma = db;

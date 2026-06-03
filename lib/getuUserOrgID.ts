@@ -1,13 +1,22 @@
 "use server"
 import { auth } from "@/lib/auth"
 import { headers } from "next/headers"
+import { authAction } from "@/lib/error-handling"
 
-const getUserOrgID = async () => {
+export default authAction(async function getUserOrgID() {
   const session = await auth.api.getSession({
     headers: headers()
   })
 
-  const orgId = session?.user?.organizationId || ""
+  if (!session?.user) {
+    throw new Error("User not authenticated")
+  }
+
+  const orgId = session.user.organizationId || ""
+
+  if (!orgId) {
+    throw new Error("User organization not found")
+  }
+
   return orgId
-}
-export default getUserOrgID
+})

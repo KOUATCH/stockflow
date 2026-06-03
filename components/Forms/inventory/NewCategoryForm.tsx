@@ -1,4 +1,6 @@
 "use client";
+
+import { notify } from "@/lib/notifications/notify"
 import createCategory from "@/actions/categories/createCategory";
 import updateCategoryById from "@/actions/categories/updateCategoryById";
 import ImageInput from "@/components/FormInputs/ImageInput";
@@ -20,8 +22,6 @@ import { CheckCircle2, LayoutGrid, Loader2 } from "lucide-react";
 import router from "next/router";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
-import { toast } from "sonner";
-
 type CategoriesFormProps = {
   editingId?: string | undefined;
   initialData?: Category | undefined | null;
@@ -44,10 +44,12 @@ const NewCategoryForm = ({
     formState: { errors },
   } = useForm<CategoryProps>({
     defaultValues: {
-      title: initialData?.title || "",
+      titleEn: initialData?.titleEn || "",
+      titleFr: initialData?.titleFr || "",
       slug: initialData?.slug || "",
       imageUrl: initialImage,
-      description: initialData?.description || "",
+      descriptionEn: initialData?.descriptionEn || "",
+      descriptionFr: initialData?.descriptionFr || "",
       organizationId: organizationId,
 
     },
@@ -60,28 +62,28 @@ const NewCategoryForm = ({
     setLoading(true);
 
     try {
-      data.slug = generateSlug(data.title).toLowerCase();
+      data.slug = generateSlug(data.titleEn).toLowerCase();
       data.imageUrl = imageUrl;
       if (editingId) {
         await updateCategoryById(editingId, data);
         setLoading(false);
         // Toast
-        toast.success("Updated Successfully!");
+        notify.success("Updated Successfully!");
         //reset
         reset();
         //router
         router.push("/dashboard/categories");
       } else {
         const res = await createCategory(data);
-        if (res.status !== 200) {
+        if (!res.success) {
           setLoading(false);
           console.log("Error:", res.error);
-          // toast.error(res.error, { description: "Category not created" });
+          // notify.error(res.error, { description: "Category not created" });
           // setErr(res.error ?? "Something went wrong, Please try again")
           return;
         }
         setLoading(false);
-        toast.success("Category Created successfully", { description: "Category created" });
+        notify.success("Category Created successfully", { description: "Category created" });
         window.location.reload();
         reset()
 
@@ -90,7 +92,7 @@ const NewCategoryForm = ({
     } catch (error) {
       setLoading(false);
       console.error("Network Error:", error);
-      // toast.error("Its seems something is wrong, try again");
+      // notify.error("Its seems something is wrong, try again");
     }
   }
 
@@ -118,10 +120,18 @@ const NewCategoryForm = ({
               <TextInput
                 register={register}
                 errors={errors}
-                label="Category Name"
-                name="title"
+                label="English Category Name"
+                name="titleEn"
                 placeholder="Category Name"
                 isRequired
+              />
+
+              <TextInput
+                register={register}
+                errors={errors}
+                label="French Category Name"
+                name="titleFr"
+                placeholder="Nom de categorie"
               />
 
 
@@ -129,9 +139,17 @@ const NewCategoryForm = ({
                 <TextArea
                   register={register}
                   errors={errors}
-                  label="Description"
-                  name="description"
+                  label="English Description"
+                  name="descriptionEn"
                   isRequired={true}
+                />
+              </div>
+              <div className="grid gap-3">
+                <TextArea
+                  register={register}
+                  errors={errors}
+                  label="French Description"
+                  name="descriptionFr"
                 />
               </div>
             </div>

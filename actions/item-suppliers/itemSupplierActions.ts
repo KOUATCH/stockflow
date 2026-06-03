@@ -1,11 +1,7 @@
 "use server"
 
 import { db } from "@/prisma/db"
-import type {
-  ItemSupplierUpdateData,
-  UpdateItemSupplierDTO,
-  UpdateItemSupplierResponse,
-} from "@/types/itemSuppliers"
+import type { UpdateItemSupplierDTO, UpdateItemSupplierResponse } from "@/types/itemSuppliers"
 import { Prisma } from "@prisma/client"
 import { revalidatePath } from "next/cache"
 
@@ -22,11 +18,11 @@ export const updateItemSupplier = async (
     }
 
     // Prepare update data
-    const updateData: ItemSupplierUpdateData = {
+    const updateData: Prisma.ItemSupplierUpdateInput = {
       isPreferred: data.isPreferred,
       supplierSku: data.supplierSku ?? null,
-      leadTime: data.leadTime ?? null,
-      minOrderQty: data.minOrderQty ?? null,
+      leadTimeDays: data.leadTime ?? null,
+      minOrderQuantity: data.minOrderQty ?? null,
       unitCost: data.unitCost ?? null,
       lastPurchaseDate: data.lastPurchaseDate ?? null,
       notes: data.notes ?? null,
@@ -69,7 +65,8 @@ export const updateItemSupplier = async (
           item: {
             select: {
               id: true,
-              name: true,
+              nameEn: true,
+              nameFr: true,
             },
           },
         },
@@ -84,7 +81,18 @@ export const updateItemSupplier = async (
 
     return {
       success: true,
-      data: result,
+      data: {
+        ...result,
+        leadTime: result.leadTimeDays,
+        minOrderQty: result.minOrderQuantity,
+        unitCost: result.unitCost ? Number(result.unitCost) : undefined,
+        item: result.item
+          ? {
+              ...result.item,
+              name: result.item.nameEn ?? result.item.nameFr ?? "",
+            }
+          : undefined,
+      },
     }
   } catch (error) {
     console.error("Failed to update Item Supplier:", error)

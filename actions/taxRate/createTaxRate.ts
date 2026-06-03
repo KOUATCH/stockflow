@@ -1,59 +1,43 @@
 "use server"
-import { getAuthenticatedUser } from "@/lib/auth-server"
-import { db } from "@/prisma/db"
+
+import { createManagedTaxRate } from "@/actions/taxRate/tax-rate-management-actions"
+import type { TaxRateManagementInput } from "@/actions/taxRate/tax-rate-management-actions"
+import { getAuthenticatedUser } from "@/config/useAuth"
 import type { TaxRateCreateDTO } from "@/types/taxRates"
-import { revalidatePath } from "next/cache"
+
+function normalizeTaxRateInput(data: TaxRateCreateDTO): TaxRateManagementInput {
+  return {
+    nameEn: data.nameEn ?? data.taxRateName ?? data.name ?? "",
+    nameFr: data.nameFr ?? null,
+    rate: Number(data.rate ?? 0),
+    type: (data.type as TaxRateManagementInput["type"]) ?? "SALES",
+    isActive: data.isActive ?? true,
+  }
+}
 
 const createTaxRate = async (data: TaxRateCreateDTO) => {
   try {
-    return await db.$transaction(async (tx) => {
-      const user = await getAuthenticatedUser()
-      if (!user || !user.organizationId) {
-        return {
-          error: `User not found`,
-          success: false,
-          data: null,
-        }
-      }
+    const user = await getAuthenticatedUser()
 
-      const taxRateData = {
-        ...data,
-        organizationId: user.organizationId,
-      }
-
-      const existingTaxRate = await tx.taxRate.findUnique({
-        where: {
-          organizationId_taxRateName: {
-            taxRateName: data.taxRateName,
-            organizationId: user.organizationId,
-          },
-        },
-      })
-
-      if (existingTaxRate) {
-        return {
-          error: `This taxRate ${data?.taxRateName} has already been created`,
-          success: false,
-          data: null,
-        }
-      }
-
-      const newtaxRate = await tx.taxRate.create({
-        data: taxRateData,
-      })
-
-      revalidatePath("/inventory/taxRates")
-
+    if (!user?.organizationId) {
       return {
-        error: null,
-        success: true,
-        data: newtaxRate,
+        error: "Organization is required",
+        success: false,
+        data: null,
       }
-    })
+    }
+
+    const result = await createManagedTaxRate(user.organizationId, normalizeTaxRateInput(data))
+
+    return {
+      error: result.error ?? null,
+      success: result.success,
+      data: result.data ?? null,
+    }
   } catch (error) {
     console.error("Error creating taxRate:", error)
     return {
-      error: `Something went wrong, Please try again`,
+      error: error instanceof Error ? error.message : "Something went wrong, please try again",
       success: false,
       data: null,
     }

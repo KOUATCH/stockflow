@@ -1,6 +1,6 @@
 'use client'
 
-import { createItemAction } from '@/actions/item/createItemAction';
+import { createItemAction } from '@/actions/item/items';
 // import { createItemAction } from '@/actions/item/createItem';
 import { deleteItemAction, getItemAction, updateItemBasicInfoAction, updateItemDetailsAction, updateItemPricingAction, updateItemRelationsAction, updateItemStockAction, updateItemTrackingAction } from '@/actions/item/items';
 import { listItemsAction, PaginatedItems } from '@/actions/item/listItemsAction';
@@ -88,6 +88,7 @@ type BaseMutationOptions<TVariables, TData> = Omit<UseMutationOptions<TData, Err
 export function useCreateItem(options?: BaseMutationOptions<unknown, ItemWithRelations>) {
   const qc = useQueryClient()
   return useMutation<ItemWithRelations, Error, unknown>({
+    meta: { operation: 'create', entity: 'Item' },
     mutationFn: (input) => callAction(createItemAction, input),
     onSuccess: async (_data, _vars) => {
       await Promise.all([
@@ -101,6 +102,7 @@ export function useCreateItem(options?: BaseMutationOptions<unknown, ItemWithRel
 export function useUpdateItemBasicInfo(options?: BaseMutationOptions<unknown, ItemWithRelations>) {
   const qc = useQueryClient()
   return useMutation<ItemWithRelations, Error, unknown>({
+    meta: { operation: 'update', entity: 'Item Basic Info' },
     mutationFn: (input) => callAction(updateItemBasicInfoAction, input),
     onSuccess: async (data, vars) => {
       const v = (vars ?? {}) as { id?: string }
@@ -118,6 +120,7 @@ export function useUpdateItemBasicInfo(options?: BaseMutationOptions<unknown, It
 export function useUpdateItemDetails(options?: BaseMutationOptions<unknown, ItemWithRelations>) {
   const qc = useQueryClient()
   return useMutation<ItemWithRelations, Error, unknown>({
+    meta: { operation: 'update', entity: 'Item Details' },
     mutationFn: (input) => callAction(updateItemDetailsAction, input),
     onSuccess: async (data, vars) => {
       const v = (vars ?? {}) as { id?: string }
@@ -135,6 +138,7 @@ export function useUpdateItemDetails(options?: BaseMutationOptions<unknown, Item
 export function useUpdateItemPricing(options?: BaseMutationOptions<unknown, ItemWithRelations>) {
   const qc = useQueryClient()
   return useMutation<ItemWithRelations, Error, unknown>({
+    meta: { operation: 'update', entity: 'Item Pricing' },
     mutationFn: (input) => callAction(updateItemPricingAction, input),
     onSuccess: async (data, vars) => {
       const v = (vars ?? {}) as { id?: string }
@@ -152,6 +156,7 @@ export function useUpdateItemPricing(options?: BaseMutationOptions<unknown, Item
 export function useUpdateItemRelations(options?: BaseMutationOptions<unknown, ItemWithRelations>) {
   const qc = useQueryClient()
   return useMutation<ItemWithRelations, Error, unknown>({
+    meta: { operation: 'update', entity: 'Item Relations' },
     mutationFn: (input) => callAction(updateItemRelationsAction, input),
     onSuccess: async (data, vars) => {
       const v = (vars ?? {}) as { id?: string }
@@ -169,6 +174,7 @@ export function useUpdateItemRelations(options?: BaseMutationOptions<unknown, It
 export function useUpdateItemStock(options?: BaseMutationOptions<unknown, ItemWithRelations>) {
   const qc = useQueryClient()
   return useMutation<ItemWithRelations, Error, unknown>({
+    meta: { operation: 'update', entity: 'Item Stock' },
     mutationFn: (input) => callAction(updateItemStockAction, input),
     onSuccess: async (data, vars) => {
       const v = (vars ?? {}) as { id?: string }
@@ -186,6 +192,7 @@ export function useUpdateItemStock(options?: BaseMutationOptions<unknown, ItemWi
 export function useUpdateItemTracking(options?: BaseMutationOptions<unknown, ItemWithRelations>) {
   const qc = useQueryClient()
   return useMutation<ItemWithRelations, Error, unknown>({
+    meta: { operation: 'update', entity: 'Item Tracking' },
     mutationFn: (input) => callAction(updateItemTrackingAction, input),
     onSuccess: async (data, vars) => {
       const v = (vars ?? {}) as { id?: string }

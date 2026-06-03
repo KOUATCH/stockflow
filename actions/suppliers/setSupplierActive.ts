@@ -40,7 +40,12 @@ export async function setSupplierActive(
     revalidateTag(`supplier-${id}`)
     revalidatePath('/dashboard/suppliers')
 
-    return { success: true, message: `Supplier ${isActive ? 'activated' : 'deactivated'} successfully`, data: updated as SupplierWithRelations }
+    return {
+      success: true,
+      error: null,
+      message: `Supplier ${isActive ? 'activated' : 'deactivated'} successfully`,
+      data: updated as SupplierWithRelations,
+    }
   } catch (error) {
     console.error('Error toggling supplier active flag:', error)
     if (error instanceof Prisma.PrismaClientKnownRequestError) {

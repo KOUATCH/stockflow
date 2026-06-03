@@ -1,5 +1,6 @@
 "use client"
 
+import { notify } from "@/lib/notifications/notify"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -28,7 +29,6 @@ import { zodResolver } from "@hookform/resolvers/zod"
 import { DollarSign, Hash, ImageIcon, Package, Ruler, Settings, Warehouse } from "lucide-react"
 import { useEffect, useMemo, useState } from "react"
 import { useForm } from "react-hook-form"
-import { toast } from "sonner"
 import type { z } from "zod"
 
 // Props data minimal DTOs
@@ -106,8 +106,10 @@ export default function ItemCreateForm({
     resolver: zodResolver(createSchema),
     defaultValues: {
       organizationId,
-      name: "",
-      description: "",
+      nameEn: "",
+      nameFr: "",
+      descriptionEn: "",
+      descriptionFr: "",
       imageUrls: "",
       thumbnail: "",
       sku: "",
@@ -149,8 +151,10 @@ export default function ItemCreateForm({
     if (mode !== "edit" || !existingItem) return
     form.reset({
       organizationId,
-      name: existingItem.name ?? "",
-      description: existingItem.description ?? "",
+      nameEn: existingItem.nameEn ?? "",
+      nameFr: existingItem.nameFr ?? "",
+      descriptionEn: existingItem.descriptionEn ?? "",
+      descriptionFr: existingItem.descriptionFr ?? "",
       imageUrls: (existingItem as any).imageUrls ?? "",
       thumbnail: (existingItem as any).thumbnail ?? "",
       sku: existingItem.sku ?? "",
@@ -192,7 +196,7 @@ export default function ItemCreateForm({
     try {
       // validation sanity for prices
       if ((values.sellingPrice ?? 0) < (values.costPrice ?? 0)) {
-        toast.warning("Selling price is below cost", { description: "Consider adjusting your selling price." })
+        notify.warning("Selling price is below cost", { description: "Consider adjusting your selling price." })
       }
 
       if (mode === "create") {
@@ -219,13 +223,15 @@ export default function ItemCreateForm({
         }
 
         const created = await createItem(payload)
-        toast.success("Item created successfully")
+        notify.success("Item created successfully")
         onCreated?.(created.id)
 
         form.reset({
           ...form.getValues(),
-          name: "",
-          description: "",
+          nameEn: "",
+          nameFr: "",
+          descriptionEn: "",
+          descriptionFr: "",
           imageUrls: "",
           thumbnail: "",
           sku: "",
@@ -260,7 +266,7 @@ export default function ItemCreateForm({
 
       // Edit mode: split into dedicated update actions to keep payloads aligned with backend
       if (!itemId) {
-        toast.error("No item selected for update")
+        notify.error("No item selected for update")
         return
       }
 
@@ -268,8 +274,10 @@ export default function ItemCreateForm({
         updateBasic.mutateAsync({
           id: itemId,
           organizationId,
-          name: values.name,
-          description: values.description,
+          nameEn: values.nameEn,
+          nameFr: values.nameFr,
+          descriptionEn: values.descriptionEn,
+          descriptionFr: values.descriptionFr,
           imageUrls: values.imageUrls ?? "",
           thumbnail: values.thumbnail ?? "",
         }),
@@ -317,11 +325,11 @@ export default function ItemCreateForm({
         }),
       ])
 
-      toast.success("Item updated")
+      notify.success("Item updated")
       onUpdated?.(itemId)
       onClose?.()
     } catch (err: any) {
-      toast.error(mode === "create" ? "Failed to create item" : "Failed to update item", {
+      notify.error(mode === "create" ? "Failed to create item" : "Failed to update item", {
         description: err?.message || "Unknown error",
       })
     }
@@ -371,10 +379,10 @@ export default function ItemCreateForm({
                       <CardContent className="space-y-4">
                         <FormField
                           control={form.control}
-                          name="name"
+                          name="nameEn"
                           render={({ field }) => (
                             <FormItem>
-                              <FormLabel>Item Name *</FormLabel>
+                              <FormLabel>English Item Name *</FormLabel>
                               <FormControl>
                                 <Input placeholder="e.g., Premium Flour 1kg" {...field} />
                               </FormControl>
@@ -384,12 +392,38 @@ export default function ItemCreateForm({
                         />
                         <FormField
                           control={form.control}
-                          name="description"
+                          name="nameFr"
                           render={({ field }) => (
                             <FormItem>
-                              <FormLabel>Description</FormLabel>
+                              <FormLabel>French Item Name</FormLabel>
+                              <FormControl>
+                                <Input placeholder="ex. Farine premium 1kg" {...field} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={form.control}
+                          name="descriptionEn"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>English Description</FormLabel>
                               <FormControl>
                                 <Textarea placeholder="Describe the item" className="min-h-[100px]" {...field} />
+                              </FormControl>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+                        <FormField
+                          control={form.control}
+                          name="descriptionFr"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel>French Description</FormLabel>
+                              <FormControl>
+                                <Textarea placeholder="Decrivez l'article" className="min-h-[100px]" {...field} />
                               </FormControl>
                               <FormMessage />
                             </FormItem>

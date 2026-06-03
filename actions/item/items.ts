@@ -9,7 +9,6 @@ import {
   getItemSchema,
   type ItemWithRelations,
   listItemsSchema,
-  revalidateItems,
   slugify,
   updateBasicInfoSchema,
   updateDetailsSchema,
@@ -18,8 +17,11 @@ import {
   updateStockSchema,
   updateTrackingSchema,
 } from "@/lib/item/schemas"
+import { revalidateItem as revalidateItems } from "@/lib/item/revalidation"
 import { db } from "@/prisma/db"
 import { Prisma } from "@prisma/client"
+import { getAuthenticatedUser } from "@/config/useAuth"
+import { createItemFromForm } from "@/services/item/item.service"
 import { revalidatePath, revalidateTag } from "next/cache"
 
 export type PaginatedItems = {
@@ -34,71 +36,10 @@ export type PaginatedItems = {
 export async function createItemAction(input: unknown): Promise<ActionResult<ItemWithRelations>> {
   try {
     const data = createItemSchema.parse(input)
-
-    // Enforce unique SKU within org
-    const existingSku = await db.item.findFirst({
-      where: { sku: data.sku, organizationId: data.organizationId },
-      select: { id: true },
-    })
-    if (existingSku) {
-      return { success: false, error: "SKU already exists in this organization" }
-    }
-
-    const slug = data.slug ?? slugify(`${data.name}-${data.sku}`)
-
-    const created = await db.$transaction(async (tx) => {
-      const item = await tx.item.create({
-        data: {
-          organizationId: data.organizationId,
-          name: data.name,
-          description: data.description ?? null,
-          imageUrls: data.imageUrls,
-          thumbnail: data.thumbnail ?? null,
-          sku: data.sku,
-          barcode: data.barcode ?? null,
-          dimensions: data.dimensions ?? null,
-          weight: data.weight ?? 0,
-          upc: data.upc ?? null,
-          ean: data.ean ?? null,
-          mpn: data.mpn ?? null,
-          isbn: data.isbn ?? null,
-          costPrice: data.costPrice ?? 0,
-          sellingPrice: data.sellingPrice ?? 0,
-          categoryId: data.categoryId ?? null,
-          brandId: data.brandId ?? null,
-          unitId: data.unitId ?? null,
-          taxRateId: data.taxRateId ?? null,
-          minStockLevel: data.minStockLevel ?? 0,
-          maxStockLevel: data.maxStockLevel ?? null,
-          isActive: data.isActive ?? true,
-          slug,
-        },
-        include: itemStandardInclude,
-      })
-
-      // Optional initial inventory
-      if (data.initialInventory && data.initialInventory.quantity > 0) {
-        const inv = data.initialInventory
-        await updateInventoryLevels(tx, {
-          itemId: item.id,
-          locationId: inv.locationId,
-          deltaQty: inv.quantity,
-          unitCost: inv.unitCost ?? item.costPrice ?? 0,
-          organizationId: data.organizationId,
-          meta: {
-            notes: inv.notes ?? "Initial item stock",
-            createdById: inv.createdById,
-            referenceType: "GOODS_RECEIPT",
-            referenceId: undefined,
-            referenceNumber: inv.referenceNumber,
-            batchNumber: inv.batchNumber,
-            serialNumbers: inv.serialNumbers,
-            expiryDate: inv.expiryDate,
-          },
-        })
-      }
-
-      return item
+    const user = await getAuthenticatedUser()
+    const created = await createItemFromForm(user.organizationId, user.id, {
+      ...data,
+      organizationId: user.organizationId,
     })
 
     revalidateItems(created.id, created.organizationId)
@@ -151,7 +92,7 @@ export async function listItemsAction(input: unknown): Promise<ActionResult<Pagi
       ...(q
         ? {
             OR: [
-              { name: { contains: q, mode: "insensitive" } },
+              { nameEn: { contains: q, mode: "insensitive" } },
               { sku: { contains: q, mode: "insensitive" } },
               { barcode: { contains: q, mode: "insensitive" } },
             ],
@@ -192,9 +133,16 @@ export async function updateItemBasicInfoAction(input: unknown): Promise<ActionR
     const updated = await db.item.update({
       where: { id: data.id },
       data: {
-        name: data.name ?? undefined,
-        description: data.description ?? undefined,
-        imageUrls: data.imageUrls ?? undefined,
+        nameEn: data.nameEn ?? undefined,
+        nameFr: data.nameFr === undefined ? undefined : data.nameFr,
+        descriptionEn: data.descriptionEn === undefined ? undefined : data.descriptionEn,
+        descriptionFr: data.descriptionFr === undefined ? undefined : data.descriptionFr,
+        imageUrls:
+          data.imageUrls === undefined
+            ? undefined
+            : data.imageUrls
+              ? [data.imageUrls]
+              : [],
         thumbnail: data.thumbnail ?? undefined,
       },
       include: itemStandardInclude,
@@ -354,7 +302,7 @@ export async function updateItemStockAction(input: unknown): Promise<ActionResul
           itemId: updatedItem.id,
           locationId,
           deltaQty,
-          unitCost: unitCost ?? updatedItem.costPrice ?? 0,
+          unitCost: unitCost ?? updatedItem.costPrice.toNumber(),
           organizationId: updatedItem.organizationId,
           meta: {
             notes: notes ?? "Manual stock adjustment",
@@ -395,6 +343,7 @@ export async function updateItemTrackingAction(input: unknown): Promise<ActionRe
 
     const patch: Prisma.ItemUpdateInput = {
       isActive: data.isActive ?? undefined,
+      trackSerialNumbers: data.isSerialTracked ?? undefined,
     }
 
     if (typeof data.slug === "string") {
@@ -444,7 +393,7 @@ export async function deleteItemAction(input: unknown): Promise<ActionResult<{ i
     revalidateTag("items")
     revalidateTag(`item-${id}`)
     revalidateTag(`org-${organizationId}-items`)
-    revalidatePath("/dashboard/items")
+    revalidatePath("/dashboard/inventory/items")
 
     return { success: true, data: { id }, message: "Item deleted" }
   } catch (error) {

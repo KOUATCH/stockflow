@@ -1,9 +1,11 @@
 "use client"
 
 import { Button } from "@/components/ui/button"
+import { getLocaleFromPathname, localizePath } from "@/i18n/routing"
+import { DEFAULT_LOCALE } from "@/types/bilingual"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { AlertTriangle } from "lucide-react"
-import { useSearchParams } from "next/navigation"
+import { usePathname, useSearchParams } from "next/navigation"
 
 const errorMessages = {
   Configuration: "There is a problem with the server configuration.",
@@ -14,6 +16,9 @@ const errorMessages = {
 
 export default function AuthErrorPage() {
   const searchParams = useSearchParams()
+  const pathname = usePathname()
+  const locale = getLocaleFromPathname(pathname) ?? DEFAULT_LOCALE
+  const localizedHref = (href: string) => localizePath(href, locale)
   const error = searchParams.get("error") as keyof typeof errorMessages
 
   return (
@@ -30,11 +35,11 @@ export default function AuthErrorPage() {
         </CardHeader>
         <CardContent className="space-y-4">
           <Button className="w-full" asChild>
-            <a href="/login">Try again</a>
+            <a href={localizedHref("/login")}>Try again</a>
           </Button>
 
           <Button variant="outline" className="w-full" asChild>
-            <a href="/">Go home</a>
+            <a href={localizedHref("/")}>Go home</a>
           </Button>
         </CardContent>
       </Card>

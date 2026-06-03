@@ -1,8 +1,13 @@
 "use server"
 
 import { db } from "@/prisma/db"
-import type { PaymentMethod, PaymentStatus, SalesOrderStatus } from "@prisma/client"
+import { PaymentStatus, Prisma, type PaymentMethod, type SalesOrderStatus } from "@prisma/client"
 import { revalidatePath } from "next/cache"
+
+const toNumber = (value: Prisma.Decimal | number | null | undefined) => {
+  if (value instanceof Prisma.Decimal) return value.toNumber()
+  return Number(value ?? 0)
+}
 
 // Create sales order
 export async function createSalesOrder(data: {
@@ -164,14 +169,44 @@ export async function processPayment(data: {
     // Generate payment number
     const paymentCount = await db.payment.count()
     const paymentNumber = `PAY-${String(paymentCount + 1).padStart(8, "0")}`
+    const relatedOrder = data.salesOrderId
+      ? await db.salesOrder.findUnique({
+          where: { id: data.salesOrderId },
+          select: { organizationId: true },
+        })
+      : data.purchaseOrderId
+        ? await db.purchaseOrder.findUnique({
+            where: { id: data.purchaseOrderId },
+            select: { organizationId: true },
+          })
+        : null
+
+    if (!relatedOrder) {
+      throw new Error("A sales or purchase order is required to process a payment")
+    }
+
+    const paymentData: Prisma.PaymentUncheckedCreateInput = {
+      paymentNumber,
+      organizationId: relatedOrder.organizationId,
+      salesOrderId: data.salesOrderId,
+      purchaseOrderId: data.purchaseOrderId,
+      amount: new Prisma.Decimal(data.amount),
+      method: data.method,
+      status: PaymentStatus.PAID,
+      processedAt: new Date(),
+      processedById: data.processedById,
+      cardType: data.cardType,
+      cardLast4: data.cardLast4,
+      transactionId: data.transactionId,
+      authorizationCode: data.authorizationCode,
+      mobileMoneyReference: data.digitalTransactionId,
+      cashTendered: data.cashTendered === undefined ? undefined : new Prisma.Decimal(data.cashTendered),
+      changeGiven: data.changeGiven === undefined ? undefined : new Prisma.Decimal(data.changeGiven),
+      notes: data.notes,
+    }
 
     const payment = await db.payment.create({
-      data: {
-        ...data,
-        paymentNumber,
-        status: "PAID",
-        processedAt: new Date(),
-      },
+      data: paymentData,
       include: {
         salesOrder: true,
         purchaseOrder: true,
@@ -187,9 +222,9 @@ export async function processPayment(data: {
       })
 
       if (salesOrder) {
-        const totalPaid = salesOrder.payments.reduce((sum, p) => sum + p.amount, 0) + data.amount
+        const totalPaid = salesOrder.payments.reduce((sum, p) => sum + toNumber(p.amount), 0) + data.amount
         const paymentStatus: PaymentStatus =
-          totalPaid >= salesOrder.total ? "PAID" : totalPaid > 0 ? "PARTIAL" : "PENDING"
+          totalPaid >= toNumber(salesOrder.total) ? PaymentStatus.PAID : totalPaid > 0 ? PaymentStatus.PARTIAL : PaymentStatus.PENDING
 
         await db.salesOrder.update({
           where: { id: data.salesOrderId },

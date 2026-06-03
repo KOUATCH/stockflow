@@ -1,5 +1,4 @@
 "use client";
-import { ourFileRouter } from "@/app/api/uploadthing/core";
 import { QueryProvider } from "@/lib/providers/query-provider";
 import { NextSSRPlugin } from "@uploadthing/react/next-ssr-plugin";
 import { AuthProvider } from "@/components/auth/AuthProvider";
@@ -8,15 +7,31 @@ import {
   ThemeProvider as NextThemesProvider,
   type ThemeProviderProps,
 } from 'next-themes';
-import { extractRouterConfig } from "uploadthing/server";
+import type { ComponentProps } from "react";
 
-export default function Providers({ children, ...props }: ThemeProviderProps) {
+type ProvidersProps = ThemeProviderProps & {
+  uploadThingRouterConfig?: ComponentProps<typeof NextSSRPlugin>["routerConfig"]
+}
+
+export default function Providers({
+  children,
+  uploadThingRouterConfig,
+  ...props
+}: ProvidersProps) {
   return (
     <QueryProvider>
       <AuthProvider>
         <NotificationProvider>
-          <NextSSRPlugin routerConfig={extractRouterConfig(ourFileRouter)} />
-          <NextThemesProvider {...props}>
+          {uploadThingRouterConfig ? (
+            <NextSSRPlugin routerConfig={uploadThingRouterConfig} />
+          ) : null}
+          <NextThemesProvider
+            attribute="class"
+            defaultTheme="system"
+            enableSystem
+            disableTransitionOnChange
+            {...props}
+          >
             {/* <ShadToaster richColors /> */}
             {children}
           </NextThemesProvider>

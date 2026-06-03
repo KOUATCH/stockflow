@@ -72,6 +72,7 @@ export function useCreateTransfer() {
   const { formSuccess, formError } = useNotifications()
 
   return useMutation({
+    meta: { operation: 'create', entity: 'Transfer' },
     mutationFn: (data: CreateTransferPayload) => createLocationTransfer(data),
     onSuccess: (response, variables) => {
       formSuccess("Create Transfer", response.message || "Transfer created and is ready for approval")
@@ -92,6 +93,7 @@ export function useApproveTransfer() {
   const { formSuccess, formError } = useNotifications()
 
   return useMutation({
+    meta: { operation: 'approve', entity: 'Transfer' },
     mutationFn: ({
       transferId,
       organizationId,

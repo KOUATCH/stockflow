@@ -1,10 +1,11 @@
 
 "use client";
 
-import { RouteDebugger } from '@/components/debug/RouteDebugger';
 import UserDropdownMenu from '@/components/UserDropdownMenu';
 import { navigationConfig, NavigationItem } from '@/components/dashboard/SidebarNavigation';
 import { useAuth } from '@/lib/auth-unified';
+import { localizePath } from '@/i18n/routing';
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -48,6 +49,7 @@ import {
   Hexagon,
   History,
   Menu,
+  Moon,
   Monitor,
   Package,
   Search,
@@ -55,6 +57,7 @@ import {
   Shield,
   ShoppingCart,
   Star,
+  Sun,
   TrendingUp,
   Users,
   X,
@@ -62,6 +65,7 @@ import {
 } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
+import { useTheme } from "next-themes";
 import { useEffect, useState } from 'react';
 
 // Types for enhanced navigation features
@@ -166,12 +170,26 @@ const ModernNavigation = ({ children }: { children: React.ReactNode }) => {
   const { session, status, hasPermission, user } = useAuth();
   const pathname = usePathname();
   const router = useRouter();
+  const { resolvedTheme, setTheme } = useTheme();
   const [isMobileOpen, setIsMobileOpen] = useState(false);
   const [expandedItems, setExpandedItems] = useState(new Set(['Dashboard']));
   const [currentPath, setCurrentPath] = useState('/dashboard');
   const [isCollapsed, setIsCollapsed] = useState(false);
   const [hoveredItem, setHoveredItem] = useState<string | null>(null);
   const [isClient, setIsClient] = useState(false);
+  const userInitials = (session?.user?.name || "User")
+    .split(" ")
+    .map((part) => part.charAt(0))
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
+  const localePrefix = pathname.match(/^\/(en|fr)(?=\/)/)?.[1] ?? "en";
+  const locale = localePrefix === "fr" ? "fr" : "en";
+  const localizedHref = (href: string) => (href.startsWith("/") ? localizePath(href, locale) : href);
+  const targetLocale = locale === "fr" ? "en" : "fr";
+  const pathWithoutLocale = pathname.replace(/^\/(en|fr)(?=\/)/, "") || "/dashboard";
+  const targetLocaleHref = `/${targetLocale}${pathWithoutLocale}`;
+  const isDarkTheme = resolvedTheme === "dark";
 
   // Handle client-side hydration
   useEffect(() => {
@@ -180,8 +198,8 @@ const ModernNavigation = ({ children }: { children: React.ReactNode }) => {
 
   // Sync currentPath with actual pathname
   useEffect(() => {
-    setCurrentPath(pathname);
-  }, [pathname]);
+    setCurrentPath(pathWithoutLocale);
+  }, [pathWithoutLocale]);
 
   // Prevent hydration mismatch by showing loading state on server and during initial client render
   if (!isClient || status === "loading") {
@@ -273,7 +291,7 @@ const ModernNavigation = ({ children }: { children: React.ReactNode }) => {
         <div
           onClick={() => {
             if (item.href) {
-              router.push(item.href);
+              router.push(localizedHref(item.href));
               setIsMobileOpen(false);
             } else if (item.children) {
               toggleExpanded(item.title);
@@ -282,12 +300,12 @@ const ModernNavigation = ({ children }: { children: React.ReactNode }) => {
           onMouseEnter={() => setHoveredItem(item.title)}
           onMouseLeave={() => setHoveredItem(null)}
           className={`
-            w-full flex items-center gap-3 px-4 py-3 rounded-2xl transition-all duration-300 relative overflow-hidden cursor-pointer
+            w-full flex items-center gap-3 px-4 py-3 rounded-xl transition-all duration-300 relative overflow-hidden cursor-pointer border border-transparent
             ${isActive && !isChild
-              ? `bg-gradient-to-r ${item.gradient || 'from-gray-500 to-gray-600'} text-white shadow-2xl ${item.glowColor || 'shadow-gray-500/25'} transform scale-[1.02]`
+              ? 'bg-[rgba(47,125,246,0.18)] text-white border-white/10 shadow-[0_18px_42px_rgba(47,125,246,0.14)] transform scale-[1.01]'
               : isActive && isChild
-                ? 'bg-gradient-to-r from-teal-500/10 to-cyan-500/10 text-teal-700 border border-teal-200/50 shadow-md'
-                : 'text-gray-700 hover:bg-gradient-to-r hover:from-gray-50 hover:to-white hover:text-gray-900 hover:shadow-lg hover:border hover:border-gray-200/50'
+                ? 'bg-[rgba(45,212,191,0.14)] text-[#e5fffb] border-white/10 shadow-md'
+                : 'text-[#b9c8c3] hover:bg-white/[0.075] hover:text-white hover:border-white/10'
             }
             ${isChild ? 'ml-8 py-2.5' : ''}
             ${isCollapsed && !isChild ? 'justify-center' : ''}
@@ -296,7 +314,7 @@ const ModernNavigation = ({ children }: { children: React.ReactNode }) => {
           {/* Animated background glow */}
           {(isActive || isHovered) && !isChild && (
             <div className={`
-              absolute inset-0 bg-gradient-to-r ${item.gradient || 'from-gray-500 to-gray-600'} opacity-10 rounded-2xl
+              absolute inset-0 bg-gradient-to-r from-[#2f7df6]/20 via-[#2dd4bf]/10 to-transparent rounded-xl
               transition-opacity duration-300
             `} />
           )}
@@ -311,10 +329,10 @@ const ModernNavigation = ({ children }: { children: React.ReactNode }) => {
               <div className={`
                 relative p-2 rounded-xl transition-all duration-300
                 ${isActive && !isChild
-                  ? 'bg-white/20 backdrop-blur-sm'
+                  ? 'bg-[rgba(45,212,191,0.16)] text-[#7de8dc] backdrop-blur-sm'
                   : isHovered && !isChild
-                    ? `bg-gradient-to-r ${item.gradient || 'from-gray-500 to-gray-600'} bg-opacity-10`
-                    : ''
+                    ? 'bg-white/[0.08] text-[#d7a84f]'
+                    : 'bg-white/[0.055] text-[#8fb7ff]'
                 }
               `}>
                 <Icon size={isChild ? 18 : 22} className={`
@@ -324,7 +342,7 @@ const ModernNavigation = ({ children }: { children: React.ReactNode }) => {
 
                 {/* Pulsing dot for active state */}
                 {isActive && !isChild && (
-                  <div className="absolute -top-1 -right-1 w-3 h-3 bg-white rounded-full shadow-sm animate-pulse" />
+                  <div className="absolute -top-1 -right-1 w-3 h-3 bg-[#2dd4bf] rounded-full shadow-sm animate-pulse" />
                 )}
               </div>
             </div>
@@ -340,14 +358,14 @@ const ModernNavigation = ({ children }: { children: React.ReactNode }) => {
                 <span className={`
                   font-semibold transition-all duration-200 block truncate
                   ${isChild ? 'text-sm' : 'text-base'}
-                  ${isActive ? 'text-shadow-sm' : ''}
+                  ${isActive ? 'text-shadow-sm text-white' : ''}
                 `}>
                   {item.title}
                 </span>
                 {!isChild && !isCollapsed && item.description && (
                   <span className={`
                     text-xs opacity-75 block truncate transition-all duration-200
-                    ${isActive ? 'text-white/80' : 'text-gray-500'}
+                    ${isActive ? 'text-white/80' : 'text-[#8fa4ab]'}
                   `}>
                     {item.description}
                   </span>
@@ -360,7 +378,7 @@ const ModernNavigation = ({ children }: { children: React.ReactNode }) => {
                   px-2 py-0.5 text-xs font-bold rounded-full transition-all duration-200
                   ${isActive
                     ? 'bg-white/20 text-white backdrop-blur-sm'
-                    : 'bg-gradient-to-r from-teal-100 to-cyan-100 text-teal-700'
+                    : 'bg-[rgba(215,168,79,0.16)] text-[#f0c76a]'
                   }
                 `}>
                   {item.badge}
@@ -383,12 +401,12 @@ const ModernNavigation = ({ children }: { children: React.ReactNode }) => {
 
           {/* Hover tooltip for collapsed state */}
           {isCollapsed && !isChild && isHovered && (
-            <div className="absolute left-full ml-4 px-3 py-2 bg-gray-900 text-white text-sm rounded-lg shadow-xl whitespace-nowrap z-50 animate-in slide-in-from-left-2">
+            <div className="absolute left-full ml-4 px-3 py-2 bg-[#0f171d] text-white text-sm rounded-lg border border-white/10 shadow-xl whitespace-nowrap z-50 animate-in slide-in-from-left-2">
               <div className="font-medium">{item.title}</div>
               {item.description && (
-                <div className="text-xs opacity-75">{item.description}</div>
+                <div className="text-xs text-[#9fb4bb]">{item.description}</div>
               )}
-              <div className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-1 w-2 h-2 bg-gray-900 rotate-45" />
+              <div className="absolute left-0 top-1/2 -translate-y-1/2 -translate-x-1 w-2 h-2 bg-[#0f171d] rotate-45 border-b border-l border-white/10" />
             </div>
           )}
         </div>
@@ -399,7 +417,7 @@ const ModernNavigation = ({ children }: { children: React.ReactNode }) => {
             overflow-hidden transition-all duration-500 ease-out
             ${isExpanded ? 'max-h-96 opacity-100 mt-2' : 'max-h-0 opacity-0'}
           `}>
-            <div className="space-y-1">
+            <div className="space-y-1 rounded-xl border border-white/[0.06] bg-[#0e1a20]/55 py-1">
               {item.children
                 .filter((child) => {
                   const childPermission = hasPermission(child.permission);
@@ -469,7 +487,7 @@ const ModernNavigation = ({ children }: { children: React.ReactNode }) => {
 
     const handleSelect = (href: string) => {
       setOpen(false);
-      router.push(href);
+      router.push(localizedHref(href));
     };
 
     return (
@@ -478,16 +496,14 @@ const ModernNavigation = ({ children }: { children: React.ReactNode }) => {
         <div className="relative hidden md:block">
           <Button
             variant="outline"
-            className="w-64 xl:w-80 justify-start text-muted-foreground bg-background/50 border-muted-foreground/20 hover:bg-background"
+            className="h-11 w-64 justify-start rounded-xl border-white/10 bg-white/[0.055] px-3 text-[#9fb4bb] shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] hover:border-[#5796ff]/50 hover:bg-white/[0.09] hover:text-white xl:w-80"
             onClick={() => setOpen(true)}
           >
-            <Search className="mr-2 h-4 w-4" />
-            <span>Search everything...</span>
-            <div className="ml-auto flex items-center gap-1">
-              <kbd className="pointer-events-none inline-flex h-5 select-none items-center gap-1 rounded border bg-muted px-1.5 font-mono text-[10px] font-medium text-muted-foreground opacity-100">
-                <span className="text-xs">⌘</span>K
-              </kbd>
-            </div>
+            <Search className="mr-2 h-4 w-4 text-[#49c6e5]" />
+            <span className="truncate">Search operations, inventory, sales...</span>
+            <span className="ml-auto rounded-full border border-white/10 bg-white/[0.06] px-2 py-0.5 text-[0.65rem] font-bold uppercase tracking-[0.12em] text-[#7de8dc]">
+              Live
+            </span>
           </Button>
         </div>
 
@@ -495,7 +511,7 @@ const ModernNavigation = ({ children }: { children: React.ReactNode }) => {
         <Button
           variant="outline"
           size="icon"
-          className="md:hidden"
+          className="rounded-xl border-white/10 bg-white/[0.06] text-[#d3ddd8] hover:bg-white/[0.1] hover:text-white md:hidden"
           onClick={() => setOpen(true)}
         >
           <Search className="h-4 w-4" />
@@ -506,15 +522,15 @@ const ModernNavigation = ({ children }: { children: React.ReactNode }) => {
           <PopoverTrigger asChild>
             <div />
           </PopoverTrigger>
-          <PopoverContent className="w-[90vw] md:w-[600px] p-0" align="center">
-            <Command>
+          <PopoverContent className="w-[92vw] overflow-hidden rounded-xl border border-white/10 bg-[#0f171d]/95 p-0 text-[#d3ddd8] shadow-[0_24px_70px_rgba(5,12,16,0.42)] backdrop-blur-xl md:w-[620px]" align="center">
+            <Command className="bg-transparent text-[#d3ddd8] [&_[cmdk-group-heading]]:text-[#7f969f] [&_[cmdk-input-wrapper]]:border-white/10 [&_[cmdk-input-wrapper]]:bg-[#142129]/80 [&_[cmdk-input]]:text-white [&_[cmdk-input]]:placeholder:text-[#7f969f]">
               <CommandInput
                 placeholder="Type a command or search..."
                 value={searchTerm}
                 onValueChange={setSearchTerm}
               />
-              <CommandList>
-                <CommandEmpty>No results found.</CommandEmpty>
+              <CommandList className="max-h-[420px]">
+                <CommandEmpty className="py-8 text-center text-sm text-[#9fb4bb]">No results found.</CommandEmpty>
 
                 {filteredActions.length > 0 && (
                   <CommandGroup heading="Quick Actions">
@@ -523,14 +539,14 @@ const ModernNavigation = ({ children }: { children: React.ReactNode }) => {
                         key={action.id}
                         value={action.title}
                         onSelect={() => handleSelect(action.href)}
-                        className="flex items-center gap-3"
+                        className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-[#d3ddd8] data-[selected=true]:bg-white/[0.08] data-[selected=true]:text-white"
                       >
-                        <div className={`p-1.5 rounded text-white ${action.color}`}>
+                        <div className={`rounded-lg p-1.5 text-white ${action.color}`}>
                           <action.icon className="h-3 w-3" />
                         </div>
                         <div className="flex-1">
                           <div className="font-medium">{action.title}</div>
-                          <div className="text-xs text-muted-foreground">{action.description}</div>
+                          <div className="text-xs text-[#8fa4ab]">{action.description}</div>
                         </div>
                       </CommandItem>
                     ))}
@@ -539,16 +555,16 @@ const ModernNavigation = ({ children }: { children: React.ReactNode }) => {
 
                 {filteredNavigation.length > 0 && (
                   <>
-                    <CommandSeparator />
+                    <CommandSeparator className="bg-white/10" />
                     <CommandGroup heading="Navigation">
                       {filteredNavigation.map((item) => (
                         <CommandItem
                           key={item.title}
                           value={item.title}
                           onSelect={() => handleSelect(item.href || "#")}
-                          className="flex items-center gap-3"
+                          className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-[#d3ddd8] data-[selected=true]:bg-white/[0.08] data-[selected=true]:text-white"
                         >
-                          <item.icon className="h-4 w-4" />
+                          <item.icon className="h-4 w-4 text-[#8fb7ff]" />
                           <span>{item.title}</span>
                         </CommandItem>
                       ))}
@@ -558,19 +574,19 @@ const ModernNavigation = ({ children }: { children: React.ReactNode }) => {
 
                 {recentActivities.length > 0 && searchTerm.length === 0 && (
                   <>
-                    <CommandSeparator />
+                    <CommandSeparator className="bg-white/10" />
                     <CommandGroup heading="Recent Activity">
                       {recentActivities.slice(0, 3).map((activity) => (
                         <CommandItem
                           key={activity.id}
                           value={activity.title}
                           onSelect={() => handleSelect(activity.href)}
-                          className="flex items-center gap-3"
+                          className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-[#d3ddd8] data-[selected=true]:bg-white/[0.08] data-[selected=true]:text-white"
                         >
-                          <activity.icon className="h-4 w-4 text-muted-foreground" />
+                          <activity.icon className="h-4 w-4 text-[#49c6e5]" />
                           <div className="flex-1">
                             <div className="font-medium">{activity.title}</div>
-                            <div className="text-xs text-muted-foreground">
+                            <div className="text-xs text-[#8fa4ab]">
                               {activity.timestamp.toLocaleTimeString()}
                             </div>
                           </div>
@@ -597,41 +613,47 @@ const ModernNavigation = ({ children }: { children: React.ReactNode }) => {
     });
 
     return (
-      <div className="hidden xl:flex items-center gap-6 text-sm">
+      <div className="hidden items-center gap-2 text-sm 2xl:flex">
         <TooltipProvider>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.045] px-2 py-1.5 shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
             <Tooltip>
               <TooltipTrigger asChild>
-                <div className="flex items-center gap-2 cursor-pointer">
-                  <DollarSign className="h-4 w-4 text-green-600" />
-                  <span className="font-semibold text-green-600">
+                <div className="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1">
+                  <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-[rgba(46,201,138,0.14)] text-[#76e3b0]">
+                    <DollarSign className="h-4 w-4" />
+                  </span>
+                  <span className="font-semibold text-[#d8f8e9]">
                     ${metrics.todaySales.toLocaleString()}
                   </span>
                 </div>
               </TooltipTrigger>
-              <TooltipContent>Today's Sales Revenue</TooltipContent>
+              <TooltipContent>Today&apos;s Sales Revenue</TooltipContent>
             </Tooltip>
 
-            <Separator orientation="vertical" className="h-4" />
+            <Separator orientation="vertical" className="h-6 bg-white/10" />
 
             <Tooltip>
               <TooltipTrigger asChild>
-                <div className="flex items-center gap-2 cursor-pointer">
-                  <ShoppingCart className="h-4 w-4 text-blue-600" />
-                  <span className="font-semibold text-blue-600">{metrics.todayOrders}</span>
+                <div className="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1">
+                  <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-[rgba(47,125,246,0.16)] text-[#8fb7ff]">
+                    <ShoppingCart className="h-4 w-4" />
+                  </span>
+                  <span className="font-semibold text-[#dbe8ff]">{metrics.todayOrders}</span>
                 </div>
               </TooltipTrigger>
-              <TooltipContent>Today's Orders</TooltipContent>
+              <TooltipContent>Today&apos;s Orders</TooltipContent>
             </Tooltip>
 
-            <Separator orientation="vertical" className="h-4" />
+            <Separator orientation="vertical" className="h-6 bg-white/10" />
 
             <Tooltip>
               <TooltipTrigger asChild>
-                <Link href="/dashboard/inventory">
-                  <div className="flex items-center gap-2 cursor-pointer hover:opacity-80">
-                    <Package className="h-4 w-4 text-orange-600" />
-                    <span className="font-semibold text-orange-600">{metrics.lowStock}</span>
+                <Link href={localizedHref("/dashboard/inventory")}>
+                  <div className="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1 hover:bg-white/[0.06]">
+                    <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-[rgba(215,168,79,0.16)] text-[#f0c76a]">
+                      <Package className="h-4 w-4" />
+                    </span>
+                    <span className="font-semibold text-[#f0c76a]">{metrics.lowStock}</span>
                   </div>
                 </Link>
               </TooltipTrigger>
@@ -660,41 +682,41 @@ const ModernNavigation = ({ children }: { children: React.ReactNode }) => {
     return (
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button variant="outline" size="sm" className="hidden lg:flex items-center gap-2">
-            <Zap className="h-4 w-4" />
+          <Button variant="outline" size="sm" className="hidden h-10 items-center gap-2 rounded-xl border-white/10 bg-[rgba(45,212,191,0.11)] px-3 text-[#bff7f1] hover:border-[#2dd4bf]/40 hover:bg-[rgba(45,212,191,0.18)] hover:text-white 2xl:flex">
+            <Zap className="h-4 w-4 text-[#2dd4bf]" />
             Quick Actions
             <ChevronDown className="h-3 w-3" />
           </Button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-96">
-          <DropdownMenuLabel className="flex items-center justify-between">
+        <DropdownMenuContent align="end" className="w-96 rounded-xl border-white/10 bg-[#0f171d]/95 p-2 text-[#d3ddd8] shadow-[0_24px_70px_rgba(5,12,16,0.42)] backdrop-blur-xl">
+          <DropdownMenuLabel className="flex items-center justify-between text-white">
             Quick Actions
-            <Badge variant="outline" className="text-xs">
+            <Badge variant="outline" className="border-white/10 bg-white/[0.06] text-xs text-[#7de8dc]">
               {quickActions.length} available
             </Badge>
           </DropdownMenuLabel>
-          <DropdownMenuSeparator />
+          <DropdownMenuSeparator className="bg-white/10" />
 
           {favoriteActions.length > 0 && (
             <>
-              <div className="px-2 py-1 text-xs font-medium text-muted-foreground">Favorites</div>
+              <div className="px-2 py-1 text-xs font-medium uppercase tracking-[0.12em] text-[#7f969f]">Favorites</div>
               <div className="grid gap-1 p-2">
                 {quickActions
                   .filter(action => favoriteActions.includes(action.id))
                   .map((action) => (
                     <Link key={action.id} href={action.href}>
-                      <div className="flex items-center gap-3 p-2 rounded hover:bg-muted transition-colors cursor-pointer group">
-                        <div className={`p-1.5 rounded text-white ${action.color}`}>
+                      <div className="group flex cursor-pointer items-center gap-3 rounded-lg p-2 transition-colors hover:bg-white/[0.07]">
+                        <div className={`rounded-lg p-1.5 text-white ${action.color}`}>
                           <action.icon className="h-3 w-3" />
                         </div>
                         <div className="flex-1">
-                          <p className="text-sm font-medium">{action.title}</p>
-                          <p className="text-xs text-muted-foreground">{action.description}</p>
+                          <p className="text-sm font-medium text-white">{action.title}</p>
+                          <p className="text-xs text-[#8fa4ab]">{action.description}</p>
                         </div>
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="h-6 w-6 opacity-0 group-hover:opacity-100"
+                          className="h-6 w-6 text-[#f0c76a] opacity-0 hover:bg-white/[0.08] group-hover:opacity-100"
                           onClick={(e) => {
                             e.preventDefault();
                             toggleFavorite(action.id);
@@ -706,31 +728,31 @@ const ModernNavigation = ({ children }: { children: React.ReactNode }) => {
                     </Link>
                   ))}
               </div>
-              <DropdownMenuSeparator />
+              <DropdownMenuSeparator className="bg-white/10" />
             </>
           )}
 
           <ScrollArea className="max-h-80">
             {categories.map(category => (
               <div key={category}>
-                <div className="px-2 py-1 text-xs font-medium text-muted-foreground">{category}</div>
+                <div className="px-2 py-1 text-xs font-medium uppercase tracking-[0.12em] text-[#7f969f]">{category}</div>
                 <div className="grid gap-1 p-2">
                   {quickActions
                     .filter(action => action.category === category)
                     .map((action) => (
                       <Link key={action.id} href={action.href}>
-                        <div className="flex items-center gap-3 p-2 rounded hover:bg-muted transition-colors cursor-pointer group">
-                          <div className={`p-1.5 rounded text-white ${action.color}`}>
+                        <div className="group flex cursor-pointer items-center gap-3 rounded-lg p-2 transition-colors hover:bg-white/[0.07]">
+                          <div className={`rounded-lg p-1.5 text-white ${action.color}`}>
                             <action.icon className="h-3 w-3" />
                           </div>
                           <div className="flex-1">
-                            <p className="text-sm font-medium">{action.title}</p>
-                            <p className="text-xs text-muted-foreground">{action.description}</p>
+                            <p className="text-sm font-medium text-white">{action.title}</p>
+                            <p className="text-xs text-[#8fa4ab]">{action.description}</p>
                           </div>
                           <Button
                             variant="ghost"
                             size="icon"
-                            className="h-6 w-6 opacity-0 group-hover:opacity-100"
+                            className="h-6 w-6 text-[#f0c76a] opacity-0 hover:bg-white/[0.08] group-hover:opacity-100"
                             onClick={(e) => {
                               e.preventDefault();
                               toggleFavorite(action.id);
@@ -739,7 +761,7 @@ const ModernNavigation = ({ children }: { children: React.ReactNode }) => {
                             <Star className={`h-3 w-3 ${
                               favoriteActions.includes(action.id)
                                 ? "fill-yellow-400 text-yellow-400"
-                                : "text-muted-foreground"
+                                : "text-[#7f969f]"
                             }`} />
                           </Button>
                         </div>
@@ -788,15 +810,16 @@ const ModernNavigation = ({ children }: { children: React.ReactNode }) => {
 
     return (
       <TooltipProvider>
-        <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 shadow-sm">
-          <div className="flex h-16 lg:h-[60px] items-center justify-between px-4 lg:px-6 w-full">
+        <header className="sticky top-0 z-50 isolate w-full overflow-hidden border-b border-white/10 bg-[#142129]/90 shadow-[0_20px_45px_rgba(5,12,16,0.22)] backdrop-blur-xl">
+          <div className="pointer-events-none absolute inset-0 bg-[radial-gradient(circle_at_12%_0%,rgba(73,198,229,0.12),transparent_28%),radial-gradient(circle_at_88%_0%,rgba(215,168,79,0.11),transparent_24%)]" />
+          <div className="relative flex min-h-16 w-full max-w-full items-center justify-between gap-2 px-2 sm:px-4 lg:h-[68px] lg:px-5">
             {/* Left Section */}
-            <div className="flex items-center gap-4">
+            <div className="flex min-w-0 items-center gap-4">
               {/* Mobile Menu Toggle */}
               <Button
                 variant="outline"
                 size="icon"
-                className="md:hidden"
+                className="shrink-0 rounded-xl border-white/10 bg-white/[0.06] text-[#d3ddd8] hover:bg-white/[0.1] hover:text-white md:hidden"
                 onClick={() => setIsMobileOpen(true)}
               >
                 <Menu className="h-5 w-5" />
@@ -804,66 +827,96 @@ const ModernNavigation = ({ children }: { children: React.ReactNode }) => {
               </Button>
 
               {/* Page Title & Breadcrumb */}
-              <div className="hidden sm:block">
-                <h1 className="text-lg font-semibold text-foreground">{title}</h1>
-                <p className="text-xs text-muted-foreground">{breadcrumb}</p>
+              <div className="hidden min-w-0 sm:block">
+                <div className="flex items-center gap-2">
+                  <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-[rgba(47,125,246,0.16)] text-[#8fb7ff] ring-1 ring-white/10">
+                    <Monitor className="h-4 w-4" />
+                  </span>
+                  <h1 className="truncate text-lg font-bold text-white">{title}</h1>
+                </div>
+                <p className="mt-0.5 truncate text-xs font-medium text-[#8fa4ab]">{breadcrumb}</p>
               </div>
             </div>
 
             {/* Center Section - Enhanced Search */}
-            <div className="flex-1 max-w-lg xl:max-w-2xl mx-2 lg:mx-4">
+            <div className="mx-1 hidden min-w-0 max-w-lg flex-1 justify-center 2xl:flex 2xl:max-w-2xl">
               <GlobalSearch />
             </div>
 
             {/* Right Section */}
-            <div className="flex items-center gap-1 sm:gap-2 lg:gap-3 flex-shrink-0">
+            <div className="flex min-w-0 shrink-0 items-center gap-1 sm:gap-2">
               {/* Business Metrics */}
               <BusinessMetrics />
 
               {/* Organization Status */}
-              <div className="hidden lg:flex items-center gap-3 text-sm">
-                <div className="flex items-center gap-2">
-                  <Building2 className="h-4 w-4 text-muted-foreground" />
-                  <span className="font-medium text-foreground max-w-32 truncate">
+              <div className="hidden items-center gap-3 rounded-xl border border-white/10 bg-white/[0.045] px-3 py-2 text-sm shadow-[inset_0_1px_0_rgba(255,255,255,0.05)] 2xl:flex">
+                <div className="flex min-w-0 items-center gap-2">
+                  <Building2 className="h-4 w-4 shrink-0 text-[#f0c76a]" />
+                  <span className="max-w-32 truncate font-medium text-[#d3ddd8]">
                     {session?.user?.organizationName || "StockFlow Enterprise"}
                   </span>
                 </div>
 
-                <Separator orientation="vertical" className="h-4" />
+                <Separator orientation="vertical" className="h-5 bg-white/10" />
 
-                <Badge variant="secondary" className="text-xs">
+                <Badge variant="secondary" className="border border-white/10 bg-[rgba(45,212,191,0.14)] text-xs text-[#7de8dc] hover:bg-[rgba(45,212,191,0.18)]">
                   {session?.user?.roles?.[0]?.name || "Admin"}
                 </Badge>
 
-                <Separator orientation="vertical" className="h-4" />
+                <Separator orientation="vertical" className="h-5 bg-white/10" />
 
                 <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse"></div>
-                  <span className="text-xs text-muted-foreground">Online</span>
+                  <div className="h-2 w-2 rounded-full bg-[#2ec98a] shadow-[0_0_0_4px_rgba(46,201,138,0.14)] animate-pulse"></div>
+                  <span className="text-xs font-medium text-[#9fb4bb]">Online</span>
                 </div>
               </div>
 
               {/* Quick Actions */}
               <QuickActionsMenu />
 
+              {/* Language */}
+              <Link
+                href={targetLocaleHref}
+                className="flex h-10 w-10 shrink-0 items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.045] px-0 text-sm font-semibold uppercase text-[#d3ddd8] transition-all hover:bg-white/[0.09] hover:text-white sm:w-auto sm:px-3"
+                aria-label={`Switch language to ${targetLocale.toUpperCase()}`}
+              >
+                <Globe className="h-4 w-4 text-[#8fb7ff]" />
+                <span className="hidden sm:inline">{targetLocale}</span>
+              </Link>
+
+              {/* Theme */}
+              <button
+                type="button"
+                onClick={() => setTheme(isDarkTheme ? "light" : "dark")}
+                className="flex h-10 w-10 shrink-0 items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.045] px-0 text-sm font-semibold text-[#d3ddd8] transition-all hover:bg-white/[0.09] hover:text-white 2xl:w-auto 2xl:px-3"
+                aria-label={isDarkTheme ? "Switch to light theme" : "Switch to dark theme"}
+              >
+                {isDarkTheme ? (
+                  <Sun className="h-4 w-4 text-[#f0c76a]" />
+                ) : (
+                  <Moon className="h-4 w-4 text-[#8fb7ff]" />
+                )}
+                <span className="hidden 2xl:inline">{isDarkTheme ? "Light" : "Dark"}</span>
+              </button>
+
               {/* Recent Activity */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon" className="hidden lg:flex">
-                    <History className="h-5 w-5" />
+                  <Button variant="ghost" size="icon" className="hidden h-10 w-10 rounded-xl border border-white/10 bg-white/[0.045] text-[#d3ddd8] hover:bg-white/[0.09] hover:text-white 2xl:flex">
+                    <History className="h-5 w-5 text-[#8fb7ff]" />
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="w-80">
-                  <DropdownMenuLabel>Recent Activity</DropdownMenuLabel>
-                  <DropdownMenuSeparator />
+                <DropdownMenuContent align="end" className="w-80 rounded-xl border-white/10 bg-[#0f171d]/95 p-2 text-[#d3ddd8] shadow-[0_24px_70px_rgba(5,12,16,0.42)] backdrop-blur-xl">
+                  <DropdownMenuLabel className="text-white">Recent Activity</DropdownMenuLabel>
+                  <DropdownMenuSeparator className="bg-white/10" />
                   <ScrollArea className="max-h-60">
                     {recentActivities.map((activity) => (
                       <DropdownMenuItem key={activity.id} asChild>
-                        <Link href={activity.href} className="flex items-center gap-3 p-3">
-                          <activity.icon className="h-4 w-4 text-muted-foreground" />
+                        <Link href={localizedHref(activity.href)} className="flex items-center gap-3 rounded-lg p-3 text-[#d3ddd8] focus:bg-white/[0.08] focus:text-white">
+                          <activity.icon className="h-4 w-4 text-[#49c6e5]" />
                           <div className="flex-1">
                             <p className="text-sm font-medium">{activity.title}</p>
-                            <p className="text-xs text-muted-foreground">
+                            <p className="text-xs text-[#8fa4ab]">
                               {activity.timestamp.toLocaleTimeString()}
                             </p>
                           </div>
@@ -875,9 +928,9 @@ const ModernNavigation = ({ children }: { children: React.ReactNode }) => {
               </DropdownMenu>
 
               {/* Enhanced Notifications */}
-              <Button variant="ghost" size="icon" className="relative">
-                <Bell className="h-5 w-5" />
-                <span className="absolute -top-1 -right-1 w-4 h-4 bg-gradient-to-r from-red-500 to-pink-500 rounded-full text-xs text-white font-bold flex items-center justify-center shadow-lg animate-bounce">
+              <Button variant="ghost" size="icon" className="relative h-10 w-10 rounded-xl border border-white/10 bg-white/[0.045] text-[#d3ddd8] hover:bg-white/[0.09] hover:text-white">
+                <Bell className="h-5 w-5 text-[#f0c76a]" />
+                <span className="absolute -right-1 -top-1 flex h-4 w-4 items-center justify-center rounded-full bg-gradient-to-r from-[#ef6a6a] to-[#d7a84f] text-xs font-bold text-white shadow-lg">
                   3
                 </span>
               </Button>
@@ -885,34 +938,34 @@ const ModernNavigation = ({ children }: { children: React.ReactNode }) => {
               {/* Help & Settings */}
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="icon">
-                    <HelpCircle className="h-5 w-5" />
+                  <Button variant="ghost" size="icon" className="hidden h-10 w-10 rounded-xl border border-white/10 bg-white/[0.045] text-[#d3ddd8] hover:bg-white/[0.09] hover:text-white sm:flex">
+                    <HelpCircle className="h-5 w-5 text-[#9fb4bb]" />
                   </Button>
                 </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuLabel>Help & Settings</DropdownMenuLabel>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem asChild>
-                    <Link href="/help/shortcuts">
-                      <CommandIcon className="mr-2 h-4 w-4" />
-                      Keyboard Shortcuts
+                <DropdownMenuContent align="end" className="rounded-xl border-white/10 bg-[#0f171d]/95 p-2 text-[#d3ddd8] shadow-[0_24px_70px_rgba(5,12,16,0.42)] backdrop-blur-xl">
+                  <DropdownMenuLabel className="text-white">Help & Settings</DropdownMenuLabel>
+                  <DropdownMenuSeparator className="bg-white/10" />
+                  <DropdownMenuItem asChild className="rounded-lg focus:bg-white/[0.08] focus:text-white">
+                    <Link href={localizedHref("/help/shortcuts")}>
+                      <CommandIcon className="mr-2 h-4 w-4 text-[#8fb7ff]" />
+                      Command Center
                     </Link>
                   </DropdownMenuItem>
-                  <DropdownMenuItem asChild>
-                    <Link href="/help/documentation">
-                      <Globe className="mr-2 h-4 w-4" />
+                  <DropdownMenuItem asChild className="rounded-lg focus:bg-white/[0.08] focus:text-white">
+                    <Link href={localizedHref("/help/documentation")}>
+                      <Globe className="mr-2 h-4 w-4 text-[#49c6e5]" />
                       Documentation
                     </Link>
                   </DropdownMenuItem>
-                  <DropdownMenuItem asChild>
-                    <Link href="/dashboard/settings">
-                      <Settings className="mr-2 h-4 w-4" />
+                  <DropdownMenuItem asChild className="rounded-lg focus:bg-white/[0.08] focus:text-white">
+                    <Link href={localizedHref("/dashboard/settings")}>
+                      <Settings className="mr-2 h-4 w-4 text-[#f0c76a]" />
                       Settings
                     </Link>
                   </DropdownMenuItem>
-                  <DropdownMenuSeparator />
-                  <DropdownMenuItem>
-                    <Download className="mr-2 h-4 w-4" />
+                  <DropdownMenuSeparator className="bg-white/10" />
+                  <DropdownMenuItem className="rounded-lg focus:bg-white/[0.08] focus:text-white">
+                    <Download className="mr-2 h-4 w-4 text-[#7de8dc]" />
                     Export Data
                   </DropdownMenuItem>
                 </DropdownMenuContent>
@@ -935,33 +988,34 @@ const ModernNavigation = ({ children }: { children: React.ReactNode }) => {
   };
 
   return (
-    <div className="flex h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-teal-50">
+    <div className="flex h-screen min-w-0 overflow-hidden bg-[#111a20]">
       {/* Desktop Sidebar with enhanced design */}
       <div className={`
-        hidden md:flex flex-col bg-white/80 backdrop-blur-xl border-r border-white/20 shadow-2xl transition-all duration-500
+        dashboard-enterprise-sidebar z-30 hidden shrink-0 overflow-hidden border-r md:flex transition-all duration-500
         ${isCollapsed ? 'w-24' : 'w-80'}
       `}>
+        <div className="relative z-10 flex h-full min-h-0 flex-col">
         {/* Enhanced Header with animations */}
-        <div className="relative p-6 border-b border-gray-100/50">
+        <div className="relative border-b border-white/10 p-6">
           <div className={`flex items-center transition-all duration-300 ${isCollapsed ? 'justify-center' : 'gap-4'}`}>
             <div className="relative">
               <div className={`
-                w-12 h-12 bg-gradient-to-br from-emerald-500 via-teal-600 to-cyan-700 rounded-2xl
-                flex items-center justify-center shadow-xl shadow-emerald-500/25 transition-all duration-300
+                w-12 h-12 rounded-2xl bg-[rgba(47,125,246,0.18)] text-[#8fb7ff] ring-1 ring-white/10
+                flex items-center justify-center shadow-[0_16px_36px_rgba(47,125,246,0.18)] transition-all duration-300
                 ${isCollapsed ? 'scale-110' : 'scale-100'}
               `}>
-                <Hexagon className="w-7 h-7 text-white drop-shadow-sm" />
-                <div className="absolute inset-0 bg-gradient-to-br from-white/20 to-transparent rounded-2xl" />
+                <Hexagon className="w-7 h-7 drop-shadow-sm" />
+                <div className="absolute -right-0.5 -top-0.5 h-2.5 w-2.5 rounded-full bg-[#2dd4bf] shadow-[0_0_0_4px_rgba(45,212,191,0.14)]" />
               </div>
-              <div className="absolute -inset-1 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-2xl opacity-20 blur animate-pulse" />
+              <div className="absolute -inset-1 rounded-2xl bg-gradient-to-br from-[#2f7df6] to-[#2dd4bf] opacity-20 blur animate-pulse" />
             </div>
 
             {!isCollapsed && (
               <div className="flex-1 min-w-0">
-                <h1 className="font-black text-2xl bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 bg-clip-text text-transparent">
+                <h1 className="font-black text-2xl tracking-[0.08em] text-white">
                   STOCKFLOW
                 </h1>
-                <p className="text-sm text-gray-500 font-medium">Inventory System</p>
+                <p className="text-sm font-semibold uppercase tracking-[0.14em] text-[#9fb4bb]">Enterprise OS</p>
               </div>
             )}
           </div>
@@ -969,9 +1023,9 @@ const ModernNavigation = ({ children }: { children: React.ReactNode }) => {
           <button
             onClick={() => setIsCollapsed(!isCollapsed)}
             className={`
-              absolute right-4 top-1/2 -translate-y-1/2 p-2 rounded-xl bg-white shadow-lg border border-gray-200/50
-              hover:shadow-xl hover:scale-105 transition-all duration-200
-              ${isCollapsed ? '-right-4 bg-gradient-to-r from-emerald-500 to-teal-600 text-white border-0' : ''}
+              absolute right-4 top-1/2 -translate-y-1/2 rounded-xl border border-white/10 bg-white/[0.07] p-2 text-[#d3ddd8]
+              shadow-lg hover:bg-white/[0.12] hover:text-white hover:shadow-xl hover:scale-105 transition-all duration-200
+              ${isCollapsed ? '-right-4 border-0 bg-gradient-to-r from-[#2f7df6] to-[#2dd4bf] text-white' : ''}
             `}
           >
             <ChevronRight className={`w-4 h-4 transition-transform duration-300 ${isCollapsed ? 'rotate-180' : ''}`} />
@@ -980,24 +1034,24 @@ const ModernNavigation = ({ children }: { children: React.ReactNode }) => {
 
         {/* Enhanced Organization Info */}
         {!isCollapsed && (
-          <div className="px-6 py-5 bg-gradient-to-r from-emerald-50 via-teal-50 to-cyan-50 border-b border-gray-100/50 relative overflow-hidden">
-            <div className="absolute inset-0 bg-gradient-to-r from-emerald-500/5 to-teal-500/5" />
+          <div className="relative overflow-hidden border-b border-white/10 bg-white/[0.045] px-6 py-5">
+            <div className="absolute inset-0 bg-gradient-to-r from-[#2f7df6]/10 via-[#2dd4bf]/8 to-[#d7a84f]/10" />
             <div className="flex items-center gap-4 relative z-10">
               <div className="relative">
-                <div className="w-12 h-12 bg-gradient-to-br from-emerald-500 via-teal-600 to-cyan-700 rounded-2xl flex items-center justify-center shadow-lg">
-                  <Building2 className="w-6 h-6 text-white" />
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-[rgba(215,168,79,0.16)] text-[#f0c76a] shadow-lg ring-1 ring-white/10">
+                  <Building2 className="w-6 h-6" />
                 </div>
-                <div className="absolute -inset-0.5 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-2xl opacity-20 blur animate-pulse" />
+                <div className="absolute -inset-0.5 rounded-2xl bg-gradient-to-br from-[#d7a84f] to-[#2dd4bf] opacity-20 blur animate-pulse" />
               </div>
               <div className="flex-1 min-w-0">
-                <p className="font-bold text-gray-900 truncate text-lg">{session?.user?.organizationName || 'Organization'}</p>
+                <p className="truncate text-lg font-bold text-white">{session?.user?.organizationName || 'Organization'}</p>
                 <div className="flex items-center gap-2 mt-1">
-                  <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-gradient-to-r from-emerald-500 to-teal-600 text-white shadow-lg">
+                  <span className="inline-flex items-center rounded-full bg-[rgba(45,212,191,0.14)] px-3 py-1 text-xs font-bold text-[#7de8dc] ring-1 ring-white/10">
                     <Crown className="w-3 h-3 mr-1" />
                     {session?.user?.roles?.[0]?.name || 'User'}
                   </span>
-                  <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700">
-                    <div className="w-2 h-2 bg-green-500 rounded-full mr-1 animate-pulse" />
+                  <span className="inline-flex items-center rounded-full bg-white/[0.07] px-2 py-1 text-xs font-medium text-[#9fb4bb]">
+                    <div className="w-2 h-2 bg-[#2ec98a] rounded-full mr-1 animate-pulse" />
                     Online
                   </span>
                 </div>
@@ -1007,9 +1061,9 @@ const ModernNavigation = ({ children }: { children: React.ReactNode }) => {
         )}
 
         {/* Enhanced Navigation */}
-        <nav className="flex-1 p-4 space-y-3 overflow-y-auto">
+        <nav className="dashboard-sidebar-scroll min-h-0 flex-1 space-y-3 overflow-y-auto p-4">
           <div className={`
-            text-xs font-bold text-gray-400 uppercase tracking-wider transition-all duration-300
+            text-xs font-bold text-[#7f969f] uppercase tracking-[0.18em] transition-all duration-300
             ${isCollapsed ? 'opacity-0 h-0' : 'opacity-100 h-auto mb-4'}
           `}>
             Navigation
@@ -1026,27 +1080,33 @@ const ModernNavigation = ({ children }: { children: React.ReactNode }) => {
         </nav>
 
         {/* Enhanced User Profile */}
-        <div className="p-4 border-t border-gray-100/50 bg-gradient-to-r from-gray-50/50 to-white/50">
+        <div className="border-t border-white/10 p-4">
           <div className={`
-            flex items-center gap-3 p-4 rounded-2xl bg-white shadow-lg border border-gray-200/50
-            hover:shadow-xl hover:scale-105 transition-all duration-300 cursor-pointer group
+            flex items-center gap-3 rounded-xl border border-white/10 bg-[#0e1a20]/70 p-4 shadow-lg
+            hover:bg-white/[0.075] hover:shadow-xl hover:scale-[1.02] transition-all duration-300 cursor-pointer group
             ${isCollapsed ? 'justify-center' : ''}
           `}>
             <div className="relative">
-              <img
-                src={session?.user?.image || "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face"}
-                alt={session?.user?.name || "User"}
-                className="w-10 h-10 rounded-2xl object-cover shadow-md"
-              />
-              <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 border-2 border-white rounded-full shadow-sm" />
+              <Avatar className="h-10 w-10 rounded-xl shadow-md ring-2 ring-white/10">
+                <AvatarImage
+                  src={session?.user?.image || "https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face"}
+                  alt={session?.user?.name || "User"}
+                  className="object-cover"
+                />
+                <AvatarFallback className="rounded-xl bg-gradient-to-br from-[#2f7df6] to-[#2dd4bf] text-sm font-bold text-white">
+                  {userInitials}
+                </AvatarFallback>
+              </Avatar>
+              <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-[#2ec98a] border-2 border-[#0e1a20] rounded-full shadow-sm" />
             </div>
             {!isCollapsed && (
               <div className="flex-1 min-w-0">
-                <p className="font-bold text-gray-900 truncate">{session?.user?.name || 'User'}</p>
-                <p className="text-xs text-gray-500 truncate">{session?.user?.email || 'user@example.com'}</p>
+                <p className="font-bold text-white truncate">{session?.user?.name || 'User'}</p>
+                <p className="text-xs text-[#8fa4ab] truncate">{session?.user?.email || 'user@example.com'}</p>
               </div>
             )}
           </div>
+        </div>
         </div>
       </div>
 
@@ -1059,28 +1119,29 @@ const ModernNavigation = ({ children }: { children: React.ReactNode }) => {
       )}
 
       <div className={`
-        fixed left-0 top-0 h-full w-80 bg-white/95 backdrop-blur-xl z-50 shadow-2xl
+        dashboard-enterprise-sidebar fixed left-0 top-0 z-50 h-full w-80 overflow-hidden border-r border-white/10 shadow-2xl
         transform transition-all duration-500 md:hidden
         ${isMobileOpen ? 'translate-x-0' : '-translate-x-full'}
       `}>
-        <div className="flex items-center justify-between p-6 border-b border-gray-200/50">
+        <div className="relative z-10 flex h-full min-h-0 flex-col">
+        <div className="flex items-center justify-between border-b border-white/10 p-6">
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-2xl flex items-center justify-center shadow-xl">
-              <Hexagon className="w-6 h-6 text-white" />
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-[rgba(47,125,246,0.18)] text-[#8fb7ff] shadow-xl ring-1 ring-white/10">
+              <Hexagon className="w-6 h-6" />
             </div>
-            <h1 className="font-black text-xl bg-gradient-to-r from-emerald-600 to-teal-600 bg-clip-text text-transparent">
+            <h1 className="font-black text-xl tracking-[0.08em] text-white">
               STOCKFLOW
             </h1>
           </div>
           <button
             onClick={() => setIsMobileOpen(false)}
-            className="p-2 rounded-xl hover:bg-gray-100 transition-all duration-200"
+            className="rounded-xl border border-white/10 bg-white/[0.06] p-2 text-[#d3ddd8] transition-all duration-200 hover:bg-white/[0.12] hover:text-white"
           >
             <X className="w-6 h-6" />
           </button>
         </div>
 
-        <nav className="flex-1 p-4 space-y-2 overflow-y-auto">
+        <nav className="dashboard-sidebar-scroll min-h-0 flex-1 space-y-2 overflow-y-auto p-4">
           {filteredNavigation.map((item, index) => (
             <div
               key={item.title}
@@ -1091,22 +1152,22 @@ const ModernNavigation = ({ children }: { children: React.ReactNode }) => {
             </div>
           ))}
         </nav>
+        </div>
       </div>
 
       {/* Enhanced Main Content */}
-      <div className="flex-1 flex flex-col overflow-hidden">
+      <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
         {/* Enhanced Professional Top Navigation */}
         <EnhancedTopNavigation />
 
         {/* Main Content */}
-        <main className="flex-1 overflow-y-auto p-8 bg-gradient-to-br from-slate-50 via-blue-50 to-teal-50">
-          <div className="max-w-7xl mx-auto">
+        <main className="min-w-0 flex-1 overflow-y-auto overflow-x-hidden bg-gradient-to-br from-slate-50 via-blue-50 to-teal-50 p-4 sm:p-6 lg:p-8">
+          <div className="mx-auto w-full max-w-7xl min-w-0">
             {children}
           </div>
         </main>
 
       </div>
-      <RouteDebugger />
     </div>
   );
 };

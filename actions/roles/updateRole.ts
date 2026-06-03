@@ -5,6 +5,7 @@ import { createRoleName } from "@/lib/createRoleName";
 import { db } from "@/prisma/db";
 import { RoleFormData } from "@/types/types";
 import { revalidatePath } from "next/cache";
+import { withDisplayRoleName } from "./role-utils";
 
 export async function updateRole(id: string, data: Partial<RoleFormData>) {
   try {
@@ -26,7 +27,7 @@ export async function updateRole(id: string, data: Partial<RoleFormData>) {
     if (data.name) {
       const existingRole = await db.role.findFirst({
         where: {
-          name: data.name,
+          nameEn: data.name,
           NOT: {
             id: id,
           },
@@ -43,8 +44,8 @@ export async function updateRole(id: string, data: Partial<RoleFormData>) {
       where: { id },
       data: {
         ...(data.name && {
-          name: data.name,
-          roleName: createRoleName(data.name),
+          nameEn: data.name,
+          code: createRoleName(data.name),
         }),
         ...(data.description && { description: data.description }),
         ...(data.permissions && { permissions: data.permissions }),
@@ -52,7 +53,7 @@ export async function updateRole(id: string, data: Partial<RoleFormData>) {
     });
 
     revalidatePath("/dashboard/settings/roles");
-    return { success: true, data: role };
+    return { success: true, data: withDisplayRoleName(role) };
   } catch (error) {
     console.error("Error updating role:", error);
     return {

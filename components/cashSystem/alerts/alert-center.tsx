@@ -30,15 +30,19 @@ import {
   Package,
   Settings,
 } from "lucide-react"
-// Extend Alert type to match all alert shapes used in this component
-import { useLowStockMonitoring, useRealTimeBalanceTracking, useSessionTimeoutMonitoring } from "@/hooks/cashDrawer/use-real-time-tracking"
-import { Alert as BaseAlert } from "@/lib/cashSystem/types"
+// Extend the tracking alert type with the legacy display fields used here.
+import {
+  type Alert as TrackingAlert,
+  useLowStockMonitoring,
+  useRealTimeBalanceTracking,
+  useSessionTimeoutMonitoring,
+} from "@/hooks/cashDrawer/use-real-time-tracking"
 
-type Alert = BaseAlert & {
-  isRead: boolean
-  isAcknowledged: boolean
+type Alert = TrackingAlert & {
+  isRead?: boolean
+  isAcknowledged?: boolean
   createdAt: Date
-  data?: any
+  acknowledgedBy?: string
 }
 
 interface AlertCenterProps {
@@ -59,8 +63,15 @@ export function AlertCenter({ terminalId, sessionId, locationId, organizationId 
   const { isApproachingTimeout, sessionDurationHours } = useSessionTimeoutMonitoring(sessionId)
 
   // Combine all alerts
-  const allAlerts = [
-    ...alerts,
+  const trackedAlerts: Alert[] = alerts.map((alert) => ({
+    ...alert,
+    isRead: false,
+    isAcknowledged: alert.acknowledged,
+    createdAt: alert.timestamp,
+  }))
+
+  const allAlerts: Alert[] = [
+    ...trackedAlerts,
     // Add low stock alerts
     ...(lowStockCount > 0
       ? [

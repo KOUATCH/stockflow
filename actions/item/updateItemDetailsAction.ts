@@ -1,15 +1,14 @@
+import { inventoryAction } from "@/lib/error-handling";
+import type { ServerActionResult } from "@/lib/error-handling/types";
 import { itemStandardInclude } from "@/lib/item/includes"
-import { ActionResult, ItemWithRelations, revalidateItems, updateDetailsSchema } from "@/lib/item/schemas"
+import { ItemWithRelations, updateDetailsSchema } from "@/lib/item/schemas"
+import { revalidateItem } from "@/lib/item/revalidation"
 import { db } from "@/prisma/db"
 import { Prisma } from "@prisma/client"
 
-
-
 // Update: Item Details (SKU/Barcode/Physical)
-export async function updateItemDetailsAction(
-  input: unknown
-): Promise<ActionResult<ItemWithRelations>> {
-  try {
+export const updateItemDetailsAction = inventoryAction(
+  async (input: unknown): Promise<ServerActionResult<ItemWithRelations>> => {
     const data = updateDetailsSchema.parse(input)
 
     if (data.sku) {
@@ -23,7 +22,7 @@ export async function updateItemDetailsAction(
         select: { id: true },
       })
       if (conflict) {
-        return { success: false, error: 'Another item with this SKU already exists' }
+        throw new Error('Another item with this SKU already exists');
       }
     }
 
@@ -42,16 +41,16 @@ export async function updateItemDetailsAction(
       include: itemStandardInclude,
     })
 
-    revalidateItems(updated.id, data.organizationId)
-    return { success: true, data: updated, message: 'Item details updated' }
-  } catch (error) {
-    console.error('updateItemDetailsAction error:', error)
-    const message =
-      error instanceof Prisma.PrismaClientKnownRequestError
-        ? `Database error: ${error.code}`
-        : error instanceof Error
-        ? error.message
-        : 'Failed to update item details'
-    return { success: false, error: message }
+    revalidateItem(updated.id, data.organizationId)
+    return { success: true, data: updated }
+  },
+  {
+    actionName: 'updateItemDetailsAction',
+    component: 'InventoryManagement',
+    businessContext: {
+      domain: 'inventory',
+      operation: 'update',
+      resourceType: 'item'
+    }
   }
-}
+)

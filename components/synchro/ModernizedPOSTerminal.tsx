@@ -230,21 +230,7 @@ export function POSTerminalFinal({ organizationId, locationId, terminalId, userI
   }, [locationId, selectedLocationId])
 
   const { user: sessionData } = useAuth()
-
-  if (!sessionData?.organizationId) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 p-6 flex items-center justify-center">
-        <div className="text-center">
-          <div className="p-4 rounded-full bg-red-100 inline-block mb-4">
-            <AlertTriangle className="h-16 w-16 text-red-600" />
-          </div>
-
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">Organization Required</h2>
-          <p className="text-gray-600">User organization not found. Please contact support.</p>
-        </div>
-      </div>
-    )
-  }
+  const isMissingSessionOrganization = !sessionData?.organizationId
   const {
     data: itemsDBData,
     error: itemsDBError,
@@ -343,6 +329,7 @@ export function POSTerminalFinal({ organizationId, locationId, terminalId, userI
   }, [])
 
   const createSaleMutation = useMutation<any, unknown, any>({
+    meta: { operation: 'create', entity: 'Sale' , suppressSuccessNotification: true, suppressErrorNotification: true },
     mutationFn: (data: any) => createSale(data, userId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["sales-orders"] })
@@ -810,6 +797,7 @@ export function POSTerminalFinal({ organizationId, locationId, terminalId, userI
   }, [selectedTerminalId, userId, selectedLocationId, organizationId, success, error])
 
   const createSessionMutation = useMutation({
+    meta: { operation: 'create', entity: 'Session' , suppressSuccessNotification: true, suppressErrorNotification: true },
     mutationFn: createPOSSession,
     onSuccess: (result) => {
       if (result.success && result.data) {
@@ -833,19 +821,7 @@ export function POSTerminalFinal({ organizationId, locationId, terminalId, userI
     },
   })
 
-  if (!organizationId) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 p-6 flex items-center justify-center">
-        <div className="text-center">
-          <div className="p-4 rounded-full bg-red-100 inline-block mb-4">
-            <AlertTriangle className="h-16 w-16 text-red-600" />
-          </div>
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">Organization Required</h2>
-          <p className="text-gray-600">User organization not found. Please contact support.</p>
-        </div>
-      </div>
-    )
-  }
+  const isMissingOrganization = !organizationId
 
   const toggleFavorite = useCallback((itemId: string) => {
     setFavorites((prevFavorites) => {
@@ -1027,6 +1003,21 @@ export function POSTerminalFinal({ organizationId, locationId, terminalId, userI
     success,
     refetchDBItems,
   ])
+
+  if (isMissingSessionOrganization || isMissingOrganization) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 p-6 flex items-center justify-center">
+        <div className="text-center">
+          <div className="p-4 rounded-full bg-red-100 inline-block mb-4">
+            <AlertTriangle className="h-16 w-16 text-red-600" />
+          </div>
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">Organization Required</h2>
+          <p className="text-gray-600">User organization not found. Please contact support.</p>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div
       className={`min-h-screen bg-gradient-to-br from-slate-50 via-emerald-50 to-teal-50 p-6 space-y-6 transition-colors duration-300 ${isDarkMode ? "dark bg-gradient-to-br from-slate-950 via-slate-900 to-slate-800" : ""

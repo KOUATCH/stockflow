@@ -3,6 +3,20 @@
 import { db } from "@/prisma/db"
 import { endOfDay, startOfDay, startOfMonth, startOfWeek, subDays } from "date-fns"
 
+const toNumber = (value: unknown): number => {
+  if (value === null || value === undefined) return 0
+  if (typeof value === "number") return value
+  if (typeof value === "object" && "toNumber" in value && typeof value.toNumber === "function") {
+    return value.toNumber()
+  }
+  return Number(value)
+}
+
+const displayName = (user: { firstName?: string | null; lastName?: string | null; email?: string | null } | null | undefined) => {
+  const fullName = [user?.firstName, user?.lastName].filter(Boolean).join(" ").trim()
+  return fullName || user?.email || "Unknown User"
+}
+
 export interface SalesAnalytics {
   totalSales: number
   totalTransactions: number
@@ -105,7 +119,7 @@ export async function getSalesAnalytics(
             item: {
               select: {
                 id: true,
-                name: true,
+                nameEn: true,
                 sku: true,
               },
             },
@@ -115,13 +129,13 @@ export async function getSalesAnalytics(
       },
     })
 
-    const totalSales = sales.reduce((sum, sale) => sum + sale.total, 0)
+    const totalSales = sales.reduce((sum, sale) => sum + toNumber(sale.total), 0)
     const totalTransactions = sales.length
     const averageTransaction = totalTransactions > 0 ? totalSales / totalTransactions : 0
 
     // Calculate total items from sale lines
     const totalItems = sales.reduce(
-      (sum, sale) => sum + sale.lines.reduce((lineSum, line) => lineSum + line.quantity, 0),
+      (sum, sale) => sum + sale.lines.reduce((lineSum, line) => lineSum + toNumber(line.quantity), 0),
       0,
     )
 
@@ -133,13 +147,13 @@ export async function getSalesAnalytics(
         if (line.item) {
           const key = line.itemId
           const existing = itemSales.get(key) || {
-            name: line.item.name,
+            name: line.item.nameEn,
             sku: line.item.sku,
             quantity: 0,
             revenue: 0,
           }
-          existing.quantity += line.quantity
-          existing.revenue += line.lineTotal
+          existing.quantity += toNumber(line.quantity)
+          existing.revenue += toNumber(line.lineTotal)
           itemSales.set(key, existing)
         }
       })
@@ -161,7 +175,7 @@ export async function getSalesAnalytics(
       const hourSales = sales.filter((sale) => new Date(sale.createdAt).getHours() === hour)
       return {
         hour,
-        sales: hourSales.reduce((sum, sale) => sum + sale.total, 0),
+        sales: hourSales.reduce((sum, sale) => sum + toNumber(sale.total), 0),
         transactions: hourSales.length,
       }
     })
@@ -176,7 +190,7 @@ export async function getSalesAnalytics(
 
       salesByDay.push({
         date: currentDate.toISOString().split("T")[0],
-        sales: daySales.reduce((sum, sale) => sum + sale.total, 0),
+        sales: daySales.reduce((sum, sale) => sum + toNumber(sale.total), 0),
         transactions: daySales.length,
       })
 
@@ -188,7 +202,7 @@ export async function getSalesAnalytics(
     sales.forEach((sale) => {
       sale.payments.forEach((payment) => {
         const existing = paymentMethodMap.get(payment.method) || { amount: 0, count: 0 }
-        existing.amount += payment.amount
+        existing.amount += toNumber(payment.amount)
         existing.count += 1
         paymentMethodMap.set(payment.method, existing)
       })
@@ -243,7 +257,9 @@ export async function getCashReconciliationReports(
         },
         user: {
           select: {
-            name: true,
+            firstName: true,
+            lastName: true,
+            email: true,
           },
         },
         salesOrders: {
@@ -253,39 +269,60 @@ export async function getCashReconciliationReports(
             },
           },
         },
-        cashDrawerTransactions: true,
       },
       orderBy: {
         startTime: "desc",
       },
     })
 
+    // Get cash drawer transactions for all sessions
+    const sessionIds = sessions.map(session => session.id)
+    const allTransactions = await db.cashDrawerTransaction.findMany({
+      where: {
+        sessionId: {
+          in: sessionIds,
+        },
+      },
+    })
+
+    // Group transactions by session
+    const transactionsBySession = allTransactions.reduce((acc, transaction) => {
+      if (transaction.sessionId) {
+        if (!acc[transaction.sessionId]) {
+          acc[transaction.sessionId] = []
+        }
+        acc[transaction.sessionId].push(transaction)
+      }
+      return acc
+    }, {} as Record<string, typeof allTransactions>)
+
     return sessions.map((session) => {
-      const totalSales = session.salesOrders.reduce((sum, sale) => sum + sale.total, 0)
+      const totalSales = session.salesOrders.reduce((sum, sale) => sum + toNumber(sale.total), 0)
+      const sessionTransactions = transactionsBySession[session.id] || []
 
-      const totalCashIn = session.cashDrawerTransactions
+      const totalCashIn = sessionTransactions
         .filter((t) => t.type === "CASH_IN")
-        .reduce((sum, t) => sum + t.amount, 0)
+        .reduce((sum, t) => sum + toNumber(t.amount), 0)
 
-      const totalCashOut = session.cashDrawerTransactions
+      const totalCashOut = sessionTransactions
         .filter((t) => t.type === "CASH_OUT")
-        .reduce((sum, t) => sum + t.amount, 0)
+        .reduce((sum, t) => sum + toNumber(t.amount), 0)
 
       return {
         sessionId: session.id,
         sessionNumber: session.sessionNumber,
         terminalName: session.terminal?.name || "Unknown Terminal",
-        userName: session.user?.name || "Unknown User",
+        userName: displayName(session.user),
         openedAt: session.startTime,
         closedAt: session.endTime || undefined,
-        openingBalance: session.openingBalance,
-        expectedBalance: session.expectedBalance || 0,
-        actualBalance: session.closingBalance || undefined,
-        variance: session.variance || undefined,
+        openingBalance: toNumber(session.openingBalance),
+        expectedBalance: toNumber(session.expectedBalance),
+        actualBalance: session.closingBalance === null ? undefined : toNumber(session.closingBalance),
+        variance: session.variance === null ? undefined : toNumber(session.variance),
         totalSales,
         totalCashIn,
         totalCashOut,
-        transactionCount: session.cashDrawerTransactions.length,
+        transactionCount: sessionTransactions.length,
         status: session.status,
       }
     })
@@ -313,7 +350,7 @@ export async function getProductPerformance(
       include: {
         category: {
           select: {
-            title: true,
+            titleEn: true,
           },
         },
         inventoryLevels: {
@@ -339,26 +376,29 @@ export async function getProductPerformance(
     })
 
     return items.map((item) => {
-      const quantitySold = item.salesOrderLines.reduce((sum, line) => sum + line.quantity, 0)
-      const totalRevenue = item.salesOrderLines.reduce((sum, line) => sum + line.lineTotal, 0)
-      const averagePrice = quantitySold > 0 ? totalRevenue / quantitySold : item.sellingPrice
-      const profitMargin = item.sellingPrice > 0 ? ((item.sellingPrice - item.costPrice) / item.sellingPrice) * 100 : 0
+      const quantitySold = item.salesOrderLines.reduce((sum, line) => sum + toNumber(line.quantity), 0)
+      const totalRevenue = item.salesOrderLines.reduce((sum, line) => sum + toNumber(line.lineTotal), 0)
+      const sellingPrice = toNumber(item.sellingPrice)
+      const costPrice = toNumber(item.costPrice)
+      const reorderLevel = toNumber(item.reorderLevel)
+      const averagePrice = quantitySold > 0 ? totalRevenue / quantitySold : sellingPrice
+      const profitMargin = sellingPrice > 0 ? ((sellingPrice - costPrice) / sellingPrice) * 100 : 0
 
       const inventoryLevel = item.inventoryLevels[0]
-      const currentStock = inventoryLevel?.quantityOnHand || 0
+      const currentStock = toNumber(inventoryLevel?.quantityOnHand)
 
       let stockStatus: "in_stock" | "low_stock" | "out_of_stock" = "in_stock"
       if (currentStock === 0) {
         stockStatus = "out_of_stock"
-      } else if (currentStock <= item.reorderLevel) {
+      } else if (currentStock <= reorderLevel) {
         stockStatus = "low_stock"
       }
 
       return {
         itemId: item.id,
-        itemName: item.name,
+        itemName: item.nameEn,
         itemSku: item.sku,
-        category: item.category?.title || "Uncategorized",
+        category: item.category?.titleEn || "Uncategorized",
         quantitySold,
         totalRevenue,
         averagePrice,
@@ -415,7 +455,7 @@ export async function getUserPerformance(
         const sessions = user.posSessions
         const sessionSales = sessions.flatMap((session) => session.salesOrders)
 
-        const totalSales = sessionSales.reduce((sum, sale) => sum + sale.total, 0)
+        const totalSales = sessionSales.reduce((sum, sale) => sum + toNumber(sale.total), 0)
         const totalTransactions = sessionSales.length
         const averageTransaction = totalTransactions > 0 ? totalSales / totalTransactions : 0
         const sessionsCount = sessions.length
@@ -433,7 +473,7 @@ export async function getUserPerformance(
         const sessionsWithVariance = sessions.filter((s) => s.variance !== null)
         const averageVariance =
           sessionsWithVariance.length > 0
-            ? sessionsWithVariance.reduce((sum, s) => sum + Math.abs(s.variance || 0), 0) / sessionsWithVariance.length
+            ? sessionsWithVariance.reduce((sum, s) => sum + Math.abs(toNumber(s.variance)), 0) / sessionsWithVariance.length
             : 0
 
         // Calculate performance score (0-100)
@@ -445,7 +485,7 @@ export async function getUserPerformance(
 
         return {
           userId: user.id,
-          userName: user.name || `${user.firstName || ""} ${user.lastName || ""}`.trim(),
+          userName: displayName(user),
           totalSales,
           totalTransactions,
           averageTransaction,

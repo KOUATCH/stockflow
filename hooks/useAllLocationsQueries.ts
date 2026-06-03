@@ -66,6 +66,7 @@ export function useCreateALocation() {
   const { formSuccess, formError } = useNotifications();
 
   return useMutation({
+    meta: { operation: 'create', entity: 'Location' },
     mutationFn: async (data: LocationDTO) => await createLocation(data),
     onSuccess: (_data, variables) => {
       formSuccess("Location Creation", "Location has been added successfully");
@@ -90,6 +91,7 @@ export function useDeleteLocation() {
   const { success, error } = useNotifications();
 
   return useMutation({
+    meta: { operation: 'delete', entity: 'Location' , suppressSuccessNotification: true, suppressErrorNotification: true },
     mutationFn: async ({ id, organizationId }: { id: string; organizationId?: string }) => await deleteLocation(id),
     onMutate: async ({ id, organizationId }) => {
       const queryKeys: Array<readonly unknown[]> = [LocationKeys.lists()]
@@ -170,6 +172,7 @@ export function useUpdateALocation() {
   const { formSuccess, formError } = useNotifications();
 
   return useMutation({
+    meta: { operation: 'update', entity: 'Location' },
     mutationFn: async ({ id, data }: { id: string; data: LocationDTO }) => await updateLocationById(id, data),
     onMutate: async (variables) => {
       await queryClient.cancelQueries({ queryKey: LocationKeys.detail(variables.id) })
@@ -258,6 +261,7 @@ export function useUpdateLocationBasicInfo() {
   const { formSuccess, formError } = useNotifications();
 
   return useMutation({
+    meta: { operation: 'update', entity: 'Location Basic Info' },
     mutationFn: async ({ id, data }: { id: string; data: LocationDTO }) => updateLocationById(id, data),
     onMutate: async (variables) => {
       await queryClient.cancelQueries({ queryKey: LocationKeys.detail(variables.id) })
@@ -346,6 +350,7 @@ export function useUpdateLocationOthers() {
   const { formSuccess, formError } = useNotifications();
 
   return useMutation({
+    meta: { operation: 'update', entity: 'Location Others' },
     mutationFn: async ({ id, data }: { id: string; data: LocationDTO }) => updateLocationById(id, data),
     onMutate: async (variables) => {
       await queryClient.cancelQueries({ queryKey: LocationKeys.detail(variables.id) })

@@ -1,4 +1,17 @@
-import { ItemAPIError } from "@/services/itemApi"
+// Legacy API Error class for compatibility
+class ItemAPIError extends Error {
+  code: string
+  statusCode?: number
+  originalError?: unknown
+
+  constructor(message: string, code: string, statusCode?: number, originalError?: unknown) {
+    super(message)
+    this.name = 'ItemAPIError'
+    this.code = code
+    this.statusCode = statusCode
+    this.originalError = originalError
+  }
+}
 
 // Utility functions for working with the Item API
 

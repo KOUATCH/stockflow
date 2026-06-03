@@ -4,7 +4,7 @@ import {
   fetchItemsWithInventoryLevels,
   fetchItemWithInventoryLevel,
   type ItemWithInventory,
-} from "@/actions/inventory/fetch-items-with-inventory"
+} from "@/actions/inventory/fetchItemsWithInventoryLevels"
 import { useInfiniteQuery, type UseInfiniteQueryOptions, useQuery, type UseQueryOptions } from "@tanstack/react-query"
 
 // Query keys factory for better cache management

@@ -100,30 +100,7 @@ const FORM_STEPS = [
 
 type FormStep = typeof FORM_STEPS[number]['id']
 
-// Mock departments and job titles - replace with actual data
-const departments = [
-  'Sales',
-  'Marketing',
-  'Operations',
-  'IT',
-  'HR',
-  'Finance',
-  'Customer Service',
-  'Management'
-]
-
-const jobTitles = [
-  'Sales Associate',
-  'Senior Sales Associate',
-  'Marketing Specialist',
-  'Operations Manager',
-  'IT Specialist',
-  'HR Coordinator',
-  'Financial Analyst',
-  'Customer Service Rep',
-  'Store Manager',
-  'Assistant Manager'
-]
+// Department and job title options - dynamically fetched
 
 export function ModernEmployeeForm({
   onSubmit,

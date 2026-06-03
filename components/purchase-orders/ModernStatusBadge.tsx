@@ -37,7 +37,7 @@ const statusConfig: Record<PurchaseOrderStatus, {
   },
   APPROVED: {
     variant: "default",
-    className: "bg-green-100 text-green-700 border-green-200 hover:bg-green-200",
+    className: "border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-50 dark:border-emerald-900/60 dark:bg-emerald-950/35 dark:text-emerald-200",
     icon: CheckCircle,
     label: "Approved"
   },
@@ -55,7 +55,7 @@ const statusConfig: Record<PurchaseOrderStatus, {
   },
   CANCELLED: {
     variant: "destructive",
-    className: "bg-red-100 text-red-700 border-red-200 hover:bg-red-200",
+    className: "border-rose-200 bg-rose-50 text-rose-700 hover:bg-rose-50 dark:border-rose-900/60 dark:bg-rose-950/35 dark:text-rose-200",
     icon: XCircle,
     label: "Cancelled"
   },
@@ -79,7 +79,7 @@ export function ModernStatusBadge({
     <Badge
       variant={config.variant}
       className={cn(
-        "inline-flex items-center gap-1.5 px-2.5 py-1 text-xs font-medium rounded-full transition-colors",
+        "inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium transition-colors",
         config.className,
         className
       )}

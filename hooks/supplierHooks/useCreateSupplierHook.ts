@@ -22,6 +22,7 @@ import type {
 export function useCreateSupplierHook() {
   const qc = useQueryClient()
   return useMutation({
+    meta: { operation: 'create', entity: 'Supplier' },
     mutationFn: async (payload: CreateSupplierDTO) => {
       const res = await createSupplier(payload)
        if (!res?.success) {

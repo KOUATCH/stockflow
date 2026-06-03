@@ -1,7 +1,7 @@
 "use client"
 
 import { useQuery } from "@tanstack/react-query"
-import { getItems } from "@/actions/itemActions"
+import { getItems } from "@/actions/items"
 
 export function useItems() {
   return useQuery({

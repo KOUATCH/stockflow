@@ -40,10 +40,11 @@ export type SupplierResponse<T> = {
   success: boolean
   error: string | null
   data: T
+  message?: string
 }
 
 // Full supplier shape with related counts and item links
-export type SupplierWithRelations = Prisma.SupplierGetPayload<{
+type SupplierWithRelationsBase = Prisma.SupplierGetPayload<{
   include: {
     _count: {
       select: {
@@ -56,7 +57,8 @@ export type SupplierWithRelations = Prisma.SupplierGetPayload<{
         item: {
           select: {
             id: true
-            name: true
+            nameEn: true
+            nameFr: true
             sku: true
             costPrice: true
             isActive: true
@@ -67,16 +69,24 @@ export type SupplierWithRelations = Prisma.SupplierGetPayload<{
   }
 }>
 
+export type SupplierWithRelations = Omit<SupplierWithRelationsBase, 'supplierItems'> & {
+  supplierItems: Array<
+    Omit<SupplierWithRelationsBase['supplierItems'][number], 'item'> & {
+      item: SupplierWithRelationsBase['supplierItems'][number]['item'] & { name: string }
+    }
+  >
+}
+
 // Full supplier shape with related counts and item links
-export type SimpleSupplierWithRelations = Prisma.SupplierGetPayload<{
+type SimpleSupplierWithRelationsBase = Prisma.SupplierGetPayload<{
   include: {
-    id:true,
     supplierItems: {
       include: {
         item: {
           select: {
             id: true
-            name: true
+            nameEn: true
+            nameFr: true
             sku: true
             costPrice: true
             isActive: true
@@ -86,6 +96,14 @@ export type SimpleSupplierWithRelations = Prisma.SupplierGetPayload<{
     }
   }
 }>
+
+export type SimpleSupplierWithRelations = Omit<SimpleSupplierWithRelationsBase, 'supplierItems'> & {
+  supplierItems: Array<
+    Omit<SimpleSupplierWithRelationsBase['supplierItems'][number], 'item'> & {
+      item: SimpleSupplierWithRelationsBase['supplierItems'][number]['item'] & { name: string }
+    }
+  >
+}
 
 // DTOs
 export type CreateSupplierDTO = {
@@ -126,6 +144,23 @@ export type UpdateSupplierDTO = {
   notes?: string | null
   isActive?: boolean | null
 }
+
+export type SupplierCreateDTO = CreateSupplierDTO
+export type UpdateSupplierPayload = Partial<Omit<UpdateSupplierDTO, 'id'>> & {
+  id?: string
+  organizationId?: string
+}
+export type UpdateSupplierBasicInfoPayload = Pick<UpdateSupplierDTO, 'id'> &
+  Partial<Pick<UpdateSupplierDTO, 'organizationId' | 'name' | 'contactPerson'>>
+export type UpdateSupplierDetailsPayload = Pick<UpdateSupplierDTO, 'id'> &
+  Partial<
+    Pick<
+      UpdateSupplierDTO,
+      'organizationId' | 'email' | 'phone' | 'address' | 'city' | 'state' | 'zipCode' | 'country' | 'paymentTerms'
+    >
+  >
+export type UpdateSupplierRelationsPayload = Pick<UpdateSupplierDTO, 'id'> &
+  Partial<Pick<UpdateSupplierDTO, 'organizationId' | 'taxId' | 'creditLimit' | 'notes' | 'isActive'>>
 
 // ItemSupplier link DTOs
 export type SupplierItemUpsert = {

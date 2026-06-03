@@ -1,9 +1,11 @@
-'use client'
+"use client"
 
-// import { getGoodsReceiptsForPurchaseOrder, getPurchaseOrdersSummary, GoodsReceiptWithRelations } from "@/actions/purchaseOrders/GoodsReceiptAndSummary"
-// import { PurchaseOrderSummary } from "@/types/purchase-orders-system-types"
-import { getGoodsReceiptsForPurchaseOrder, GoodsReceiptWithRelations, PurchaseOrderSummary } from "@/actions/purchaseOrderWorkflow/GoodsReceiptAndSummary"
-import { getPurchaseOrdersSummary } from "@/actions/purchaseOrderWorkflow/purchaseOrderWorkflowActions"
+import {
+  getGoodsReceiptsForPurchaseOrder,
+  getPurchaseOrdersSummary,
+  GoodsReceiptWithRelations,
+  PurchaseOrderSummary,
+} from "@/actions/purchaseOrderWorkflow/GoodsReceiptAndSummary"
 import { useQuery } from "@tanstack/react-query"
 import { purchaseOrderModalKeys } from "./purchaseOrderKeys"
 
@@ -35,17 +37,7 @@ export function usePurchaseOrdersSummaryHook(organizationId: string) {
     queryFn: async () => {
       if (!organizationId) throw new Error('Organization ID is required')
       
-      const result = await getPurchaseOrdersSummary(organizationId)
-      
-      // Transform the data to match our expected type
-      return {
-        ...result,
-        statusBreakdown: {
-          ...result.statusBreakdown,
-          closed: result.statusBreakdown.completed, // Map completed to closed
-          completed: undefined, // Remove the completed property
-        }
-      } as PurchaseOrderSummary
+      return getPurchaseOrdersSummary(organizationId)
     },
     enabled: Boolean(organizationId),
     staleTime: 30_000,

@@ -52,7 +52,7 @@ export async function unlinkItemFromSupplier(
     revalidatePath('/dashboard/suppliers')
     revalidatePath(`/dashboard/suppliers/${payload.supplierId}`)
 
-    return { success: true, message: 'Item unlinked from supplier', data: result as SupplierWithRelations }
+    return { success: true, error: null, message: 'Item unlinked from supplier', data: result as SupplierWithRelations }
   } catch (error) {
     console.error('Error unlinking item from supplier:', error)
     if (error instanceof Prisma.PrismaClientKnownRequestError) {

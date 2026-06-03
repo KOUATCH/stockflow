@@ -10,11 +10,11 @@ This document outlines the comprehensive security measures implemented in the St
 - **Session Strategy**: JWT with secure HTTP-only cookies
 - **Session Duration**: 7 days with auto-refresh
 - **Providers**:
-  - Credentials (email/password with bcrypt hashing)
+  - Credentials (email/password with Argon2id hashing)
   - Google OAuth (optional)
 
 ### Security Features
-- **Password Security**: bcrypt with 12 rounds
+- **Password Security**: Argon2id with memory-hard hashing
 - **Account Lockout**: Configurable failed login attempts
 - **Two-Factor Authentication**: TOTP support with backup codes
 - **Email Verification**: Required for account activation

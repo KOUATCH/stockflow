@@ -1,5 +1,6 @@
 "use client";
 
+import { notify } from "@/lib/notifications/notify"
 import {
   Card,
   CardContent,
@@ -17,7 +18,6 @@ import updateCategoryById from "@/actions/categories/updateCategoryById";
 import { generateSlug } from "@/lib/generateSlug";
 import { CategoryProps } from "@/types/types";
 import { Category } from "@prisma/client";
-import { toast } from "sonner";
 import ImageInput from "../FormInputs/ImageInput";
 import TextArea from "../FormInputs/TextAreaInput";
 import TextInput from "../FormInputs/TextInput";
@@ -45,8 +45,10 @@ export default function CategoryForm({
     formState: { errors },
   } = useForm<CategoryProps>({
     defaultValues: {
-      title: initialData?.title,
-      description: initialData?.description || "",
+      titleEn: initialData?.titleEn || "",
+      titleFr: initialData?.titleFr || "",
+      descriptionEn: initialData?.descriptionEn || "",
+      descriptionFr: initialData?.descriptionFr || "",
     },
   });
   const router = useRouter();
@@ -58,14 +60,14 @@ export default function CategoryForm({
   async function saveCategory(data: CategoryProps) {
     try {
       setLoading(true);
-      data.slug = generateSlug(data.title);
+      data.slug = generateSlug(data.titleEn);
       data.imageUrl = imageUrl;
 
       if (editingId) {
         await updateCategoryById(editingId, data);
         setLoading(false);
         // Toast
-        toast.success("Updated Successfully!",{description:"Category Successfully updated"});
+        notify.success("Updated Successfully!",{description:"Category Successfully updated"});
         //reset
         reset();
         //route
@@ -75,7 +77,7 @@ export default function CategoryForm({
         await createCategory(data);
         setLoading(false);
         // Toast
-        toast.success("Successfully Created!",{description:"Category Successfully Created"});
+        notify.success("Successfully Created!",{description:"Category Successfully Created"});
         //reset
         reset();
         setImageUrl("/placeholder.svg");
@@ -114,16 +116,32 @@ export default function CategoryForm({
                   <TextInput
                     register={register}
                     errors={errors}
-                    label="Category Title"
-                    name="title"
+                    label="English Category Title"
+                    name="titleEn"
+                  />
+                </div>
+                <div className="grid gap-3">
+                  <TextInput
+                    register={register}
+                    errors={errors}
+                    label="French Category Title"
+                    name="titleFr"
                   />
                 </div>
                 <div className="grid gap-3">
                   <TextArea
                     register={register}
                     errors={errors}
-                    label="Description"
-                    name="description"
+                    label="English Description"
+                    name="descriptionEn"
+                  />
+                </div>
+                <div className="grid gap-3">
+                  <TextArea
+                    register={register}
+                    errors={errors}
+                    label="French Description"
+                    name="descriptionFr"
                   />
                 </div>
               </div>

@@ -1,17 +1,19 @@
 "use client"
 
+import { notify } from "@/lib/notifications/notify"
 import { signInWithCredentials } from "@/actions/auth"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { TooltipProvider } from "@/components/ui/tooltip"
-import { useToast } from "@/hooks/use-toast"
+import { getLocaleFromPathname, localizePath } from "@/i18n/routing"
 import { cn } from "@/lib/utils"
+import { DEFAULT_LOCALE } from "@/types/bilingual"
 import type { LoginProps } from "@/types/types"
 import { AlertCircle, ArrowLeft, CheckCircle, Eye, EyeOff, Key, Loader2, Lock, Mail, User } from "lucide-react"
 import Link from "next/link"
-import { useRouter, useSearchParams } from "next/navigation"
+import { usePathname, useRouter, useSearchParams } from "next/navigation"
 import { useEffect, useState } from "react"
 import { useForm } from "react-hook-form"
 
@@ -30,11 +32,15 @@ export default function LoginForm() {
   } = useForm<LoginProps>()
 
   const params = useSearchParams()
-  const returnUrl = params.get("returnUrl") || "/dashboard"
+  const pathname = usePathname()
+  const locale = getLocaleFromPathname(pathname) ?? DEFAULT_LOCALE
+  const localizedHref = (href: string) => localizePath(href, locale)
+  const requestedReturnUrl = params.get("returnUrl") || params.get("callbackUrl")
+  const returnUrl =
+    requestedReturnUrl?.startsWith("/") && !requestedReturnUrl.startsWith("//")
+      ? localizedHref(requestedReturnUrl)
+      : localizedHref("/dashboard")
   const router = useRouter()
-  const { toast } = useToast()
-
-  // Watch email for validation
   const emailValue = watch("email")
 
   useEffect(() => {
@@ -58,13 +64,13 @@ export default function LoginForm() {
 
       if (result.error) {
         setLoading(false)
-        toast({
+        notify({
           variant: "destructive",
           title: "Authentication Failed",
           description: result.error,
         })
       } else if (result.success) {
-        toast({
+        notify({
           title: "Login Successful",
           description: result.message,
         })
@@ -74,7 +80,7 @@ export default function LoginForm() {
       }
     } catch (error) {
       setLoading(false)
-      toast({
+      notify({
         variant: "destructive",
         title: "Connection Error",
         description: "Unable to connect to authentication service. Please try again.",
@@ -212,7 +218,7 @@ export default function LoginForm() {
                 <span className="text-sm text-gray-600">Remember me</span>
               </label>
               <Link
-                href="/forgot-password"
+                href={localizedHref("/forgot-password")}
                 className="text-sm text-emerald-600 hover:text-emerald-500 transition-colors"
               >
                 Forgot password?
@@ -246,9 +252,9 @@ export default function LoginForm() {
             {/* Sign Up Link */}
             <div className="text-center pt-4 border-t">
               <p className="text-gray-600">
-                Don't have an account?{" "}
+                Do not have an account?{" "}
                 <Link
-                  href="/register"
+                  href={localizedHref("/register")}
                   className="text-emerald-600 hover:text-emerald-500 font-semibold transition-colors"
                 >
                   Create Account

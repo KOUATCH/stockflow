@@ -1,7 +1,8 @@
 "use client"
 
+import { notify } from "@/lib/notifications/notify"
 import { Button } from "@/components/ui/button"
-import { type Column, ConfirmationDialog, DataTable, EntityForm2, TableActions } from "@/components/ui/data-table"
+import { type Column, ConfirmationDialog, DataTable, EntityForm, TableActions } from "@/components/ui/data-table"
 import { FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
 import { Switch } from "@/components/ui/switch"
@@ -27,7 +28,6 @@ import {
 } from "lucide-react"
 import { useCallback, useState } from "react"
 import { useForm } from "react-hook-form"
-import { toast } from "sonner"
 import * as XLSX from "xlsx"
 import { z } from "zod"
 
@@ -177,11 +177,11 @@ const UnifiedSupplierFormRevised = ({
       const fileName = `Suppliers_${format(new Date(), "yyyy-MM-dd")}.xlsx`
       XLSX.writeFile(workbook, fileName)
 
-      toast.success("Export successful", {
+      notify.success("Export successful", {
         description: `Suppliers exported to ${fileName}`,
       })
     } catch (error) {
-      toast.error("Export failed", {
+      notify.error("Export failed", {
         description: error instanceof Error ? error.message : "Unknown error occurred",
       })
     }
@@ -203,7 +203,7 @@ const UnifiedSupplierFormRevised = ({
     form.reset({
       id: supplier.id,
       name: supplier.name,
-      contactPerson: supplier.contactPerson,
+      contactPerson: supplier.contactPerson ?? "",
       email: supplier.email || "",
       paymentTerms: supplier.paymentTerms || 0,
       address: supplier.address || "",
@@ -240,18 +240,18 @@ const UnifiedSupplierFormRevised = ({
 
       await updateSupplierMutation.mutateAsync(updatedSupplier, {
         onSuccess: async () => {
-          toast.success("Basic information updated successfully")
+          notify.success("Basic information updated successfully")
           setSupplierToEdit(updatedSupplier)
           await refetch()
         },
         onError: (error: any) => {
-          toast.error("Failed to update basic information", {
+          notify.error("Failed to update basic information", {
             description: error?.message || "Unknown error occurred",
           })
         },
       })
     } catch (error) {
-      toast.error("Update failed", {
+      notify.error("Update failed", {
         description: error instanceof Error ? error.message : "Unknown error",
       })
     } finally {
@@ -274,18 +274,18 @@ const UnifiedSupplierFormRevised = ({
 
       await updateSupplierMutation.mutateAsync(updatedSupplier, {
         onSuccess: async () => {
-          toast.success("Contact information updated successfully")
+          notify.success("Contact information updated successfully")
           setSupplierToEdit(updatedSupplier)
           await refetch()
         },
         onError: (error: any) => {
-          toast.error("Failed to update contact information", {
+          notify.error("Failed to update contact information", {
             description: error?.message || "Unknown error occurred",
           })
         },
       })
     } catch (error) {
-      toast.error("Update failed", {
+      notify.error("Update failed", {
         description: error instanceof Error ? error.message : "Unknown error",
       })
     } finally {
@@ -308,18 +308,18 @@ const UnifiedSupplierFormRevised = ({
 
       await updateSupplierMutation.mutateAsync(updatedSupplier, {
         onSuccess: async () => {
-          toast.success("Business information updated successfully")
+          notify.success("Business information updated successfully")
           setSupplierToEdit(updatedSupplier)
           await refetch()
         },
         onError: (error: any) => {
-          toast.error("Failed to update business information", {
+          notify.error("Failed to update business information", {
             description: error?.message || "Unknown error occurred",
           })
         },
       })
     } catch (error) {
-      toast.error("Update failed", {
+      notify.error("Update failed", {
         description: error instanceof Error ? error.message : "Unknown error",
       })
     } finally {
@@ -346,19 +346,19 @@ const UnifiedSupplierFormRevised = ({
 
       await createSupplierMutation.mutateAsync(newSupplierData, {
         onSuccess: async () => {
-          toast.success("Supplier created successfully")
+          notify.success("Supplier created successfully")
           setFormDialogOpen(false)
           resetFormToDefaults()
           await refetch()
         },
         onError: (error: any) => {
-          toast.error("Failed to create supplier", {
+          notify.error("Failed to create supplier", {
             description: error?.message || "Unknown error occurred",
           })
         },
       })
     } catch (error) {
-      toast.error("An unexpected error occurred", {
+      notify.error("An unexpected error occurred", {
         description: error instanceof Error ? error.message : "Unknown error",
       })
     }
@@ -370,17 +370,17 @@ const UnifiedSupplierFormRevised = ({
       try {
         await deleteSupplierMutation.mutateAsync(supplierToDelete.id, {
           onSuccess: () => {
-            toast.success("Supplier deleted successfully")
+            notify.success("Supplier deleted successfully")
             refetch()
           },
           onError: (error: any) => {
-            toast.error("Failed to delete supplier", {
+            notify.error("Failed to delete supplier", {
               description: error?.message || "Unknown error occurred",
             })
           },
         })
       } catch (error) {
-        toast.error("Delete failed", {
+        notify.error("Delete failed", {
           description: error instanceof Error ? error.message : "Unknown error",
         })
       } finally {
@@ -388,6 +388,17 @@ const UnifiedSupplierFormRevised = ({
         setSupplierToDelete(null)
       }
     }
+  }
+
+  const handleFormSubmit = createSupplier
+
+  const handleSectionUpdate = async (
+    _section: string,
+    getData: () => unknown,
+    updateFn: (data: any) => Promise<void>
+  ) => {
+    const data = getData()
+    await updateFn(data)
   }
 
 
@@ -506,7 +517,7 @@ const UnifiedSupplierFormRevised = ({
       />
 
       {/* Tabbed Create/Update Supplier Form Dialog */}
-      <EntityForm2
+      <EntityForm
         open={formDialogOpen}
         onOpenChange={handleFormDialogClose}
         title={isEditMode ? "Edit Supplier" : "Add New Supplier"}
@@ -790,7 +801,7 @@ const UnifiedSupplierFormRevised = ({
             </TabsContent>
           </Tabs>
         </div>
-      </EntityForm2>
+      </EntityForm>
 
       {/* Delete Confirmation Dialog */}
       <ConfirmationDialog

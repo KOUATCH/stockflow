@@ -1,7 +1,9 @@
 "use server";
 import { db } from "@/prisma/db";
-import { InvitedUserProps } from "@/types/types";
 import { hashPassword } from "@/lib/password";
+import { logSecurityEvent, SecurityEventType } from "@/lib/security/audit-log";
+import { checkPasswordPolicy } from "@/services/auth/password-policy";
+import { InviteStatus } from "@prisma/client";
 // import { Resend } from "resend";
 
 // // import { generateNumericToken } from "@/lib/token";
@@ -10,12 +12,83 @@ import { hashPassword } from "@/lib/password";
 
 
 
+type InvitedUserProps = {
+  token: string;
+  email?: string;
+  password: string;
+  firstName?: string | null;
+  lastName?: string | null;
+  phone?: string | null;
+  image?: string | null;
+};
+
 export async function createInvitedUser(data: InvitedUserProps) {
-  const { email, password, firstName, lastName, name, phone, image, organizationId, roleId,organizationName } = data;
+  const { token, password, firstName, lastName, phone, image } = data;
 
   try {
     // Use a transaction for atomic operations
     return await db.$transaction(async (tx) => {
+      const invite = await tx.invite.findUnique({
+        where: { token },
+        include: {
+          role: { select: { id: true, organizationId: true } },
+        },
+      });
+
+      if (!invite || invite.status !== InviteStatus.PENDING) {
+        return {
+          error: "Invalid or already used invitation link",
+          status: 400,
+          data: null,
+        };
+      }
+
+      if (invite.expiresAt <= new Date()) {
+        await tx.invite.update({
+          where: { id: invite.id },
+          data: { status: InviteStatus.EXPIRED },
+        });
+
+        return {
+          error: "Invitation link has expired",
+          status: 410,
+          data: null,
+        };
+      }
+
+      if (invite.role.organizationId !== invite.organizationId) {
+        return {
+          error: "Invitation role is invalid",
+          status: 403,
+          data: null,
+        };
+      }
+
+      const existingUser = await tx.user.findFirst({
+        where: { email: { equals: invite.email, mode: "insensitive" } },
+        select: { id: true },
+      });
+
+      if (existingUser) {
+        return {
+          error: "This email is already registered",
+          status: 409,
+          data: null,
+        };
+      }
+
+      const passwordPolicy = await checkPasswordPolicy({
+        password,
+        email: invite.email,
+      });
+
+      if (!passwordPolicy.ok) {
+        return {
+          error: passwordPolicy.message,
+          status: 400,
+          data: null,
+        };
+      }
      
       // Hash password
       const hashedPassword = await hashPassword(password);
@@ -23,37 +96,50 @@ export async function createInvitedUser(data: InvitedUserProps) {
       // Invited User registers with role
       const newUser = await tx.user.create({
         data: {
-          email,
+          email: invite.email,
           password: hashedPassword,
           firstName,
           lastName,
-          organizationId:organizationId,
-          organizationName:organizationName,
-          name,
-          phone,
+          organizationId: invite.organizationId,
+          phone: phone || null,
           isVerified:true,  
-          image,
+          image: image || null,
           roles: {
             connect: {
-              id:roleId,
+              id: invite.roleId,
             },
           },
         },
-        include: {
-          roles: true, // Include roles in the response
+        select: {
+          id: true,
+          email: true,
         },
       });
-      
-     await tx.invite.update({
-        where:{email,status:false},
-        data: {status:true}
+
+      await tx.passwordHistory.create({
+        data: {
+          userId: newUser.id,
+          passwordHash: hashedPassword,
+        },
       })
       
-console.log({data})
+     await tx.invite.update({
+        where:{ id: invite.id },
+        data: {status: InviteStatus.ACCEPTED}
+      })
+      
+      void logSecurityEvent({
+        type: SecurityEventType.INVITE_REDEEMED,
+        userId: newUser.id,
+        organizationId: invite.organizationId,
+        resource: invite.email,
+        details: { inviteId: invite.id, roleId: invite.roleId },
+      })
+
       return {
         error: null,
         status: 200,
-        data: {id:newUser?.id, email:newUser?.email},
+        data: newUser,
       };
     });
   } catch (error) {

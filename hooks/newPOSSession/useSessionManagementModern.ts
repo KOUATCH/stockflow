@@ -40,6 +40,7 @@ export function useSessionManagement(terminalId: string) {
 
   // Mutation to open session
   const openSessionMutation = useMutation({
+    meta: { operation: 'open', entity: 'Session' , suppressSuccessNotification: true, suppressErrorNotification: true },
     mutationFn: async (data: OpenSessionData) => {
       const result = await openPOSSession(data)
       if (!result.success) {
@@ -72,6 +73,7 @@ export function useSessionManagement(terminalId: string) {
 
   // Mutation to close session
   const closeSessionMutation = useMutation({
+    meta: { operation: 'close', entity: 'Session' , suppressSuccessNotification: true, suppressErrorNotification: true },
     mutationFn: async (data: CloseSessionData) => {
       const result = await closePOSSession(data)
       if (!result.success) {

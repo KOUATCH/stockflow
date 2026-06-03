@@ -6,6 +6,13 @@ import { Resend } from "resend";
 const resend = new Resend(process.env.RESEND_API_KEY);
 const baseUrl = process.env.NEXT_PUBLIC_BASE_URL;
 
+const toNumber = (value: unknown): number => {
+  if (typeof value === "number") return value;
+  if (value && typeof value === "object" && "toNumber" in value && typeof value.toNumber === "function") {
+    return value.toNumber();
+  }
+  return Number(value ?? 0);
+};
 
 const getBriefOrgItems = async (orgId:string) => {
   try {
@@ -33,7 +40,8 @@ const getBriefOrgItems = async (orgId:string) => {
       },
       select: {
         id: true,
-        name: true,
+        nameEn: true,
+        nameFr: true,
         createdAt: true,
         thumbnail: true,
         costPrice: true,
@@ -42,13 +50,18 @@ const getBriefOrgItems = async (orgId:string) => {
        
       },
       orderBy: {
-        name: "desc",
+        nameEn: "desc",
       },
     });
     if (!items) {
       throw new Error("No items found for this organization");
     }
-    return items
+    return items.map((item) => ({
+      ...item,
+      name: item.nameEn || item.nameFr || item.slug,
+      costPrice: toNumber(item.costPrice),
+      sellingPrice: toNumber(item.sellingPrice),
+    }))
   } catch (error) {
     console.error("Error fetching the count:", error);
     return 0;

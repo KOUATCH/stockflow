@@ -36,7 +36,9 @@ import {
 } from "@/components/ui/sheet";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { sidebarLinks } from "@/config/sidebar";
+import { getLocaleFromPathname, localizePath } from "@/i18n/routing";
 import { cn } from "@/lib/utils";
+import { DEFAULT_LOCALE } from "@/types/bilingual";
 import {
   BarChart3,
   Bell,
@@ -187,6 +189,9 @@ const recentActivities: RecentActivity[] = [
 
 // Business Metrics Component
 const BusinessMetrics = () => {
+  const pathname = usePathname();
+  const locale = getLocaleFromPathname(pathname) ?? DEFAULT_LOCALE;
+  const localizedHref = (href: string) => localizePath(href, locale);
   const [metrics] = useState({
     todaySales: 12459.50,
     todayOrders: 28,
@@ -207,7 +212,7 @@ const BusinessMetrics = () => {
                 </span>
               </div>
             </TooltipTrigger>
-            <TooltipContent>Today's Sales Revenue</TooltipContent>
+            <TooltipContent>Today&apos;s Sales Revenue</TooltipContent>
           </Tooltip>
 
           <Separator orientation="vertical" className="h-4" />
@@ -219,14 +224,14 @@ const BusinessMetrics = () => {
                 <span className="font-semibold text-blue-600">{metrics.todayOrders}</span>
               </div>
             </TooltipTrigger>
-            <TooltipContent>Today's Orders</TooltipContent>
+            <TooltipContent>Today&apos;s Orders</TooltipContent>
           </Tooltip>
 
           <Separator orientation="vertical" className="h-4" />
 
           <Tooltip>
             <TooltipTrigger asChild>
-              <Link href="/dashboard/inventory/stock/low-stock">
+              <Link href={localizedHref("/dashboard/inventory/stock/low-stock")}>
                 <div className="flex items-center gap-2 cursor-pointer hover:opacity-80">
                   <Package className="h-4 w-4 text-orange-600" />
                   <span className="font-semibold text-orange-600">{metrics.lowStock}</span>
@@ -246,6 +251,9 @@ const GlobalSearch = () => {
   const [open, setOpen] = useState(false);
   const [searchTerm, setSearchTerm] = useState("");
   const router = useRouter();
+  const pathname = usePathname();
+  const locale = getLocaleFromPathname(pathname) ?? DEFAULT_LOCALE;
+  const localizedHref = (href: string) => localizePath(href, locale);
 
   // Filter actions based on search term
   const filteredActions = quickActions.filter((action) =>
@@ -273,7 +281,7 @@ const GlobalSearch = () => {
 
   const handleSelect = (href: string) => {
     setOpen(false);
-    router.push(href);
+    router.push(localizedHref(href));
   };
 
   return (
@@ -428,6 +436,9 @@ const OrganizationStatus = ({ session }: { session: any }) => {
 // Enhanced Quick Actions Menu
 const QuickActionsMenu = () => {
   const [favoriteActions, setFavoriteActions] = useState<string[]>(['new-sale', 'add-product']);
+  const pathname = usePathname();
+  const locale = getLocaleFromPathname(pathname) ?? DEFAULT_LOCALE;
+  const localizedHref = (href: string) => localizePath(href, locale);
 
   const toggleFavorite = (actionId: string) => {
     setFavoriteActions(prev =>
@@ -465,7 +476,7 @@ const QuickActionsMenu = () => {
               {quickActions
                 .filter(action => favoriteActions.includes(action.id))
                 .map((action) => (
-                  <Link key={action.id} href={action.href}>
+                  <Link key={action.id} href={localizedHref(action.href)}>
                     <div className="flex items-center gap-3 p-2 rounded hover:bg-muted transition-colors cursor-pointer group">
                       <div className={cn("p-1.5 rounded text-white", action.color)}>
                         <action.icon className="h-3 w-3" />
@@ -502,7 +513,7 @@ const QuickActionsMenu = () => {
                 {quickActions
                   .filter(action => action.category === category)
                   .map((action) => (
-                    <Link key={action.id} href={action.href}>
+                    <Link key={action.id} href={localizedHref(action.href)}>
                       <div className="flex items-center gap-3 p-2 rounded hover:bg-muted transition-colors cursor-pointer group">
                         <div className={cn("p-1.5 rounded text-white", action.color)}>
                           <action.icon className="h-3 w-3" />
@@ -555,6 +566,8 @@ export default function EnhancedTopNavigation({
   className,
 }: EnhancedTopNavigationProps) {
   const pathname = usePathname();
+  const locale = getLocaleFromPathname(pathname) ?? DEFAULT_LOCALE;
+  const localizedHref = (href: string) => localizePath(href, locale);
 
   // Get page title and breadcrumb
   const getPageInfo = () => {
@@ -611,7 +624,7 @@ export default function EnhancedTopNavigation({
             {/* Desktop Logo (only show if no sidebar) */}
             {!showMobileMenu && (
               <div className="hidden md:block">
-                <Logo href="/dashboard" />
+                <Logo href={localizedHref("/dashboard")} />
               </div>
             )}
 
@@ -651,7 +664,7 @@ export default function EnhancedTopNavigation({
                 <ScrollArea className="max-h-60">
                   {recentActivities.map((activity) => (
                     <DropdownMenuItem key={activity.id} asChild>
-                      <Link href={activity.href} className="flex items-center gap-3 p-3">
+                      <Link href={localizedHref(activity.href)} className="flex items-center gap-3 p-3">
                         <activity.icon className="h-4 w-4 text-muted-foreground" />
                         <div className="flex-1">
                           <p className="text-sm font-medium">{activity.title}</p>
@@ -694,7 +707,7 @@ export default function EnhancedTopNavigation({
                   </Link>
                 </DropdownMenuItem>
                 <DropdownMenuItem asChild>
-                  <Link href="/dashboard/settings">
+                  <Link href={localizedHref("/dashboard/settings")}>
                     <Settings className="mr-2 h-4 w-4" />
                     Settings
                   </Link>

@@ -1,42 +1,41 @@
 "use client"
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Carousel, CarouselContent, CarouselItem, CarouselNext, CarouselPrevious } from "@/components/ui/carousel"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Progress } from "@/components/ui/progress"
+import { getFinancialMetrics, type FinancialMetrics } from "@/actions/analytics/financial-analytics"
+import { getPayableSummary } from "@/actions/finance/accounts-payable-actions"
+import { getReceivableSummary } from "@/actions/finance/accounts-receivable-actions"
+import { useClientAuth } from "@/hooks/useClientAuth"
+import { startOfMonth, endOfMonth, startOfWeek, endOfWeek, startOfYear, endOfYear, subDays } from "date-fns"
 import {
   DollarSign,
   TrendingUp,
   TrendingDown,
-  PieChart,
-  BarChart3,
+  ArrowUpIcon,
+  ArrowDownIcon,
   Calculator,
-  CreditCard,
   Wallet,
   Target,
   AlertTriangle,
-  ArrowUpDown,
   Percent,
-  Calendar,
+  Building2,
+  Receipt,
+  Activity,
   FileText,
   Download,
   RefreshCw,
-  Building2,
-  Banknote,
-  Receipt,
-  ShoppingCart,
-  Package,
-  Users,
-  Clock,
   CheckCircle,
-  XCircle,
   AlertCircle,
-  Zap,
-  Activity
+  BarChart3,
+  Clock,
+  Users,
+  CreditCard,
+  Calendar
 } from "lucide-react"
 
 interface ComprehensiveFinancialDashboardProps {
@@ -48,244 +47,252 @@ const ComprehensiveFinancialDashboard = ({
   organizationId = "default-org",
   locationId = "1"
 }: ComprehensiveFinancialDashboardProps) => {
+  const { organizationId: authOrgId } = useClientAuth()
   const [selectedPeriod, setSelectedPeriod] = useState("month")
   const [selectedLocation, setSelectedLocation] = useState(locationId)
   const [activeView, setActiveView] = useState("overview")
+  const [financialMetrics, setFinancialMetrics] = useState<FinancialMetrics | null>(null)
+  const [payableSummary, setPayableSummary] = useState<any>(null)
+  const [receivableSummary, setReceivableSummary] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
 
-  // Mock financial data - replace with real API calls
-  const financialMetrics = {
-    revenue: {
-      total: 1247850.67,
-      growth: 15.7,
-      recurring: 892450.23,
-      oneTime: 355400.44,
-      forecast: 1350000,
-      target: 1200000,
-      achievement: 103.9
-    },
-    profitability: {
-      grossProfit: 523890.45,
-      grossMargin: 42.0,
-      netProfit: 187234.12,
-      netMargin: 15.0,
-      ebitda: 234567.89,
-      ebitdaMargin: 18.8,
-      operatingProfit: 198765.43
-    },
-    expenses: {
-      total: 450123.78,
-      cogs: 723960.22,
-      operational: 156890.34,
-      salaries: 187432.15,
-      rent: 45000,
-      utilities: 12890.87,
-      marketing: 23456.78,
-      other: 24384.42
-    },
-    cashFlow: {
-      operating: 345678.90,
-      investing: -89123.45,
-      financing: -45678.90,
-      netCashFlow: 210876.55,
-      cashOnHand: 567890.12,
-      burnRate: 12345.67
-    },
-    assets: {
-      total: 2456789.01,
-      current: 987654.32,
-      inventory: 456789.12,
-      receivables: 234567.89,
-      cash: 567890.12,
-      fixedAssets: 1469134.69
-    },
-    liabilities: {
-      total: 567890.12,
-      current: 234567.89,
-      payables: 156789.45,
-      accrued: 67890.12,
-      longTerm: 333322.23,
-      loans: 234567.89
-    },
-    ratios: {
-      currentRatio: 4.2,
-      quickRatio: 2.3,
-      debtToEquity: 0.3,
-      roe: 12.5,
-      roa: 7.8,
-      grossMarginTrend: 2.1,
-      inventoryTurnover: 8.4,
-      receivablesTurnover: 12.3
-    },
-    taxes: {
-      salesTax: 89765.43,
-      incomeTax: 45678.90,
-      payrollTax: 23456.78,
-      totalTaxLiability: 158901.11,
-      taxRate: 22.5
+  const orgId = organizationId || authOrgId || ""
+  const locId = locationId || "default-location"
+
+  const getDateRange = (period: string) => {
+    const now = new Date()
+    switch (period) {
+      case "week":
+        return { start: startOfWeek(now), end: endOfWeek(now) }
+      case "month":
+        return { start: startOfMonth(now), end: endOfMonth(now) }
+      case "quarter":
+        const quarterStart = new Date(now.getFullYear(), Math.floor(now.getMonth() / 3) * 3, 1)
+        const quarterEnd = new Date(quarterStart.getFullYear(), quarterStart.getMonth() + 3, 0)
+        return { start: quarterStart, end: quarterEnd }
+      case "year":
+        return { start: startOfYear(now), end: endOfYear(now) }
+      case "ytd":
+        return { start: startOfYear(now), end: now }
+      default:
+        return { start: startOfMonth(now), end: endOfMonth(now) }
     }
   }
 
-  const financialAspects = [
-    {
-      id: "revenue",
-      title: "Revenue Analysis",
-      icon: DollarSign,
-      color: "bg-green-500",
-      metrics: [
-        { label: "Total Revenue", value: `$${financialMetrics.revenue.total.toLocaleString()}`, change: `+${financialMetrics.revenue.growth}%` },
-        { label: "Target Achievement", value: `${financialMetrics.revenue.achievement}%`, change: "Above target" },
-        { label: "Recurring Revenue", value: `$${financialMetrics.revenue.recurring.toLocaleString()}`, change: "71.5% of total" },
-        { label: "Forecast", value: `$${financialMetrics.revenue.forecast.toLocaleString()}`, change: "Next period" }
-      ]
-    },
-    {
-      id: "profitability",
-      title: "Profitability Metrics",
-      icon: TrendingUp,
-      color: "bg-blue-500",
-      metrics: [
-        { label: "Gross Profit", value: `$${financialMetrics.profitability.grossProfit.toLocaleString()}`, change: `${financialMetrics.profitability.grossMargin}% margin` },
-        { label: "Net Profit", value: `$${financialMetrics.profitability.netProfit.toLocaleString()}`, change: `${financialMetrics.profitability.netMargin}% margin` },
-        { label: "EBITDA", value: `$${financialMetrics.profitability.ebitda.toLocaleString()}`, change: `${financialMetrics.profitability.ebitdaMargin}% margin` },
-        { label: "Operating Profit", value: `$${financialMetrics.profitability.operatingProfit.toLocaleString()}`, change: "+8.2%" }
-      ]
-    },
-    {
-      id: "expenses",
-      title: "Expense Management",
-      icon: Receipt,
-      color: "bg-red-500",
-      metrics: [
-        { label: "Total Expenses", value: `$${financialMetrics.expenses.total.toLocaleString()}`, change: "-3.2%" },
-        { label: "COGS", value: `$${financialMetrics.expenses.cogs.toLocaleString()}`, change: "58% of revenue" },
-        { label: "Operational", value: `$${financialMetrics.expenses.operational.toLocaleString()}`, change: "12.6% of revenue" },
-        { label: "Salaries", value: `$${financialMetrics.expenses.salaries.toLocaleString()}`, change: "15% of revenue" }
-      ]
-    },
-    {
-      id: "cashflow",
-      title: "Cash Flow Analysis",
-      icon: Wallet,
-      color: "bg-teal-500",
-      metrics: [
-        { label: "Operating Cash Flow", value: `$${financialMetrics.cashFlow.operating.toLocaleString()}`, change: "+12.3%" },
-        { label: "Net Cash Flow", value: `$${financialMetrics.cashFlow.netCashFlow.toLocaleString()}`, change: "+8.7%" },
-        { label: "Cash on Hand", value: `$${financialMetrics.cashFlow.cashOnHand.toLocaleString()}`, change: "3.2 months runway" },
-        { label: "Burn Rate", value: `$${financialMetrics.cashFlow.burnRate.toLocaleString()}/month`, change: "Stable" }
-      ]
-    },
-    {
-      id: "balance",
-      title: "Balance Sheet",
-      icon: Building2,
-      color: "bg-orange-500",
-      metrics: [
-        { label: "Total Assets", value: `$${financialMetrics.assets.total.toLocaleString()}`, change: "+5.4%" },
-        { label: "Current Assets", value: `$${financialMetrics.assets.current.toLocaleString()}`, change: "40.2% of total" },
-        { label: "Total Liabilities", value: `$${financialMetrics.liabilities.total.toLocaleString()}`, change: "23.1% of assets" },
-        { label: "Equity", value: `$${(financialMetrics.assets.total - financialMetrics.liabilities.total).toLocaleString()}`, change: "76.9% equity ratio" }
-      ]
-    },
-    {
-      id: "ratios",
-      title: "Financial Ratios",
-      icon: Calculator,
-      color: "bg-cyan-500",
-      metrics: [
-        { label: "Current Ratio", value: financialMetrics.ratios.currentRatio.toString(), change: "Excellent liquidity" },
-        { label: "ROE", value: `${financialMetrics.ratios.roe}%`, change: "Strong returns" },
-        { label: "Debt-to-Equity", value: financialMetrics.ratios.debtToEquity.toString(), change: "Low leverage" },
-        { label: "Inventory Turnover", value: `${financialMetrics.ratios.inventoryTurnover}x`, change: "Efficient management" }
-      ]
-    },
-    {
-      id: "taxes",
-      title: "Tax Management",
-      icon: FileText,
-      color: "bg-pink-500",
-      metrics: [
-        { label: "Total Tax Liability", value: `$${financialMetrics.taxes.totalTaxLiability.toLocaleString()}`, change: "Current period" },
-        { label: "Sales Tax", value: `$${financialMetrics.taxes.salesTax.toLocaleString()}`, change: "56.5% of total" },
-        { label: "Income Tax", value: `$${financialMetrics.taxes.incomeTax.toLocaleString()}`, change: "28.7% of total" },
-        { label: "Effective Tax Rate", value: `${financialMetrics.taxes.taxRate}%`, change: "Competitive rate" }
-      ]
-    },
-    {
-      id: "working-capital",
-      title: "Working Capital",
-      icon: ArrowUpDown,
-      color: "bg-teal-500",
-      metrics: [
-        { label: "Working Capital", value: `$${(financialMetrics.assets.current - financialMetrics.liabilities.current).toLocaleString()}`, change: "+15.2%" },
-        { label: "Inventory Value", value: `$${financialMetrics.assets.inventory.toLocaleString()}`, change: "46.3% of current assets" },
-        { label: "Receivables", value: `$${financialMetrics.assets.receivables.toLocaleString()}`, change: "23.8% of current assets" },
-        { label: "Payables", value: `$${financialMetrics.liabilities.payables.toLocaleString()}`, change: "66.8% of current liabilities" }
-      ]
-    },
-    {
-      id: "kpis",
-      title: "Financial KPIs",
-      icon: Target,
-      color: "bg-yellow-500",
-      metrics: [
-        { label: "Revenue Growth", value: `${financialMetrics.revenue.growth}%`, change: "YoY growth" },
-        { label: "Profit Margin Trend", value: `+${financialMetrics.ratios.grossMarginTrend}%`, change: "Improving" },
-        { label: "Cost Control", value: "95.2%", change: "Target achievement" },
-        { label: "Financial Health Score", value: "87/100", change: "Strong position" }
-      ]
+  useEffect(() => {
+    async function fetchFinancialData() {
+      if (!orgId) return
+
+      try {
+        setLoading(true)
+        const { start, end } = getDateRange(selectedPeriod)
+
+        // Fetch all financial data in parallel
+        const [metricsData, payableData, receivableData] = await Promise.all([
+          getFinancialMetrics(orgId, locId, start, end),
+          getPayableSummary(orgId),
+          getReceivableSummary(orgId)
+        ])
+
+        setFinancialMetrics(metricsData)
+        setPayableSummary(payableData.success ? payableData.data : null)
+        setReceivableSummary(receivableData.success ? receivableData.data : null)
+      } catch (error) {
+        console.error("Error fetching financial data:", error)
+        // Set default data on error
+        setFinancialMetrics({
+          revenue: {
+            total: 0,
+            growth: 0,
+            recurring: 0,
+            oneTime: 0,
+            forecast: 0,
+            target: 0,
+            achievement: 0
+          },
+          profitability: {
+            grossProfit: 0,
+            grossMargin: 0,
+            netProfit: 0,
+            netMargin: 0,
+            ebitda: 0,
+            ebitdaMargin: 0,
+            operatingProfit: 0
+          },
+          expenses: {
+            total: 0,
+            cogs: 0,
+            operational: 0,
+            salaries: 0,
+            rent: 0,
+            utilities: 0,
+            marketing: 0,
+            other: 0
+          },
+          cashFlow: {
+            operating: 0,
+            investing: 0,
+            financing: 0,
+            netCashFlow: 0,
+            cashOnHand: 0,
+            burnRate: 0
+          },
+          assets: {
+            total: 0,
+            current: 0,
+            inventory: 0,
+            receivables: 0,
+            cash: 0,
+            fixedAssets: 0
+          },
+          liabilities: {
+            total: 0,
+            current: 0,
+            payables: 0,
+            accrued: 0,
+            longTerm: 0,
+            loans: 0
+          },
+          ratios: {
+            currentRatio: 0,
+            quickRatio: 0,
+            debtToEquity: 0,
+            roe: 0,
+            roa: 0,
+            grossMarginTrend: 0,
+            inventoryTurnover: 0,
+            receivablesTurnover: 0
+          },
+          taxes: {
+            salesTax: 0,
+            incomeTax: 0,
+            payrollTax: 0,
+            totalTaxLiability: 0,
+            taxRate: 0
+          }
+        })
+      } finally {
+        setLoading(false)
+      }
     }
+
+    fetchFinancialData()
+  }, [orgId, locId, selectedPeriod])
+
+  // Use real data or loading state
+  const currentMetrics = financialMetrics || {
+    revenue: { total: 0, growth: 0, recurring: 0, oneTime: 0, forecast: 0, target: 0, achievement: 0 },
+    profitability: { grossProfit: 0, grossMargin: 0, netProfit: 0, netMargin: 0, ebitda: 0, ebitdaMargin: 0, operatingProfit: 0 },
+    expenses: { total: 0, cogs: 0, operational: 0, salaries: 0, rent: 0, utilities: 0, marketing: 0, other: 0 },
+    cashFlow: { operating: 0, investing: 0, financing: 0, netCashFlow: 0, cashOnHand: 0, burnRate: 0 },
+    assets: { total: 0, current: 0, inventory: 0, receivables: 0, cash: 0, fixedAssets: 0 },
+    liabilities: { total: 0, current: 0, payables: 0, accrued: 0, longTerm: 0, loans: 0 },
+    ratios: { currentRatio: 0, quickRatio: 0, debtToEquity: 0, roe: 0, roa: 0, grossMarginTrend: 0, inventoryTurnover: 0, receivablesTurnover: 0 },
+    taxes: { salesTax: 0, incomeTax: 0, payrollTax: 0, totalTaxLiability: 0, taxRate: 0 }
+  }
+
+
+  const getCardColors = (index: number) => {
+    const colorSchemes = [
+      {
+        bg: "from-emerald-50 to-teal-50 dark:from-emerald-900/20 dark:to-teal-900/20",
+        border: "border-emerald-200/40 dark:border-emerald-800/40",
+        iconBg: "bg-emerald-500/10 dark:bg-emerald-400/10",
+        iconColor: "text-emerald-600 dark:text-emerald-400",
+        textColor: "text-emerald-600 dark:text-emerald-400",
+        valueColor: "text-emerald-900 dark:text-emerald-100"
+      },
+      {
+        bg: "from-blue-50 to-cyan-50 dark:from-blue-900/20 dark:to-cyan-900/20",
+        border: "border-blue-200/40 dark:border-blue-800/40",
+        iconBg: "bg-blue-500/10 dark:bg-blue-400/10",
+        iconColor: "text-blue-600 dark:text-blue-400",
+        textColor: "text-blue-600 dark:text-blue-400",
+        valueColor: "text-blue-900 dark:text-blue-100"
+      },
+      {
+        bg: "from-orange-50 to-yellow-50 dark:from-orange-900/20 dark:to-yellow-900/20",
+        border: "border-orange-200/40 dark:border-orange-800/40",
+        iconBg: "bg-orange-500/10 dark:bg-orange-400/10",
+        iconColor: "text-orange-600 dark:text-orange-400",
+        textColor: "text-orange-600 dark:text-orange-400",
+        valueColor: "text-orange-900 dark:text-orange-100"
+      },
+      {
+        bg: "from-purple-50 to-indigo-50 dark:from-purple-900/20 dark:to-indigo-900/20",
+        border: "border-purple-200/40 dark:border-purple-800/40",
+        iconBg: "bg-purple-500/10 dark:bg-purple-400/10",
+        iconColor: "text-purple-600 dark:text-purple-400",
+        textColor: "text-purple-600 dark:text-purple-400",
+        valueColor: "text-purple-900 dark:text-purple-100"
+      },
+      {
+        bg: "from-teal-50 to-cyan-50 dark:from-teal-900/20 dark:to-cyan-900/20",
+        border: "border-teal-200/40 dark:border-teal-800/40",
+        iconBg: "bg-teal-500/10 dark:bg-teal-400/10",
+        iconColor: "text-teal-600 dark:text-teal-400",
+        textColor: "text-teal-600 dark:text-teal-400",
+        valueColor: "text-teal-900 dark:text-teal-100"
+      }
+    ]
+    return colorSchemes[index % colorSchemes.length]
+  }
+
+  const financialStats = [
+    {
+      title: "Total Revenue",
+      value: loading ? "Loading..." : `$${currentMetrics.revenue.total.toLocaleString()}`,
+      change: loading ? "..." : `+${currentMetrics.revenue.growth.toFixed(1)}%`,
+      trend: "up",
+      icon: DollarSign,
+      description: "vs last period",
+    },
+    {
+      title: "Net Profit",
+      value: loading ? "Loading..." : `$${currentMetrics.profitability.netProfit.toLocaleString()}`,
+      change: loading ? "..." : `${currentMetrics.profitability.netMargin.toFixed(1)}%`,
+      trend: "up",
+      icon: TrendingUp,
+      description: "profit margin",
+    },
+    {
+      title: "Cash Flow",
+      value: loading ? "Loading..." : `$${currentMetrics.cashFlow.netCashFlow.toLocaleString()}`,
+      change: loading ? "..." : currentMetrics.cashFlow.netCashFlow >= 0 ? "Positive" : "Negative",
+      trend: currentMetrics.cashFlow.netCashFlow >= 0 ? "up" : "down",
+      icon: Wallet,
+      description: "net cash flow",
+    },
+    {
+      title: "Total Assets",
+      value: loading ? "Loading..." : `$${(currentMetrics.assets.total / 1000000).toFixed(1)}M`,
+      change: loading ? "..." : "Asset base",
+      trend: "up",
+      icon: Building2,
+      description: "total assets",
+    },
+    {
+      title: "A/P Outstanding",
+      value: loading ? "Loading..." : `$${((payableSummary?.outstandingAmount || 0) / 1000).toFixed(0)}K`,
+      change: loading ? "..." : payableSummary?.overdueCount ? `${payableSummary.overdueCount} overdue` : "All current",
+      trend: (payableSummary?.overdueCount || 0) > 0 ? "down" : "up",
+      icon: CreditCard,
+      description: "accounts payable",
+    },
+    {
+      title: "A/R Outstanding",
+      value: loading ? "Loading..." : `$${((receivableSummary?.outstandingAmount || 0) / 1000).toFixed(0)}K`,
+      change: loading ? "..." : receivableSummary?.overdueCount ? `${receivableSummary.overdueCount} overdue` : "All current",
+      trend: (receivableSummary?.overdueCount || 0) > 0 ? "down" : "up",
+      icon: Users,
+      description: "accounts receivable",
+    },
   ]
 
-  const renderFinancialCard = (aspect: typeof financialAspects[0]) => {
-    const IconComponent = aspect.icon
-    return (
-      <Card key={aspect.id} className="w-full">
-        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
-          <CardTitle className="text-lg font-semibold">{aspect.title}</CardTitle>
-          <div className={`p-2 rounded-lg ${aspect.color} text-white`}>
-            <IconComponent className="h-5 w-5" />
-          </div>
-        </CardHeader>
-        <CardContent className="space-y-4">
-          {aspect.metrics.map((metric, index) => (
-            <div key={index} className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">{metric.label}</p>
-                <p className="text-2xl font-bold">{metric.value}</p>
-              </div>
-              <div className="text-right">
-                <Badge
-                  variant={
-                    metric.change.includes('+') ? 'default' :
-                    metric.change.includes('-') ? 'destructive' :
-                    'secondary'
-                  }
-                  className="text-xs"
-                >
-                  {metric.change}
-                </Badge>
-              </div>
-            </div>
-          ))}
-        </CardContent>
-      </Card>
-    )
-  }
-
   return (
-    <div className="w-full max-w-7xl mx-auto p-6 space-y-6">
-      {/* Header */}
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900 flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-gradient-to-br from-green-500 to-green-600 text-white">
-              <PieChart className="h-6 w-6" />
-            </div>
-            Financial Analytics Dashboard
-          </h1>
-          <p className="text-gray-600 mt-1">Comprehensive financial tracking and analysis</p>
-        </div>
-
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <h1 className="text-3xl font-bold tracking-tight">Financial Analytics</h1>
         <div className="flex items-center gap-4">
           <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
             <SelectTrigger className="w-40">
@@ -299,7 +306,6 @@ const ComprehensiveFinancialDashboard = ({
               <SelectItem value="ytd">Year to Date</SelectItem>
             </SelectContent>
           </Select>
-
           <div className="flex gap-2">
             <Button variant="outline" size="sm">
               <RefreshCw className="h-4 w-4 mr-2" />
@@ -313,199 +319,554 @@ const ComprehensiveFinancialDashboard = ({
         </div>
       </div>
 
-      {/* Financial Health Overview */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6">
-        <Card className="relative overflow-hidden">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Revenue</CardTitle>
-            <DollarSign className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">${financialMetrics.revenue.total.toLocaleString()}</div>
-            <div className="flex items-center text-xs text-muted-foreground">
-              <TrendingUp className="h-3 w-3 mr-1 text-green-600" />
-              <span className="text-green-600">+{financialMetrics.revenue.growth}% from last period</span>
-            </div>
-            <div className="mt-2">
-              <Progress value={financialMetrics.revenue.achievement} className="h-2" />
-              <p className="text-xs text-gray-500 mt-1">{financialMetrics.revenue.achievement}% of target</p>
-            </div>
-          </CardContent>
-        </Card>
+      {/* Financial Key Metrics */}
+      <div className="grid grid-cols-2 lg:grid-cols-6 gap-4">
+        {financialStats.map((stat, index) => {
+          const Icon = stat.icon
+          const isPositive = stat.trend === "up"
+          const colors = getCardColors(index)
 
-        <Card className="relative overflow-hidden">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Net Profit</CardTitle>
-            <TrendingUp className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">${financialMetrics.profitability.netProfit.toLocaleString()}</div>
-            <div className="flex items-center text-xs text-muted-foreground">
-              <Percent className="h-3 w-3 mr-1 text-blue-600" />
-              <span className="text-blue-600">{financialMetrics.profitability.netMargin}% margin</span>
+          return (
+            <div key={index} className={`bg-gradient-to-br ${colors.bg} p-4 rounded-xl border ${colors.border}`}>
+              <div className="flex items-center gap-3">
+                <div className={`p-2 rounded-lg ${colors.iconBg}`}>
+                  <Icon className={`w-5 h-5 ${colors.iconColor}`} />
+                </div>
+                <div className="flex-1">
+                  <p className={`text-xs font-medium ${colors.textColor} uppercase tracking-wide`}>
+                    {stat.title}
+                  </p>
+                  <p className={`text-xl font-bold ${colors.valueColor}`}>{stat.value}</p>
+                </div>
+                <div className="flex items-center text-xs">
+                  {isPositive ? <ArrowUpIcon className="mr-1 h-3 w-3 text-emerald-600" /> : <ArrowDownIcon className="mr-1 h-3 w-3 text-red-600" />}
+                  <span className={isPositive ? "text-emerald-700 dark:text-emerald-400 font-semibold" : "text-red-700 dark:text-red-400 font-semibold"}>
+                    {stat.change}
+                  </span>
+                </div>
+              </div>
             </div>
-          </CardContent>
-        </Card>
-
-        <Card className="relative overflow-hidden">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Cash Flow</CardTitle>
-            <Wallet className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">${financialMetrics.cashFlow.netCashFlow.toLocaleString()}</div>
-            <div className="flex items-center text-xs text-muted-foreground">
-              <Activity className="h-3 w-3 mr-1 text-teal-600" />
-              <span className="text-teal-600">Positive flow</span>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="relative overflow-hidden">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Total Assets</CardTitle>
-            <Building2 className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">${financialMetrics.assets.total.toLocaleString()}</div>
-            <div className="flex items-center text-xs text-muted-foreground">
-              <CheckCircle className="h-3 w-3 mr-1 text-green-600" />
-              <span className="text-green-600">Strong balance sheet</span>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card className="relative overflow-hidden">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium">Financial Health</CardTitle>
-            <Target className="h-4 w-4 text-muted-foreground" />
-          </CardHeader>
-          <CardContent>
-            <div className="text-2xl font-bold">87/100</div>
-            <div className="flex items-center text-xs text-muted-foreground">
-              <Zap className="h-3 w-3 mr-1 text-yellow-600" />
-              <span className="text-yellow-600">Excellent rating</span>
-            </div>
-          </CardContent>
-        </Card>
+          )
+        })}
       </div>
 
-      {/* Main Content */}
+      {/* Main Content with Tabs */}
       <Tabs value={activeView} onValueChange={setActiveView} className="w-full">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-5">
           <TabsTrigger value="overview">Financial Overview</TabsTrigger>
+          <TabsTrigger value="payables">Accounts Payable</TabsTrigger>
+          <TabsTrigger value="receivables">Accounts Receivable</TabsTrigger>
           <TabsTrigger value="analysis">Detailed Analysis</TabsTrigger>
-          <TabsTrigger value="forecasting">Forecasting</TabsTrigger>
           <TabsTrigger value="reports">Financial Reports</TabsTrigger>
         </TabsList>
 
         <TabsContent value="overview" className="space-y-6">
-          <div className="flex items-center justify-between">
-            <h2 className="text-xl font-semibold">Financial Tracking Areas</h2>
-            <Badge variant="outline" className="text-sm">
-              {financialAspects.length} financial aspects
-            </Badge>
+          {/* Quick Financial Summary */}
+          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-6">
+            <Card className="bg-gradient-to-br from-emerald-50 to-teal-50 dark:from-emerald-900/20 dark:to-teal-900/20">
+              <CardContent className="p-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-emerald-500/10 rounded-lg">
+                    <DollarSign className="h-5 w-5 text-emerald-600" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-emerald-700">Cash Flow</p>
+                    <p className="text-lg font-bold text-emerald-900">
+                      {loading ? "..." : currentMetrics.cashFlow.netCashFlow >= 0 ? "Positive" : "Negative"}
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20">
+              <CardContent className="p-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-blue-500/10 rounded-lg">
+                    <CreditCard className="h-5 w-5 text-blue-600" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-blue-700">Payables Due</p>
+                    <p className="text-lg font-bold text-blue-900">
+                      {loading ? "..." : `$${((payableSummary?.dueSoonAmount || 0) / 1000).toFixed(0)}K`}
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-gradient-to-br from-green-50 to-teal-50 dark:from-green-900/20 dark:to-teal-900/20">
+              <CardContent className="p-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-green-500/10 rounded-lg">
+                    <Users className="h-5 w-5 text-green-600" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-green-700">Receivables Due</p>
+                    <p className="text-lg font-bold text-green-900">
+                      {loading ? "..." : `$${((receivableSummary?.dueSoonAmount || 0) / 1000).toFixed(0)}K`}
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-gradient-to-br from-purple-50 to-indigo-50 dark:from-purple-900/20 dark:to-indigo-900/20">
+              <CardContent className="p-4">
+                <div className="flex items-center gap-3">
+                  <div className="p-2 bg-purple-500/10 rounded-lg">
+                    <Target className="h-5 w-5 text-purple-600" />
+                  </div>
+                  <div>
+                    <p className="text-sm font-medium text-purple-700">Working Capital</p>
+                    <p className="text-lg font-bold text-purple-900">
+                      {loading ? "..." : `$${((currentMetrics.assets.current - currentMetrics.liabilities.current) / 1000000).toFixed(1)}M`}
+                    </p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
           </div>
 
-          {/* Carousel for Financial Aspects */}
-          <Carousel className="w-full">
-            <CarouselContent className="-ml-2 md:-ml-4">
-              {financialAspects.map((aspect) => (
-                <CarouselItem key={aspect.id} className="pl-2 md:pl-4 md:basis-1/2 lg:basis-1/3">
-                  {renderFinancialCard(aspect)}
-                </CarouselItem>
-              ))}
-            </CarouselContent>
-            <CarouselPrevious />
-            <CarouselNext />
-          </Carousel>
-        </TabsContent>
-
-        <TabsContent value="analysis" className="space-y-6">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Profit & Loss Analysis */}
-            <Card>
+          {/* Financial Analysis Cards */}
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
+            {/* Profit & Loss Card */}
+            <Card className="col-span-full lg:col-span-2">
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <BarChart3 className="h-5 w-5" />
-                  Profit & Loss Breakdown
+                  <Receipt className="h-5 w-5" />
+                  Profit & Loss Analysis
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-3">
                   <div className="flex justify-between items-center">
                     <span className="text-sm">Total Revenue</span>
-                    <span className="font-bold text-green-600">+$1,247,851</span>
+                    <span className="font-bold text-green-600">+${currentMetrics.revenue.total.toLocaleString()}</span>
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-sm">Cost of Goods Sold</span>
-                    <span className="font-medium text-red-600">-$723,960</span>
+                    <span className="font-medium text-red-600">-${currentMetrics.expenses.cogs.toLocaleString()}</span>
                   </div>
                   <div className="flex justify-between items-center border-t pt-2">
                     <span className="text-sm font-medium">Gross Profit</span>
-                    <span className="font-bold">$523,891 (42.0%)</span>
+                    <span className="font-bold">${currentMetrics.profitability.grossProfit.toLocaleString()} ({currentMetrics.profitability.grossMargin.toFixed(1)}%)</span>
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-sm">Operating Expenses</span>
-                    <span className="font-medium text-red-600">-$325,125</span>
-                  </div>
-                  <div className="flex justify-between items-center border-t pt-2">
-                    <span className="text-sm font-medium">Operating Profit</span>
-                    <span className="font-bold">$198,766 (15.9%)</span>
-                  </div>
-                  <div className="flex justify-between items-center">
-                    <span className="text-sm">Other Income/Expenses</span>
-                    <span className="font-medium text-red-600">-$11,532</span>
+                    <span className="font-medium text-red-600">-${currentMetrics.expenses.operational.toLocaleString()}</span>
                   </div>
                   <div className="flex justify-between items-center border-t pt-2 bg-gray-50 p-2 rounded">
                     <span className="text-sm font-bold">Net Profit</span>
-                    <span className="font-bold text-green-600">$187,234 (15.0%)</span>
+                    <span className="font-bold text-green-600">${currentMetrics.profitability.netProfit.toLocaleString()} ({currentMetrics.profitability.netMargin.toFixed(1)}%)</span>
                   </div>
                 </div>
               </CardContent>
             </Card>
 
-            {/* Cash Flow Statement */}
+            {/* Cash Flow Card */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Wallet className="h-5 w-5" />
-                  Cash Flow Statement
+                  Cash Flow
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="space-y-3">
                   <div className="bg-green-50 p-3 rounded-lg">
                     <div className="flex justify-between items-center">
-                      <span className="text-sm font-medium text-green-800">Operating Activities</span>
-                      <span className="font-bold text-green-700">+$345,679</span>
+                      <span className="text-sm font-medium text-green-800">Operating</span>
+                      <span className="font-bold text-green-700">+${currentMetrics.cashFlow.operating.toLocaleString()}</span>
                     </div>
-                    <p className="text-xs text-green-600 mt-1">Cash from core operations</p>
                   </div>
                   <div className="bg-red-50 p-3 rounded-lg">
                     <div className="flex justify-between items-center">
-                      <span className="text-sm font-medium text-red-800">Investing Activities</span>
-                      <span className="font-bold text-red-700">-$89,123</span>
+                      <span className="text-sm font-medium text-red-800">Investing</span>
+                      <span className="font-bold text-red-700">${currentMetrics.cashFlow.investing.toLocaleString()}</span>
                     </div>
-                    <p className="text-xs text-red-600 mt-1">Equipment and asset purchases</p>
                   </div>
                   <div className="bg-blue-50 p-3 rounded-lg">
                     <div className="flex justify-between items-center">
-                      <span className="text-sm font-medium text-blue-800">Financing Activities</span>
-                      <span className="font-bold text-blue-700">-$45,679</span>
+                      <span className="text-sm font-medium text-blue-800">Financing</span>
+                      <span className="font-bold text-blue-700">${currentMetrics.cashFlow.financing.toLocaleString()}</span>
                     </div>
-                    <p className="text-xs text-blue-600 mt-1">Loan payments and equity</p>
                   </div>
                   <div className="border-t pt-3">
                     <div className="flex justify-between items-center bg-gray-100 p-2 rounded">
                       <span className="text-sm font-bold">Net Cash Flow</span>
-                      <span className="font-bold text-green-600">+$210,877</span>
+                      <span className="font-bold text-green-600">+${currentMetrics.cashFlow.netCashFlow.toLocaleString()}</span>
                     </div>
                   </div>
                 </div>
               </CardContent>
             </Card>
+          </div>
 
+          {/* Financial Ratios and Goals */}
+          <div className="grid gap-6 md:grid-cols-2">
+            {/* Financial Ratios */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Calculator className="h-5 w-5" />
+                  Key Financial Ratios
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="text-center p-3 bg-green-50 rounded-lg">
+                    <p className="text-2xl font-bold text-green-700">{currentMetrics.ratios.currentRatio}</p>
+                    <p className="text-xs text-green-600">Current Ratio</p>
+                    <p className="text-xs text-gray-500">Excellent</p>
+                  </div>
+                  <div className="text-center p-3 bg-blue-50 rounded-lg">
+                    <p className="text-2xl font-bold text-blue-700">{currentMetrics.ratios.roe}%</p>
+                    <p className="text-xs text-blue-600">ROE</p>
+                    <p className="text-xs text-gray-500">Strong</p>
+                  </div>
+                  <div className="text-center p-3 bg-teal-50 rounded-lg">
+                    <p className="text-2xl font-bold text-teal-700">{currentMetrics.ratios.debtToEquity}</p>
+                    <p className="text-xs text-teal-600">Debt-to-Equity</p>
+                    <p className="text-xs text-gray-500">Low Risk</p>
+                  </div>
+                  <div className="text-center p-3 bg-orange-50 rounded-lg">
+                    <p className="text-2xl font-bold text-orange-700">{currentMetrics.ratios.inventoryTurnover}x</p>
+                    <p className="text-xs text-orange-600">Inventory Turnover</p>
+                    <p className="text-xs text-gray-500">Efficient</p>
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Financial Goals */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Target className="h-5 w-5" />
+                  Financial Goals
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div>
+                  <div className="flex justify-between text-sm mb-1">
+                    <span>Revenue Target</span>
+                    <span>{currentMetrics.revenue.achievement}%</span>
+                  </div>
+                  <Progress value={currentMetrics.revenue.achievement} className="h-2" />
+                </div>
+                <div>
+                  <div className="flex justify-between text-sm mb-1">
+                    <span>Profit Margin</span>
+                    <span>75%</span>
+                  </div>
+                  <Progress value={75} className="h-2" />
+                </div>
+                <div>
+                  <div className="flex justify-between text-sm mb-1">
+                    <span>Cost Control</span>
+                    <span>95.2%</span>
+                  </div>
+                  <Progress value={95.2} className="h-2" />
+                </div>
+                <div>
+                  <div className="flex justify-between text-sm mb-1">
+                    <span>Cash Flow</span>
+                    <span>88%</span>
+                  </div>
+                  <Progress value={88} className="h-2" />
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </TabsContent>
+
+        <TabsContent value="payables" className="space-y-6">
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+            {/* Payables Summary Cards */}
+            <Card className="bg-gradient-to-br from-red-50 to-orange-50 dark:from-red-900/20 dark:to-orange-900/20 border-red-200/40">
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center gap-2 text-red-700 dark:text-red-400">
+                  <CreditCard className="h-5 w-5" />
+                  Total Payables
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  <p className="text-2xl font-bold text-red-900 dark:text-red-100">
+                    ${loading ? "..." : (payableSummary?.totalAmount || 0).toLocaleString()}
+                  </p>
+                  <p className="text-sm text-red-600 dark:text-red-400">
+                    {loading ? "..." : payableSummary?.totalCount || 0} invoices
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-gradient-to-br from-yellow-50 to-orange-50 dark:from-yellow-900/20 dark:to-orange-900/20 border-yellow-200/40">
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center gap-2 text-yellow-700 dark:text-yellow-400">
+                  <Clock className="h-5 w-5" />
+                  Outstanding
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  <p className="text-2xl font-bold text-yellow-900 dark:text-yellow-100">
+                    ${loading ? "..." : (payableSummary?.outstandingAmount || 0).toLocaleString()}
+                  </p>
+                  <p className="text-sm text-yellow-600 dark:text-yellow-400">
+                    Unpaid balance
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-gradient-to-br from-red-50 to-pink-50 dark:from-red-900/20 dark:to-pink-900/20 border-red-200/40">
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center gap-2 text-red-700 dark:text-red-400">
+                  <AlertTriangle className="h-5 w-5" />
+                  Overdue
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  <p className="text-2xl font-bold text-red-900 dark:text-red-100">
+                    ${loading ? "..." : (payableSummary?.overdueAmount || 0).toLocaleString()}
+                  </p>
+                  <p className="text-sm text-red-600 dark:text-red-400">
+                    {loading ? "..." : payableSummary?.overdueCount || 0} overdue invoices
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-gradient-to-br from-blue-50 to-cyan-50 dark:from-blue-900/20 dark:to-cyan-900/20 border-blue-200/40">
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center gap-2 text-blue-700 dark:text-blue-400">
+                  <Calendar className="h-5 w-5" />
+                  Due Soon
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  <p className="text-2xl font-bold text-blue-900 dark:text-blue-100">
+                    ${loading ? "..." : (payableSummary?.dueSoonAmount || 0).toLocaleString()}
+                  </p>
+                  <p className="text-sm text-blue-600 dark:text-blue-400">
+                    Due next 7 days
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Payables Management */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Receipt className="h-5 w-5" />
+                Accounts Payable Management
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <Button className="h-20 flex-col gap-2" variant="outline">
+                  <CreditCard className="h-6 w-6" />
+                  <span>Create Invoice</span>
+                </Button>
+                <Button className="h-20 flex-col gap-2" variant="outline">
+                  <DollarSign className="h-6 w-6" />
+                  <span>Record Payment</span>
+                </Button>
+                <Button className="h-20 flex-col gap-2" variant="outline">
+                  <FileText className="h-6 w-6" />
+                  <span>View All Payables</span>
+                </Button>
+              </div>
+
+              <div className="space-y-3">
+                <h4 className="font-medium">Recent Activities</h4>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between p-2 bg-gray-50 rounded">
+                    <div className="flex items-center gap-2">
+                      <CheckCircle className="h-4 w-4 text-green-500" />
+                      <span className="text-sm">Payment processed - INV-2024-001</span>
+                    </div>
+                    <span className="text-sm text-gray-500">2 hours ago</span>
+                  </div>
+                  <div className="flex items-center justify-between p-2 bg-gray-50 rounded">
+                    <div className="flex items-center gap-2">
+                      <AlertCircle className="h-4 w-4 text-yellow-500" />
+                      <span className="text-sm">Invoice overdue - INV-2024-002</span>
+                    </div>
+                    <span className="text-sm text-gray-500">1 day ago</span>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="receivables" className="space-y-6">
+          <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-4">
+            {/* Receivables Summary Cards */}
+            <Card className="bg-gradient-to-br from-green-50 to-teal-50 dark:from-green-900/20 dark:to-teal-900/20 border-green-200/40">
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center gap-2 text-green-700 dark:text-green-400">
+                  <Users className="h-5 w-5" />
+                  Total Receivables
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  <p className="text-2xl font-bold text-green-900 dark:text-green-100">
+                    ${loading ? "..." : (receivableSummary?.totalAmount || 0).toLocaleString()}
+                  </p>
+                  <p className="text-sm text-green-600 dark:text-green-400">
+                    {loading ? "..." : receivableSummary?.totalCount || 0} invoices
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-gradient-to-br from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 border-blue-200/40">
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center gap-2 text-blue-700 dark:text-blue-400">
+                  <Clock className="h-5 w-5" />
+                  Outstanding
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  <p className="text-2xl font-bold text-blue-900 dark:text-blue-100">
+                    ${loading ? "..." : (receivableSummary?.outstandingAmount || 0).toLocaleString()}
+                  </p>
+                  <p className="text-sm text-blue-600 dark:text-blue-400">
+                    Pending collection
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-gradient-to-br from-red-50 to-pink-50 dark:from-red-900/20 dark:to-pink-900/20 border-red-200/40">
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center gap-2 text-red-700 dark:text-red-400">
+                  <AlertTriangle className="h-5 w-5" />
+                  Overdue
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  <p className="text-2xl font-bold text-red-900 dark:text-red-100">
+                    ${loading ? "..." : (receivableSummary?.overdueAmount || 0).toLocaleString()}
+                  </p>
+                  <p className="text-sm text-red-600 dark:text-red-400">
+                    {loading ? "..." : receivableSummary?.overdueCount || 0} overdue invoices
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card className="bg-gradient-to-br from-purple-50 to-indigo-50 dark:from-purple-900/20 dark:to-indigo-900/20 border-purple-200/40">
+              <CardHeader className="pb-3">
+                <CardTitle className="flex items-center gap-2 text-purple-700 dark:text-purple-400">
+                  <TrendingUp className="h-5 w-5" />
+                  Collection Rate
+                </CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-2">
+                  <p className="text-2xl font-bold text-purple-900 dark:text-purple-100">
+                    {loading ? "..." : receivableSummary ?
+                      ((receivableSummary.paidAmount / (receivableSummary.totalAmount || 1)) * 100).toFixed(1) + "%"
+                      : "0%"
+                    }
+                  </p>
+                  <p className="text-sm text-purple-600 dark:text-purple-400">
+                    Collection efficiency
+                  </p>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Aging Analysis */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <BarChart3 className="h-5 w-5" />
+                Aging Analysis
+              </CardTitle>
+            </CardHeader>
+            <CardContent>
+              <div className="grid grid-cols-1 md:grid-cols-5 gap-4">
+                {receivableSummary?.aging?.map((age: any, index: number) => (
+                  <div key={age.range} className="text-center p-3 bg-gray-50 rounded-lg">
+                    <p className="text-lg font-bold">${age.amount.toLocaleString()}</p>
+                    <p className="text-sm text-gray-600">{age.range} days</p>
+                    <p className="text-xs text-gray-500">{age.count} invoices</p>
+                  </div>
+                )) || Array.from({ length: 5 }, (_, i) => (
+                  <div key={i} className="text-center p-3 bg-gray-50 rounded-lg">
+                    <p className="text-lg font-bold">$0</p>
+                    <p className="text-sm text-gray-600">—</p>
+                    <p className="text-xs text-gray-500">0 invoices</p>
+                  </div>
+                ))}
+              </div>
+            </CardContent>
+          </Card>
+
+          {/* Receivables Management */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Users className="h-5 w-5" />
+                Accounts Receivable Management
+              </CardTitle>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <Button className="h-20 flex-col gap-2" variant="outline">
+                  <FileText className="h-6 w-6" />
+                  <span>Create Invoice</span>
+                </Button>
+                <Button className="h-20 flex-col gap-2" variant="outline">
+                  <DollarSign className="h-6 w-6" />
+                  <span>Record Payment</span>
+                </Button>
+                <Button className="h-20 flex-col gap-2" variant="outline">
+                  <Activity className="h-6 w-6" />
+                  <span>Send Reminder</span>
+                </Button>
+              </div>
+
+              <div className="space-y-3">
+                <h4 className="font-medium">Recent Activities</h4>
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between p-2 bg-gray-50 rounded">
+                    <div className="flex items-center gap-2">
+                      <CheckCircle className="h-4 w-4 text-green-500" />
+                      <span className="text-sm">Payment received - INV-R-2024-001</span>
+                    </div>
+                    <span className="text-sm text-gray-500">1 hour ago</span>
+                  </div>
+                  <div className="flex items-center justify-between p-2 bg-gray-50 rounded">
+                    <div className="flex items-center gap-2">
+                      <Activity className="h-4 w-4 text-blue-500" />
+                      <span className="text-sm">Reminder sent - INV-R-2024-002</span>
+                    </div>
+                    <span className="text-sm text-gray-500">3 hours ago</span>
+                  </div>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        <TabsContent value="analysis" className="space-y-6">
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             {/* Balance Sheet Summary */}
             <Card>
               <CardHeader>
@@ -521,15 +882,15 @@ const ComprehensiveFinancialDashboard = ({
                     <div className="space-y-2 ml-2">
                       <div className="flex justify-between text-sm">
                         <span>Current Assets</span>
-                        <span>$987,654</span>
+                        <span>${currentMetrics.assets.current.toLocaleString()}</span>
                       </div>
                       <div className="flex justify-between text-sm">
                         <span>Fixed Assets</span>
-                        <span>$1,469,135</span>
+                        <span>${currentMetrics.assets.fixedAssets.toLocaleString()}</span>
                       </div>
                       <div className="flex justify-between font-medium border-t pt-1">
                         <span>Total Assets</span>
-                        <span>$2,456,789</span>
+                        <span>${currentMetrics.assets.total.toLocaleString()}</span>
                       </div>
                     </div>
                   </div>
@@ -538,57 +899,57 @@ const ComprehensiveFinancialDashboard = ({
                     <div className="space-y-2 ml-2">
                       <div className="flex justify-between text-sm">
                         <span>Current Liabilities</span>
-                        <span>$234,568</span>
+                        <span>${currentMetrics.liabilities.current.toLocaleString()}</span>
                       </div>
                       <div className="flex justify-between text-sm">
                         <span>Long-term Liabilities</span>
-                        <span>$333,322</span>
+                        <span>${currentMetrics.liabilities.longTerm.toLocaleString()}</span>
                       </div>
                       <div className="flex justify-between font-medium border-t pt-1">
                         <span>Total Liabilities</span>
-                        <span>$567,890</span>
+                        <span>${currentMetrics.liabilities.total.toLocaleString()}</span>
                       </div>
                     </div>
                   </div>
                   <div className="bg-blue-50 p-2 rounded">
                     <div className="flex justify-between font-bold">
                       <span>Shareholders' Equity</span>
-                      <span>$1,888,899</span>
+                      <span>${(currentMetrics.assets.total - currentMetrics.liabilities.total).toLocaleString()}</span>
                     </div>
                   </div>
                 </div>
               </CardContent>
             </Card>
 
-            {/* Financial Ratios */}
+            {/* Expense Breakdown */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <Calculator className="h-5 w-5" />
-                  Key Financial Ratios
+                  <Receipt className="h-5 w-5" />
+                  Expense Breakdown
                 </CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="text-center p-3 bg-green-50 rounded-lg">
-                    <p className="text-2xl font-bold text-green-700">{financialMetrics.ratios.currentRatio}</p>
-                    <p className="text-xs text-green-600">Current Ratio</p>
-                    <p className="text-xs text-gray-500">Excellent</p>
+                <div className="space-y-3">
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm">Salaries & Benefits</span>
+                    <span className="font-bold">${currentMetrics.expenses.salaries.toLocaleString()}</span>
                   </div>
-                  <div className="text-center p-3 bg-blue-50 rounded-lg">
-                    <p className="text-2xl font-bold text-blue-700">{financialMetrics.ratios.roe}%</p>
-                    <p className="text-xs text-blue-600">ROE</p>
-                    <p className="text-xs text-gray-500">Strong</p>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm">Rent & Utilities</span>
+                    <span className="font-bold">${(currentMetrics.expenses.rent + currentMetrics.expenses.utilities).toLocaleString()}</span>
                   </div>
-                  <div className="text-center p-3 bg-teal-50 rounded-lg">
-                    <p className="text-2xl font-bold text-teal-700">{financialMetrics.ratios.debtToEquity}</p>
-                    <p className="text-xs text-teal-600">Debt-to-Equity</p>
-                    <p className="text-xs text-gray-500">Low Risk</p>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm">Marketing & Advertising</span>
+                    <span className="font-bold">${currentMetrics.expenses.marketing.toLocaleString()}</span>
                   </div>
-                  <div className="text-center p-3 bg-orange-50 rounded-lg">
-                    <p className="text-2xl font-bold text-orange-700">{financialMetrics.ratios.inventoryTurnover}x</p>
-                    <p className="text-xs text-orange-600">Inventory Turnover</p>
-                    <p className="text-xs text-gray-500">Efficient</p>
+                  <div className="flex justify-between items-center">
+                    <span className="text-sm">Other Expenses</span>
+                    <span className="font-bold">${currentMetrics.expenses.other.toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between items-center border-t pt-2 bg-gray-50 p-2 rounded">
+                    <span className="text-sm font-bold">Total Operating Expenses</span>
+                    <span className="font-bold text-red-600">${currentMetrics.expenses.operational.toLocaleString()}</span>
                   </div>
                 </div>
               </CardContent>
@@ -610,19 +971,19 @@ const ComprehensiveFinancialDashboard = ({
                 <div className="space-y-3">
                   <div className="flex justify-between items-center">
                     <span className="text-sm">Next Month</span>
-                    <span className="font-bold">$1,350,000</span>
+                    <span className="font-bold">${currentMetrics.revenue.forecast.toLocaleString()}</span>
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-sm">Next Quarter</span>
-                    <span className="font-bold">$3,890,000</span>
+                    <span className="font-bold">${(currentMetrics.revenue.forecast * 3).toLocaleString()}</span>
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-sm">Next Year</span>
-                    <span className="font-bold">$16,250,000</span>
+                    <span className="font-bold">${(currentMetrics.revenue.forecast * 12).toLocaleString()}</span>
                   </div>
                   <div className="mt-4 p-3 bg-blue-50 rounded-lg">
                     <p className="text-sm font-medium text-blue-800">Growth Projection</p>
-                    <p className="text-xs text-blue-600">Based on current trends: 15.7% YoY growth expected</p>
+                    <p className="text-xs text-blue-600">Based on current trends: {currentMetrics.revenue.growth}% YoY growth expected</p>
                   </div>
                 </div>
               </CardContent>
@@ -640,15 +1001,15 @@ const ComprehensiveFinancialDashboard = ({
                 <div className="space-y-3">
                   <div className="flex justify-between items-center">
                     <span className="text-sm">Next Month COGS</span>
-                    <span className="font-medium">$785,000</span>
+                    <span className="font-medium">${(currentMetrics.expenses.cogs * 1.05).toLocaleString()}</span>
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-sm">Operating Expenses</span>
-                    <span className="font-medium">$165,000</span>
+                    <span className="font-medium">${(currentMetrics.expenses.operational * 1.02).toLocaleString()}</span>
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-sm">Total Forecasted</span>
-                    <span className="font-bold">$950,000</span>
+                    <span className="font-bold">${((currentMetrics.expenses.cogs * 1.05) + (currentMetrics.expenses.operational * 1.02)).toLocaleString()}</span>
                   </div>
                   <div className="mt-4 p-3 bg-yellow-50 rounded-lg">
                     <p className="text-sm font-medium text-yellow-800">Cost Control Target</p>
@@ -723,48 +1084,37 @@ const ComprehensiveFinancialDashboard = ({
               </CardContent>
             </Card>
 
-            {/* Financial Goals */}
+            {/* Tax Information */}
             <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
-                  <Target className="h-5 w-5" />
-                  Financial Goals
+                  <FileText className="h-5 w-5" />
+                  Tax Summary
                 </CardTitle>
               </CardHeader>
-              <CardContent className="space-y-4">
-                <div>
-                  <div className="flex justify-between text-sm mb-1">
-                    <span>Revenue Target</span>
-                    <span>103.9%</span>
-                  </div>
-                  <Progress value={103.9} className="h-2" />
+              <CardContent className="space-y-3">
+                <div className="flex justify-between items-center">
+                  <span className="text-sm">Sales Tax</span>
+                  <span className="font-medium">${currentMetrics.taxes.salesTax.toLocaleString()}</span>
                 </div>
-                <div>
-                  <div className="flex justify-between text-sm mb-1">
-                    <span>Profit Margin</span>
-                    <span>75%</span>
-                  </div>
-                  <Progress value={75} className="h-2" />
+                <div className="flex justify-between items-center">
+                  <span className="text-sm">Income Tax</span>
+                  <span className="font-medium">${currentMetrics.taxes.incomeTax.toLocaleString()}</span>
                 </div>
-                <div>
-                  <div className="flex justify-between text-sm mb-1">
-                    <span>Cost Control</span>
-                    <span>95.2%</span>
-                  </div>
-                  <Progress value={95.2} className="h-2" />
+                <div className="flex justify-between items-center">
+                  <span className="text-sm">Payroll Tax</span>
+                  <span className="font-medium">${currentMetrics.taxes.payrollTax.toLocaleString()}</span>
                 </div>
-                <div>
-                  <div className="flex justify-between text-sm mb-1">
-                    <span>Cash Flow</span>
-                    <span>88%</span>
-                  </div>
-                  <Progress value={88} className="h-2" />
+                <div className="flex justify-between items-center border-t pt-2">
+                  <span className="text-sm font-bold">Total Tax Liability</span>
+                  <span className="font-bold">${currentMetrics.taxes.totalTaxLiability.toLocaleString()}</span>
                 </div>
               </CardContent>
             </Card>
           </div>
         </TabsContent>
       </Tabs>
+
     </div>
   )
 }

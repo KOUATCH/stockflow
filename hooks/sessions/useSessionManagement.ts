@@ -53,6 +53,7 @@ export function useSessionManagement({
 
   // Mutation to open session
   const openSessionMutation = useMutation({
+    meta: { operation: 'open', entity: 'Session' , suppressSuccessNotification: true, suppressErrorNotification: true },
     mutationFn: async (data: SessionData) => {
       const result = await createPOSSession(data)
       if (!result.success) {
@@ -87,6 +88,7 @@ export function useSessionManagement({
 
   // Mutation to close session
   const closeSessionMutation = useMutation({
+    meta: { operation: 'close', entity: 'Session' , suppressSuccessNotification: true, suppressErrorNotification: true },
     mutationFn: async (data: CloseSessionData) => {
       const result = await closePOSSession(data)
       if (!result.success) {
@@ -118,6 +120,7 @@ export function useSessionManagement({
 
   // Mutation to force close session
   const forceCloseSessionMutation = useMutation({
+    meta: { operation: 'close', entity: 'force Session' , suppressSuccessNotification: true, suppressErrorNotification: true },
     mutationFn: async () => {
       if (!organizationId) {
         throw new Error("Organization ID is required to force close session")

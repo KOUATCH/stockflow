@@ -8,6 +8,7 @@ import { ProtectedRoute } from "@/components/auth/protected-route"
 import { UserMenu } from "@/components/auth/user-menu"
 import { CashDrawerManager } from "@/components/cash-drawer/cash-drawer-manager"
 import { LoginForm } from "@/components/login-form"
+import POSStation from "@/components/newPOSSession/pos-terminal"
 import { AnalyticsDashboard } from "@/components/reports/analytics-dashboard"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -123,7 +124,7 @@ export function MainLayout({ children }: MainLayoutProps) {
         <main className="flex-1 overflow-auto">
           {activeTab === "pos" && (
             <div className="p-6">
-              <pOSStation />
+              <POSStation />
             </div>
           )}
 

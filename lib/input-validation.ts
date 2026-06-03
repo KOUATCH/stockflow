@@ -188,9 +188,16 @@ export const UserRegistrationSchema = z.object({
   email: ValidationSchemas.email,
   phone: ValidationSchemas.phone,
   companyName: ValidationSchemas.companyName,
-  companySize: z.enum(['1-10', '11-50', '51-200', '201-1000', '1000+'], {
+  companySize: z.enum(['1-10', '11-50', '51-200', '201+', '201-1000', '1000+'], {
     required_error: "Company size is required"
   }),
+  industry: z.string().max(100, "Industry too long").optional(),
+  country: z.string().max(80, "Country too long").optional(),
+  state: z.string().max(80, "State too long").optional(),
+  address: z.string().max(500, "Address too long").optional(),
+  currency: z.string().length(3, "Currency must be a 3-letter code").optional(),
+  timezone: z.string().max(80, "Timezone too long").optional(),
+  defaultLocale: z.enum(["en", "fr"]).optional(),
   password: ValidationSchemas.password,
   confirmPassword: z.string(),
   termsAccepted: z.boolean().refine(val => val === true, "You must accept the terms and conditions")

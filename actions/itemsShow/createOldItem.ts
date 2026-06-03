@@ -1,3 +1,5 @@
+import { inventoryAction } from "@/lib/error-handling";
+import type { ServerActionResult } from "@/lib/error-handling/types";
 import { getAuthenticatedUser } from "@/lib/auth-server";
 import { db } from "@/prisma/db";
 import { ItemCreateDTO } from "@/types/item";
@@ -7,63 +9,61 @@ const DEFAULT_IMAGE_URL =
   "https://14J7oh8kso.ufs.sh/f/HLxTbDBCDLwfAXaapcezIN7vwylKf1PXSCqAuseUG0gx8mhd";
 
 const formatItemData = (data: ItemCreateDTO, organizationId: string) => ({
-  ...data,
+  nameEn: data.nameEn,
+  nameFr: data.nameFr ?? null,
+  descriptionEn: data.descriptionEn ?? null,
+  descriptionFr: data.descriptionFr ?? null,
+  slug: data.slug || data.nameEn.toLowerCase().replace(/\s+/g, "-"),
+  sku: data.sku,
+  thumbnail: data.thumbnail ?? null,
   organizationId,
   costPrice: Number(data.costPrice ?? 0),
   sellingPrice: Number(data.sellingPrice ?? 0),
-  imageUrls: data.imageUrls?.[0] ?? DEFAULT_IMAGE_URL,
+  imageUrls: data.imageUrls ? [data.imageUrls] : [DEFAULT_IMAGE_URL],
 });
 
-const createOldItem = async (data: ItemCreateDTO, organizationId:string) => {
-  try {
+export const createOldItem = inventoryAction(
+  async (data: ItemCreateDTO & { organizationId?: string }): Promise<ServerActionResult<any>> => {
     const user = await getAuthenticatedUser();
+    const organizationId = data.organizationId ?? user.organizationId;
 
-    if (!user.organizationId) {
-      return {
-        success: false,
-        error: "User not found or not associated with an organization",
-        data: null,
-      };
+    if (!organizationId) {
+      throw new Error("User not found or not associated with an organization");
     }
 
-    return await db.$transaction(async (tx) => {
-      const existingItem = await tx.item.findUnique({
+    const result = await db.$transaction(async (tx) => {
+      const existingItem = await tx.item.findFirst({
         where: {
-          organizationId_name: {
-            organizationId:organizationId,
-            name: data.name ?? "",
-          },
+          organizationId,
+          nameEn: data.nameEn,
         },
       });
 
       if (existingItem) {
-        return {
-          success: false,
-          error: `Item "${data.name}" already exists for this organization`,
-          data: null,
-        };
+        throw new Error(`Item "${data.nameEn}" already exists for this organization`);
       }
 
       const newItem = await tx.item.create({
-        data: formatItemData(data,organizationId),
+        data: formatItemData(data, organizationId),
       });
 
       revalidatePath("/inventory/items");
 
-      return {
-        success: true,
-        error: null,
-        data: newItem,
-      };
+      return newItem;
     });
-  } catch (error) {
-    console.error("Error creating item:", error);
-    return {
-      success: false,
-      error: "Something went wrong. Item was not created. Please try again.",
-      data: null,
-    };
-  }
-};
 
-export default createOldItem;
+    return {
+      success: true,
+      data: result,
+    };
+  },
+  {
+    actionName: 'createOldItem',
+    component: 'InventoryManagement',
+    businessContext: {
+      domain: 'inventory',
+      operation: 'create',
+      resourceType: 'item'
+    }
+  }
+)

@@ -85,7 +85,8 @@ export async function listItemsAction(
       ...(q
         ? {
             OR: [
-              { name: { contains: q, mode: 'insensitive' } },
+              { nameEn: { contains: q, mode: 'insensitive' } },
+              { nameFr: { contains: q, mode: 'insensitive' } },
               { sku: { contains: q, mode: 'insensitive' } },
               { barcode: { contains: q, mode: 'insensitive' } },
             ],

@@ -1,30 +1,45 @@
-
-
 "use server";
 
 import { db } from "@/prisma/db";
+import { inventoryAction } from "@/lib/error-handling";
+import type { ServerActionResult } from "@/lib/error-handling/types";
 
 
-const deleteItem = async (id: string) => {
+export const deleteItem = inventoryAction(
+  async (id: string): Promise<ServerActionResult<any>> => {
 
   try {
       const item = await db.item.findUnique({
         where: { id },
+        select: {
+          id: true,
+          _count: {
+            select: {
+              salesOrderLines: true,
+              purchaseOrderLines: true,
+              inventoryTransactions: true,
+              transferLines: true,
+              adjustmentLines: true,
+              goodsReceiptLines: true,
+            },
+          },
+        },
       })
 
       if (!item) {
-        return {
-          error: `Something went wrong, Item not found`,
-          success: false ,
-          data: null,
-        };
+        throw new Error('Item not found');
       }
-      if (item.salesCount > 0) {
-        return {
-          error: `Item has related records so should not be deleted`,
-          success: false ,
-          data: null,
-        };
+
+      const relatedRecords =
+        item._count.salesOrderLines +
+        item._count.purchaseOrderLines +
+        item._count.inventoryTransactions +
+        item._count.transferLines +
+        item._count.adjustmentLines +
+        item._count.goodsReceiptLines;
+
+      if (relatedRecords > 0) {
+        throw new Error('Item has related records and cannot be deleted');
       }
       const deletedItem = await db.item.delete({
         where: {  id },
@@ -32,17 +47,21 @@ const deleteItem = async (id: string) => {
 
       return {
         success: true,
-        error: null,
         data: deletedItem
       };
 
-  } catch (error) {
-    console.error("Error deleting item:", error);
-    return {
-      error: `Something went wrong, Please try again`,
-      success: true,
-      data: null,
-    };
+    } catch (error) {
+      throw error;
+    }
+  },
+  {
+    actionName: 'deleteItem',
+    component: 'InventoryManagement',
+    businessContext: {
+      domain: 'inventory',
+      operation: 'delete',
+      resourceType: 'item',
+      critical: true
+    }
   }
-}
-export default deleteItem
+);

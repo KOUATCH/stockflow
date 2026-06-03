@@ -1,8 +1,7 @@
 "use client"
 
+import { notify } from "@/lib/notifications/notify"
 import { useQuery } from "@tanstack/react-query"
-import { toast } from "sonner"
-
 // Mock inventory data
 const mockInventoryItems = [
   {
@@ -57,7 +56,7 @@ export const useItemsWithInventory = () => {
     retry: 3,
     onError: (error: any) => {
       console.error("Failed to fetch inventory items:", error)
-      toast.error("Failed to load inventory")
+      notify.error("Failed to load inventory")
     },
   })
 }

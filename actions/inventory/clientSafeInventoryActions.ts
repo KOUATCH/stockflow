@@ -8,6 +8,14 @@ import { db } from "@/prisma/db"
  * These use NextAuth session instead to prevent NEXT_REDIRECT errors
  */
 
+function toNumber(value: any): number {
+  if (value === null || value === undefined) return 0
+  if (typeof value === "number") return value
+  if (typeof value === "string") return Number(value) || 0
+  if (typeof value.toNumber === "function") return value.toNumber()
+  return Number(value) || 0
+}
+
 export async function getOrgItemsWithInventoryLevelsClientSafe(organizationId?: string) {
   try {
     const session = await auth()
@@ -32,7 +40,8 @@ export async function getOrgItemsWithInventoryLevelsClientSafe(organizationId?: 
       },
       select: {
         id: true,
-        name: true,
+        nameEn: true,
+        nameFr: true,
         slug: true,
         costPrice: true,
         sellingPrice: true,
@@ -42,28 +51,32 @@ export async function getOrgItemsWithInventoryLevelsClientSafe(organizationId?: 
         thumbnail: true,
         sku: true,
         barcode: true,
-        description: true,
+        descriptionEn: true,
+        descriptionFr: true,
         weight: true,
         dimensions: true,
-        tags: true,
         isActive: true,
+        maxStockLevel: true,
         category: {
           select: {
             id: true,
-            name: true,
+            titleEn: true,
+            titleFr: true,
           },
         },
         brand: {
           select: {
             id: true,
-            name: true,
+            nameEn: true,
+            nameFr: true,
           },
         },
         unit: {
           select: {
             id: true,
-            name: true,
-            abbreviation: true,
+            nameEn: true,
+            nameFr: true,
+            symbol: true,
           },
         },
         inventoryLevels: {
@@ -73,7 +86,6 @@ export async function getOrgItemsWithInventoryLevelsClientSafe(organizationId?: 
             quantityAvailable: true,
             quantityReserved: true,
             reorderPoint: true,
-            maxStockLevel: true,
             averageCost: true,
             totalValue: true,
             location: {
@@ -89,7 +101,44 @@ export async function getOrgItemsWithInventoryLevelsClientSafe(organizationId?: 
 
     return {
       success: true,
-      data: items,
+      data: items.map((item) => ({
+        ...item,
+        name: item.nameEn,
+        description: item.descriptionEn,
+        costPrice: toNumber(item.costPrice),
+        sellingPrice: toNumber(item.sellingPrice),
+        weight: toNumber(item.weight),
+        tags: [],
+        category: item.category
+          ? {
+              ...item.category,
+              name: item.category.titleEn ?? item.category.titleFr ?? "",
+            }
+          : null,
+        brand: item.brand
+          ? {
+              ...item.brand,
+              name: item.brand.nameEn ?? item.brand.nameFr ?? "",
+            }
+          : null,
+        unit: item.unit
+          ? {
+              ...item.unit,
+              name: item.unit.nameEn ?? item.unit.nameFr ?? item.unit.symbol,
+              abbreviation: item.unit.symbol,
+            }
+          : null,
+        inventoryLevels: item.inventoryLevels.map((level) => ({
+          ...level,
+          quantityOnHand: toNumber(level.quantityOnHand),
+          quantityAvailable: toNumber(level.quantityAvailable),
+          quantityReserved: toNumber(level.quantityReserved),
+          reorderPoint: toNumber(level.reorderPoint),
+          maxStockLevel: toNumber(item.maxStockLevel),
+          averageCost: toNumber(level.averageCost),
+          totalValue: toNumber(level.totalValue),
+        })),
+      })),
       error: null
     }
   } catch (error) {
@@ -198,7 +247,8 @@ export async function getInventoryLevelsClientSafe(organizationId?: string, loca
         item: {
           select: {
             id: true,
-            name: true,
+            nameEn: true,
+            nameFr: true,
             sku: true,
             barcode: true,
             imageUrls: true,
@@ -215,14 +265,28 @@ export async function getInventoryLevelsClientSafe(organizationId?: string, loca
       },
       orderBy: {
         item: {
-          name: 'asc',
+          nameEn: 'asc',
         },
       },
     })
 
     return {
       success: true,
-      data: inventoryLevels,
+      data: inventoryLevels.map((level) => ({
+        ...level,
+        quantityOnHand: toNumber(level.quantityOnHand),
+        quantityReserved: toNumber(level.quantityReserved),
+        quantityAvailable: toNumber(level.quantityAvailable),
+        quantityInTransit: toNumber(level.quantityInTransit),
+        quantityOnOrder: toNumber(level.quantityOnOrder),
+        reorderPoint: toNumber(level.reorderPoint),
+        averageCost: toNumber(level.averageCost),
+        totalValue: toNumber(level.totalValue),
+        item: {
+          ...level.item,
+          name: level.item.nameEn ?? level.item.nameFr ?? "",
+        },
+      })),
       error: null
     }
   } catch (error) {

@@ -1,8 +1,8 @@
 "use client"
 
+import { notify } from "@/lib/notifications/notify"
 import { useState, useMemo, useCallback } from "react"
 import { format } from "date-fns"
-import { toast } from "sonner"
 import * as XLSX from "xlsx"
 import { Plus, RefreshCw, Download, Search } from "lucide-react"
 
@@ -129,9 +129,9 @@ export function ItemManagement({
   const handleRefresh = useCallback(async () => {
     try {
       await refetch()
-      toast.success("Items refreshed successfully")
+      notify.success("Items refreshed successfully")
     } catch (error) {
-      toast.error("Failed to refresh items")
+      notify.error("Failed to refresh items")
     }
   }, [refetch])
 
@@ -155,12 +155,12 @@ export function ItemManagement({
       const fileName = `Items_${format(new Date(), "yyyy-MM-dd_HH-mm-ss")}.xlsx`
       XLSX.writeFile(workbook, fileName)
 
-      toast.success("Export successful", {
+      notify.success("Export successful", {
         description: `${items.length} items exported to ${fileName}`,
       })
     } catch (error) {
       console.error("Export error:", error)
-      toast.error("Export failed", {
+      notify.error("Export failed", {
         description: error instanceof Error ? error.message : "Unknown error occurred",
       })
     }

@@ -1,12 +1,12 @@
 "use server"
 
 import { db } from "@/prisma/db"
-import type { RetailFinancialSummary, CashFlowData, FinancialAlert, FinancialFilters } from "@/types/retailFinance"
-import { SalesAnalytics } from "./salesAnalytics"
+import type { CashFlowData, FinancialAlert, FinancialFilters, RetailFinancialSummary } from "@/types/retailFinance"
+import { differenceInDays, endOfDay, endOfMonth, format, startOfDay, startOfMonth, subMonths } from "date-fns"
 import { CostAnalytics } from "./costAnalytics"
-import { ProfitabilityAnalytics } from "./profitabilityAnalytics"
 import { CustomerFinancialManager } from "./customerFinancialManager"
-import { startOfMonth, endOfMonth, startOfDay, endOfDay, subMonths, format, differenceInDays } from "date-fns"
+import { ProfitabilityAnalytics } from "./profitabilityAnalytics"
+import { SalesAnalytics } from "./salesAnalytics"
 
 export class RetailFinancialAnalytics {
 
@@ -26,7 +26,7 @@ export class RetailFinancialAnalytics {
         costSummary,
         profitabilityAnalysis,
         customerFinances,
-        supplierFinances,
+        supplierPaymentSummary,
         cashFlowData
       ] = await Promise.all([
         SalesAnalytics.getSalesSummary(organizationId, filters),
@@ -36,6 +36,11 @@ export class RetailFinancialAnalytics {
         CostAnalytics.getSupplierPaymentSummary(organizationId),
         this.getCashFlowSummary(organizationId, filters)
       ])
+
+      const supplierFinances = {
+        ...supplierPaymentSummary,
+        supplierCreditBalance: 0 // Add the missing property - would be calculated from actual supplier credit system
+      }
 
       return {
         period: {
@@ -64,8 +69,19 @@ export class RetailFinancialAnalytics {
         },
 
         customerFinances,
-        supplierFinances,
-        cashFlow: cashFlowData
+         supplierFinances,
+        cashFlow: cashFlowData,
+        payroll: {
+          totalPayrollExpense: 0,
+          totalEmployees: 0,
+          averageSalary: 0,
+          payrollGrowth: 0,
+          departmentBreakdown: [],
+          benefitsCost: 0,
+          payrollTaxes: 0,
+          overtimeCost: 0,
+          overtimePercentage: 0
+        }
       }
 
     } catch (error) {
@@ -220,11 +236,11 @@ export class RetailFinancialAnalytics {
       })
 
       const totalCashIn = recentPayments
-        .filter(p => p.salesOrder)
+        .filter(p => p.amount > 0 && p.salesOrderId)
         .reduce((sum, p) => sum + p.amount, 0)
 
       const totalCashOut = recentPayments
-        .filter(p => p.purchaseOrder)
+        .filter(p => p.amount > 0 && p.purchaseOrderId)
         .reduce((sum, p) => sum + p.amount, 0)
 
       // Estimate current position (would be replaced with actual bank balance)

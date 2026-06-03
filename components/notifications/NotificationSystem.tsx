@@ -3,7 +3,6 @@
 import { Button } from "@/components/ui/button"
 import { Progress } from "@/components/ui/progress"
 import { cn } from "@/lib/utils"
-import { theme } from "@/lib/theme"
 import {
   AlertTriangle,
   CheckCircle2,
@@ -17,7 +16,31 @@ import {
   FileText,
   Zap
 } from "lucide-react"
-import { useEffect, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
+
+export type NotificationCategory =
+  | "general"
+  | "form"
+  | "operation"
+  | "cash"
+  | "reconciliation"
+  | "error"
+  | "warning"
+  | "info"
+  | "business"
+  | "security"
+  | "system"
+  | "network"
+  | "inventory"
+  | "sales"
+  | "pos"
+  | "financial"
+  | "purchase"
+  | "purchase_order"
+  | "reporting"
+  | "payment"
+  | "receipt"
+  | "client_order"
 
 export interface NotificationData {
   id: string
@@ -27,7 +50,7 @@ export interface NotificationData {
   duration?: number
   sound?: boolean
   priority?: "low" | "normal" | "high"
-  category?: "general" | "form" | "operation" | "cash" | "reconciliation" | "error" | "warning" | "info"
+  category?: NotificationCategory
   showProgress?: boolean
   action?: {
     label: string
@@ -245,8 +268,20 @@ function NotificationCard({
   const [isExiting, setIsExiting] = useState(false)
   const [progress, setProgress] = useState(100)
 
+  const handleRemove = useCallback(() => {
+    setIsExiting(true)
+    setTimeout(() => {
+      onRemove(notification.id)
+    }, 300)
+  }, [notification.id, onRemove])
+
   useEffect(() => {
     const duration = notification.duration || 5000
+    if (duration <= 0) {
+      setProgress(100)
+      return
+    }
+
     const interval = 50 // Update every 50ms
     const steps = duration / interval
     let currentStep = 0
@@ -265,14 +300,7 @@ function NotificationCard({
       clearInterval(progressTimer)
       clearTimeout(removeTimer)
     }
-  }, [notification.duration])
-
-  const handleRemove = () => {
-    setIsExiting(true)
-    setTimeout(() => {
-      onRemove(notification.id)
-    }, 300)
-  }
+  }, [handleRemove, notification.duration])
 
   return (
     <div

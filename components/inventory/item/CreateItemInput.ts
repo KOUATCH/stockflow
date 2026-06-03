@@ -1,7 +1,8 @@
 "use server"
 
 import { itemStandardInclude } from "@/lib/item/includes"
-import { createItemSchema, revalidateItems, slugify, type ItemWithRelations } from "@/lib/item/schemas"
+import { createItemSchema, slugify, type ItemWithRelations } from "@/lib/item/schemas"
+import { revalidateItem } from "@/lib/item/revalidation"
 import { db } from "@/prisma/db"
 import type { z } from "zod"
 
@@ -44,12 +45,12 @@ export async function createItemAction(input: CreateItemInput): Promise<ItemWith
   const parsed = createItemSchema.parse(input)
 
   // 2) Normalize strings and derived fields
-  const name = parsed.name.trim()
+  const nameEn = parsed.nameEn.trim()
   const sku = parsed.sku.trim().toUpperCase()
   const organizationId = parsed.organizationId
 
   const desiredSlug = parsed.slug?.trim()
-  const baseSlug = slugify(desiredSlug && desiredSlug.length > 0 ? desiredSlug : name)
+  const baseSlug = slugify(desiredSlug && desiredSlug.length > 0 ? desiredSlug : nameEn)
   const uniqueSlug = await ensureUniqueSlug(baseSlug, organizationId)
 
   // 3) Create the item (exclude client-only initialInventory from the data payload)
@@ -61,10 +62,12 @@ export async function createItemAction(input: CreateItemInput): Promise<ItemWith
   const created = await db.item.create({
     data: {
       organizationId,
-      name,
+      nameEn,
+      nameFr: rest.nameFr ?? null,
       sku,
-      description: rest.description ?? null,
-      imageUrls: rest.imageUrls ?? "", // string
+      descriptionEn: rest.descriptionEn ?? null,
+      descriptionFr: rest.descriptionFr ?? null,
+      imageUrls: rest.imageUrls ? [rest.imageUrls] : [],
       thumbnail: rest.thumbnail ?? null,
       barcode: rest.barcode ?? null,
       dimensions: rest.dimensions ?? null,
@@ -100,7 +103,7 @@ export async function createItemAction(input: CreateItemInput): Promise<ItemWith
   // coupling to inventory schema. Use your existing inventory action to seed stock.
 
   // 5) Revalidate caches so UI stays fresh
-  revalidateItems(created.id, organizationId)
+  revalidateItem(created.id, organizationId)
 
   return created
 }

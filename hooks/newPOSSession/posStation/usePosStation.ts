@@ -65,6 +65,7 @@ export function useCreatePosStation() {
   const { success, error } = useNotifications()
 
   return useMutation({
+    meta: { operation: 'create', entity: 'Pos Station' , suppressSuccessNotification: true, suppressErrorNotification: true },
     mutationFn: (input: CreatePosStationInput) => createPosStation(input),
     onSuccess: (result) => {
       if (result.success) {
@@ -92,6 +93,7 @@ export function useUpdatePosStation() {
   const { success, error } = useNotifications()
 
   return useMutation({
+    meta: { operation: 'update', entity: 'Pos Station' , suppressSuccessNotification: true, suppressErrorNotification: true },
     mutationFn: (input: UpdatePosStationInput) => updatePosStation(input),
     onSuccess: (result, variables) => {
       if (result.success) {
@@ -120,6 +122,7 @@ export function useDeletePosStation() {
   const { success, error } = useNotifications()
 
   return useMutation({
+    meta: { operation: 'delete', entity: 'Pos Station' , suppressSuccessNotification: true, suppressErrorNotification: true },
     mutationFn: (id: string) => deletePosStation(id),
     onSuccess: (result) => {
       if (result.success) {

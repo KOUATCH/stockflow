@@ -1,5 +1,6 @@
 "use client"
 
+import { notify } from "@/lib/notifications/notify"
 import {
   getInventoryLevelsClientSafe,
   getInventoryTransactionsClientSafe,
@@ -28,8 +29,6 @@ import type {
   UpdateInventoryLevelRequest,
 } from "@/types/inventoryTypes"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { toast } from "sonner"
-
 // ===== QUERY KEYS =====
 export const inventoryKeys = {
   all: ["inventory"] as const,
@@ -43,14 +42,24 @@ export const inventoryKeys = {
   transfers: (organizationId?: string) => [...inventoryKeys.all, "transfers", organizationId] as const,
 }
 
+function getActionErrorMessage(error: unknown, fallback: string) {
+  if (!error) return fallback
+  if (typeof error === "string") return error
+  if (typeof error === "object") {
+    const details = error as { userMessage?: string; message?: string }
+    return details.userMessage || details.message || fallback
+  }
+  return fallback
+}
+
 // ===== ITEMS HOOKS =====
 export function useItems(organizationId?: string, filters?: InventoryFilters) {
   return useQuery({
     queryKey: inventoryKeys.items(organizationId),
     queryFn: async () => {
       if (!organizationId) throw new Error("Organization ID is required")
-      const result = await getItems(organizationId, filters)
-      if (!result.success) throw new Error(result.error || "Failed to fetch items")
+      const result = await getItems({ organizationId, filters })
+      if (!result.success) throw new Error(getActionErrorMessage(result.error, "Failed to fetch items"))
       return result.data
     },
     enabled: Boolean(organizationId),
@@ -64,8 +73,8 @@ export function useItem(id?: string) {
     queryKey: inventoryKeys.item(id),
     queryFn: async () => {
       if (!id) throw new Error("Item ID is required")
-      const result = await getItem(id)
-      if (!result.success) throw new Error(result.error || "Failed to fetch item")
+      const result = await getItem({ id })
+      if (!result.success) throw new Error(getActionErrorMessage(result.error, "Failed to fetch item"))
       return result.data
     },
     enabled: Boolean(id),
@@ -78,9 +87,10 @@ export function useCreateItem(organizationId: string) {
   const queryClient = useQueryClient()
 
   return useMutation({
+    meta: { operation: 'create', entity: 'Item' , suppressSuccessNotification: true, suppressErrorNotification: true },
     mutationFn: async (data: CreateItemRequest) => {
-      const result = await createItem(organizationId, data)
-      if (!result.success) throw new Error(result.error || "Failed to create item")
+      const result = await createItem({ organizationId, data })
+      if (!result.success) throw new Error(getActionErrorMessage(result.error, "Failed to create item"))
       return result.data
     },
     onSuccess: (newItem) => {
@@ -88,12 +98,14 @@ export function useCreateItem(organizationId: string) {
       queryClient.invalidateQueries({ queryKey: inventoryKeys.items(organizationId) })
 
       // Add the new item to the cache
-      queryClient.setQueryData(inventoryKeys.item(newItem.id), newItem)
+      if (newItem) {
+        queryClient.setQueryData(inventoryKeys.item(newItem.id), newItem)
+      }
 
-      toast.success("Item created successfully")
+      notify.success("Item created successfully")
     },
     onError: (error) => {
-      toast.error(`Failed to create item: ${error.message}`)
+      notify.error(`Failed to create item: ${error.message}`)
     },
   })
 }
@@ -104,7 +116,7 @@ export function useInventoryLevels(organizationId?: string, locationId?: string)
     queryKey: inventoryKeys.levels(organizationId, { locationId }),
     queryFn: async () => {
       const result = await getInventoryLevelsClientSafe(organizationId, locationId)
-      if (!result.success) throw new Error(result.error || "Failed to fetch inventory levels")
+      if (!result.success) throw new Error(getActionErrorMessage(result.error, "Failed to fetch inventory levels"))
       return result.data
     },
     enabled: Boolean(organizationId),
@@ -117,9 +129,10 @@ export function useUpdateInventoryLevel(organizationId: string) {
   const queryClient = useQueryClient()
 
   return useMutation({
+    meta: { operation: 'update', entity: 'Inventory Level' , suppressSuccessNotification: true, suppressErrorNotification: true },
     mutationFn: async (data: UpdateInventoryLevelRequest) => {
-      const result = await updateInventoryLevel(data)
-      if (!result.success) throw new Error(result.error || "Failed to update inventory level")
+      const result = await updateInventoryLevel({ data })
+      if (!result.success) throw new Error(getActionErrorMessage(result.error, "Failed to update inventory level"))
       return result.data
     },
     onSuccess: () => {
@@ -127,10 +140,10 @@ export function useUpdateInventoryLevel(organizationId: string) {
       queryClient.invalidateQueries({ queryKey: inventoryKeys.levels(organizationId) })
       queryClient.invalidateQueries({ queryKey: inventoryKeys.transactions(organizationId) })
 
-      toast.success("Inventory level updated successfully")
+      notify.success("Inventory level updated successfully")
     },
     onError: (error) => {
-      toast.error(`Failed to update inventory level: ${error.message}`)
+      notify.error(`Failed to update inventory level: ${error.message}`)
     },
   })
 }
@@ -141,7 +154,7 @@ export function useInventoryTransactions(organizationId?: string, itemId?: strin
     queryKey: inventoryKeys.transactions(organizationId, { itemId, locationId }),
     queryFn: async () => {
       const result = await getInventoryTransactionsClientSafe(organizationId, itemId, locationId, 50)
-      if (!result.success) throw new Error(result.error || "Failed to fetch inventory transactions")
+      if (!result.success) throw new Error(getActionErrorMessage(result.error, "Failed to fetch inventory transactions"))
       return result.data
     },
     enabled: Boolean(organizationId),
@@ -155,9 +168,10 @@ export function useReserveInventory(organizationId: string) {
   const queryClient = useQueryClient()
 
   return useMutation({
+    meta: { operation: 'reserve', entity: 'Inventory' },
     mutationFn: async (data: ReserveInventoryRequest) => {
-      const result = await reserveInventory(data)
-      if (!result.success) throw new Error(result.error || "Failed to reserve inventory")
+      const result = await reserveInventory({ data })
+      if (!result.success) throw new Error(getActionErrorMessage(result.error, "Failed to reserve inventory"))
       return result.data
     },
     onSuccess: () => {
@@ -165,10 +179,10 @@ export function useReserveInventory(organizationId: string) {
       queryClient.invalidateQueries({ queryKey: inventoryKeys.levels(organizationId) })
       queryClient.invalidateQueries({ queryKey: inventoryKeys.transactions(organizationId) })
 
-      toast.success("Inventory reserved successfully")
+      notify.success("Inventory reserved successfully")
     },
     onError: (error) => {
-      toast.error(`Failed to reserve inventory: ${error.message}`)
+      notify.error(`Failed to reserve inventory: ${error.message}`)
     },
   })
 }
@@ -177,9 +191,10 @@ export function useReleaseInventory(organizationId: string) {
   const queryClient = useQueryClient()
 
   return useMutation({
+    meta: { operation: 'release', entity: 'Inventory' },
     mutationFn: async (data: ReserveInventoryRequest) => {
-      const result = await releaseInventory(data)
-      if (!result.success) throw new Error(result.error || "Failed to release inventory")
+      const result = await releaseInventory({ data })
+      if (!result.success) throw new Error(getActionErrorMessage(result.error, "Failed to release inventory"))
       return result.data
     },
     onSuccess: () => {
@@ -187,10 +202,10 @@ export function useReleaseInventory(organizationId: string) {
       queryClient.invalidateQueries({ queryKey: inventoryKeys.levels(organizationId) })
       queryClient.invalidateQueries({ queryKey: inventoryKeys.transactions(organizationId) })
 
-      toast.success("Inventory reservations released successfully")
+      notify.success("Inventory reservations released successfully")
     },
     onError: (error) => {
-      toast.error(`Failed to release inventory: ${error.message}`)
+      notify.error(`Failed to release inventory: ${error.message}`)
     },
   })
 }
@@ -201,8 +216,8 @@ export function useStockAdjustments(organizationId?: string) {
     queryKey: inventoryKeys.adjustments(organizationId),
     queryFn: async () => {
       if (!organizationId) throw new Error("Organization ID is required")
-      const result = await getStockAdjustments(organizationId)
-      if (!result.success) throw new Error(result.error || "Failed to fetch stock adjustments")
+      const result = await getStockAdjustments({ organizationId })
+      if (!result.success) throw new Error(getActionErrorMessage(result.error, "Failed to fetch stock adjustments"))
       return result.data
     },
     enabled: Boolean(organizationId),
@@ -215,9 +230,10 @@ export function useCreateStockAdjustment(organizationId: string) {
   const queryClient = useQueryClient()
 
   return useMutation({
+    meta: { operation: 'create', entity: 'Stock Adjustment' , suppressSuccessNotification: true, suppressErrorNotification: true },
     mutationFn: async (data: CreateStockAdjustmentRequest) => {
-      const result = await createStockAdjustment(data)
-      if (!result.success) throw new Error(result.error || "Failed to create stock adjustment")
+      const result = await createStockAdjustment({ data })
+      if (!result.success) throw new Error(getActionErrorMessage(result.error, "Failed to create stock adjustment"))
       return result.data
     },
     onSuccess: () => {
@@ -226,10 +242,10 @@ export function useCreateStockAdjustment(organizationId: string) {
       queryClient.invalidateQueries({ queryKey: inventoryKeys.levels(organizationId) })
       queryClient.invalidateQueries({ queryKey: inventoryKeys.transactions(organizationId) })
 
-      toast.success("Stock adjustment created successfully")
+      notify.success("Stock adjustment created successfully")
     },
     onError: (error) => {
-      toast.error(`Failed to create stock adjustment: ${error.message}`)
+      notify.error(`Failed to create stock adjustment: ${error.message}`)
     },
   })
 }
@@ -240,8 +256,8 @@ export function useStockTransfers(organizationId?: string) {
     queryKey: inventoryKeys.transfers(organizationId),
     queryFn: async () => {
       if (!organizationId) throw new Error("Organization ID is required")
-      const result = await getStockTransfers(organizationId)
-      if (!result.success) throw new Error(result.error || "Failed to fetch stock transfers")
+      const result = await getStockTransfers({ organizationId })
+      if (!result.success) throw new Error(getActionErrorMessage(result.error, "Failed to fetch stock transfers"))
       return result.data
     },
     enabled: Boolean(organizationId),
@@ -254,9 +270,10 @@ export function useCreateStockTransfer(organizationId: string) {
   const queryClient = useQueryClient()
 
   return useMutation({
+    meta: { operation: 'create', entity: 'Stock Transfer' , suppressSuccessNotification: true, suppressErrorNotification: true },
     mutationFn: async (data: CreateStockTransferRequest) => {
-      const result = await createStockTransfer(data)
-      if (!result.success) throw new Error(result.error || "Failed to create stock transfer")
+      const result = await createStockTransfer({ data })
+      if (!result.success) throw new Error(getActionErrorMessage(result.error, "Failed to create stock transfer"))
       return result.data
     },
     onSuccess: () => {
@@ -265,10 +282,10 @@ export function useCreateStockTransfer(organizationId: string) {
       queryClient.invalidateQueries({ queryKey: inventoryKeys.levels(organizationId) })
       queryClient.invalidateQueries({ queryKey: inventoryKeys.transactions(organizationId) })
 
-      toast.success("Stock transfer created successfully")
+      notify.success("Stock transfer created successfully")
     },
     onError: (error) => {
-      toast.error(`Failed to create stock transfer: ${error.message}`)
+      notify.error(`Failed to create stock transfer: ${error.message}`)
     },
   })
 }

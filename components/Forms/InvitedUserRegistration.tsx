@@ -1,12 +1,14 @@
 "use client";
+
+import { notify } from "@/lib/notifications/notify"
 import { createInvitedUser } from "@/actions/users/createInvitedUser";
-import { InvitedUserProps } from "@/types/types";
+import { getLocaleFromPathname, localizePath } from "@/i18n/routing";
+import { DEFAULT_LOCALE } from "@/types/bilingual";
 import { Headset, Loader2, Lock, User } from "lucide-react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
-import { toast } from "sonner";
 import PasswordInput from "../FormInputs/PasswordInput";
 import SubmitButton from "../FormInputs/SubmitButton";
 import TextInput from "../FormInputs/TextInput";
@@ -20,7 +22,29 @@ export type OrgDataProps = {
   currency: string | undefined;
   timezone: string | undefined;
 }
-const InvitedUserRegistration = ({ email, organizationName, roleId, organizationId }: { email: string, organizationName: string, roleId: string, organizationId: string }) => {
+
+type InvitedUserFormValues = {
+  email: string;
+  password: string;
+  firstName?: string | null;
+  lastName?: string | null;
+  phone?: string | null;
+  image?: string | null;
+}
+
+const InvitedUserRegistration = ({
+  email,
+  organizationName,
+  roleName,
+  token,
+  isValidInvite,
+}: {
+  email: string
+  organizationName: string
+  roleName: string
+  token: string
+  isValidInvite: boolean
+}) => {
 
   const [loading, setLoading] = useState(false);
   const [emailErr, setEmailErr] = useState<string | null>(null);
@@ -29,41 +53,45 @@ const InvitedUserRegistration = ({ email, organizationName, roleId, organization
     register,
     formState: { errors },
     reset,
-  } = useForm<InvitedUserProps>({
+  } = useForm<InvitedUserFormValues>({
     defaultValues: {
       email
     }
   });
   const router = useRouter();
-  async function onSubmit(data: InvitedUserProps) {
+  const pathname = usePathname();
+  const locale = getLocaleFromPathname(pathname) ?? DEFAULT_LOCALE;
+  const localizedHref = (href: string) => localizePath(href, locale);
+  async function onSubmit(data: InvitedUserFormValues) {
+    if (!isValidInvite) {
+      setEmailErr("This invitation link is invalid or has expired");
+      return;
+    }
+
     setLoading(true);
-    console.log({ data })
-    data.name = `${data.firstName} ${data.lastName}`;
-    data.image =
-      "https://utfs.io/f/59b606d1-9148-4f50-ae1c-e9d02322e834-2558r.png";
-    data.roleId = roleId
-    data.organizationName = organizationName
-    data.organizationId = organizationId
-    console.log({ organizationName })
+    const payload = {
+      ...data,
+      image: "https://utfs.io/f/59b606d1-9148-4f50-ae1c-e9d02322e834-2558r.png",
+      token,
+    };
     try {
-      const res = await createInvitedUser(data);
-      console.log({ res })
+      const res = await createInvitedUser(payload);
       if (res.status === 409) {
         setLoading(false);
         setEmailErr(res.error);
       } else if (res.status === 200) {
         setLoading(false);
-        toast.success("Account Created successfully", { description: "Your account has been created Please login" });
-        router.push(`/login`);
+        notify.success("Account Created successfully", { description: "Your account has been created Please login" });
+        router.push(localizedHref("/login"));
 
       } else {
         setLoading(false);
-        toast.error("Something went wrong", { description: "Error during Account creation, Please try again" });
+        notify.error("Something went wrong", { description: "Error during Account creation, Please try again" });
       }
     } catch (error) {
       setLoading(false);
       console.error("Network Error:", error);
-      toast.error("Its seems something is wrong, try again");
+      notify.error("Its seems something is wrong, try again");
     }
   }
 
@@ -77,12 +105,14 @@ const InvitedUserRegistration = ({ email, organizationName, roleId, organization
           <div className="grid gap-2 text-center mt-10 md:mt-0">
             <h1 className="text-3xl font-bold">Welcome to {organizationName}  Team</h1>
             <p className="text-muted-foreground text-sm">
-              Please complete your account info with us to get started
-              as ${roleId}
+              {isValidInvite
+                ? `Please complete your account info with us to get started as ${roleName}`
+                : "This invitation link is invalid or has expired"}
             </p>
           </div>
           <div className="">
             <form className="space-y-3" onSubmit={handleSubmit(onSubmit)}>
+              <input type="hidden" value={token} readOnly />
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <TextInput
                   register={register}
@@ -130,8 +160,8 @@ const InvitedUserRegistration = ({ email, organizationName, roleId, organization
               <div>
                 <SubmitButton
                   title="Sign Up"
-                  loadingTitle="Creating Please wait.."
-                  loading={loading}
+                  loadingTitle={isValidInvite ? "Creating Please wait.." : "Invalid invitation"}
+                  loading={loading || !isValidInvite}
                   className="w-full"
                   loaderIcon={Loader2}
                   showIcon={false}
@@ -165,7 +195,7 @@ const InvitedUserRegistration = ({ email, organizationName, roleId, organization
             <p className="mt-6 text-sm text-gray-500">
               Already Registered ?{" "}
               <Link
-                href="/login"
+                href={localizedHref("/login")}
                 className="font-semibold leading-6 text-rose-600 hover:text-rose-500"
               >
                 Login

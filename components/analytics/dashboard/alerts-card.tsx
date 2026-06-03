@@ -2,7 +2,7 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { AlertTriangle, Info, CheckCircle } from "lucide-react"
+import { AlertTriangle, Info, CheckCircle, Bell } from "lucide-react"
 
 const alerts = [
   {
@@ -27,17 +27,28 @@ const alerts = [
 
 export function AlertsCard() {
   return (
-    <Card className="glass-effect border-0">
-      <CardHeader className="pb-4">
-        <CardTitle className="text-lg font-bold font-[family-name:var(--font-montserrat)]">Alerts</CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-3">
+    <div className="bg-white/60 dark:bg-slate-800/60 backdrop-blur-sm rounded-xl border border-slate-200/60 dark:border-slate-700/60 p-6 hover:bg-white/80 dark:hover:bg-slate-800/80 transition-all">
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center gap-3">
+          <div className="p-2 rounded-lg bg-gradient-to-br from-red-100 to-orange-100 dark:from-red-900/30 dark:to-orange-900/30">
+            <Bell className="w-5 h-5 text-red-600 dark:text-red-400" />
+          </div>
+          <div>
+            <h3 className="text-base font-bold text-slate-900 dark:text-white">Alerts</h3>
+            <p className="text-sm text-slate-600 dark:text-slate-400">System notifications</p>
+          </div>
+        </div>
+        <Badge variant="secondary" className="bg-slate-100 dark:bg-slate-800">
+          {alerts.length} active
+        </Badge>
+      </div>
+      <div className="space-y-3">
         {alerts.map((alert, index) => {
           const Icon = alert.icon
           const variant = alert.type === "warning" ? "destructive" : alert.type === "success" ? "default" : "secondary"
 
           return (
-            <div key={index} className="flex items-start space-x-3 p-3 rounded-lg bg-muted/30">
+            <div key={index} className="flex items-start space-x-3 p-3 rounded-lg bg-slate-50/60 dark:bg-slate-700/60">
               <Icon
                 className={`h-4 w-4 mt-0.5 ${
                   alert.type === "warning"
@@ -48,8 +59,8 @@ export function AlertsCard() {
                 }`}
               />
               <div className="flex-1 min-w-0">
-                <p className="text-sm font-medium">{alert.message}</p>
-                <p className="text-xs text-muted-foreground">{alert.time}</p>
+                <p className="text-sm font-medium text-slate-900 dark:text-white">{alert.message}</p>
+                <p className="text-xs text-slate-600 dark:text-slate-400">{alert.time}</p>
               </div>
               <Badge variant={variant} className="text-xs">
                 {alert.type}
@@ -57,7 +68,7 @@ export function AlertsCard() {
             </div>
           )
         })}
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   )
 }

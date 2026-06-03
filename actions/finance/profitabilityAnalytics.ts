@@ -1,8 +1,8 @@
 "use server"
 
 import { db } from "@/prisma/db"
-import type { CategoryProfit, ProductProfit, ProfitableItem, FinancialFilters } from "@/types/retailFinance"
-import { startOfDay, endOfDay, subDays, format } from "date-fns"
+import type { CategoryProfit, FinancialFilters, ProductProfit, ProfitableItem } from "@/types/retailFinance"
+import { endOfDay, format, startOfDay, subDays } from "date-fns"
 
 export class ProfitabilityAnalytics {
 
@@ -26,7 +26,7 @@ export class ProfitabilityAnalytics {
           ...(filters.customers?.length && { customerId: { in: filters.customers } })
         },
         include: {
-          salesOrderLines: {
+          lines: {
             include: {
               item: {
                 include: {
@@ -233,7 +233,7 @@ export class ProfitabilityAnalytics {
           status: { not: 'CANCELLED' }
         },
         include: {
-          salesOrderLines: {
+          lines: {
             include: {
               item: true
             }
@@ -246,7 +246,7 @@ export class ProfitabilityAnalytics {
       let dayProfit = 0
 
       for (const order of salesOrders) {
-        for (const line of order.salesOrderLines) {
+        for (const line of order.lines) {
           const lineRevenue = line.lineTotal
           const lineCost = (line.item.costPrice || line.unitPrice * 0.6) * line.quantity
 
@@ -286,7 +286,7 @@ export class ProfitabilityAnalytics {
         status: { not: 'CANCELLED' }
       },
       include: {
-        salesOrderLines: {
+        lines: {
           include: {
             item: true
           }
@@ -332,7 +332,7 @@ export class ProfitabilityAnalytics {
       const periodData = periods.get(periodKey)!
       periodData.transactions += 1
 
-      for (const line of order.salesOrderLines) {
+      for (const line of order.lines) {
         const lineRevenue = line.lineTotal
         const lineCost = (line.item.costPrice || line.unitPrice * 0.6) * line.quantity
 
@@ -367,7 +367,7 @@ export class ProfitabilityAnalytics {
       },
       include: {
         customer: true,
-        salesOrderLines: {
+        lines: {
           include: {
             item: true
           }
@@ -406,7 +406,7 @@ export class ProfitabilityAnalytics {
       const customerData = customerProfits.get(customerId)!
       customerData.transactions += 1
 
-      for (const line of order.salesOrderLines) {
+      for (const line of order.lines) {
         const lineRevenue = line.lineTotal
         const lineCost = (line.item.costPrice || line.unitPrice * 0.6) * line.quantity
 

@@ -3,28 +3,69 @@
 import VerifyEmail from "@/components/email-templates/verify-email"
 // import { adminPermissions } from "@/config/permissions"
 import { hashPassword } from "@/lib/password"
+import { checkPasswordPolicy } from "@/services/auth/password-policy"
 import { generateOtp } from "@/lib/generateOtp"
+import { generateSlug } from "@/lib/generateSlug"
 import { db } from "@/prisma/db"
 import type { OrgDataProps, UserProps } from "@/types/types"
+import { Locale as PrismaLocale } from "@prisma/client"
 import { Resend } from "resend"
+import { randomUUID } from "crypto"
 
 const resend = new Resend(process.env.RESEND_API_KEY)
 
 const ADMIN_USER_ROLE = {
-  name: "Admin",
+  nameEn: "Admin",
+  nameFr: "Administrateur",
   description: "Default Admin role with all permissions",
-  permissions: [], // Provide an array of permission strings, e.g. ["read", "write", "delete"]
+  permissions: ["*"],
+}
+
+function cleanText(value?: string | null) {
+  const trimmed = value?.trim()
+  return trimmed ? trimmed : null
+}
+
+function normalizeSlug(value: string) {
+  const slug = generateSlug(value).replace(/^-+|-+$/g, "")
+  return slug || `organization-${randomUUID().slice(0, 8)}`
+}
+
+function toPrismaLocale(value?: string | null) {
+  return value === "fr" ? PrismaLocale.FR : PrismaLocale.EN
+}
+
+async function resolveUniqueOrganizationSlug(tx: any, requestedSlug: string | undefined, organizationName: string) {
+  const baseSlug = normalizeSlug(requestedSlug || organizationName)
+  let candidate = baseSlug
+  let suffix = 2
+
+  while (await tx.organization.findUnique({ where: { slug: candidate } })) {
+    candidate = `${baseSlug}-${suffix}`
+    suffix += 1
+  }
+
+  return candidate
 }
 
 /**
  * Creates a new user with organization and default admin role
  */
 const createUser = async (data: UserProps, orgData: OrgDataProps) => {
-  const { email, password, firstName, lastName, name, phone, image } = data
+  const { email, password, firstName, lastName, phone, image } = data
+  const passwordPolicy = await checkPasswordPolicy({ password, email })
+  if (!passwordPolicy.ok) {
+    return {
+      error: passwordPolicy.message,
+      status: 400,
+      data: null,
+    }
+  }
 
   try {
     // Use a transaction for atomic operations
     return await db.$transaction(async (tx) => {
+      const now = new Date()
       // Check for existing users
       const existingUserByEmail = await tx.user.findUnique({
         where: { email },
@@ -50,29 +91,31 @@ const createUser = async (data: UserProps, orgData: OrgDataProps) => {
         }
       }
 
-      // Check for existing organization
-      const existingOrg = await tx.organization.findUnique({
-        where: { slug: orgData.slug },
-      })
-
-      if (existingOrg) {
-        return {
-          error: `This organization name is not available. Please choose a different name.`,
-          status: 409,
-          data: null,
-        }
-      }
+      const organizationSlug = await resolveUniqueOrganizationSlug(tx, orgData.slug, orgData.name)
 
       // Create organization
       console.log("Creating organization...")
       const org = await tx.organization.create({
-        data: orgData,
+        data: {
+          id: randomUUID(),
+          name: orgData.name,
+          slug: organizationSlug,
+          industry: cleanText(orgData.industry),
+          country: cleanText(orgData.country),
+          state: cleanText(orgData.state),
+          address: cleanText(orgData.address),
+          currency: orgData.currency || "XAF",
+          timezone: orgData.timezone || "Africa/Douala",
+          defaultLocale: toPrismaLocale(orgData.defaultLocale),
+          isActive: true,
+          updatedAt: now,
+        },
       })
 
       // Find or create default admin role
       let defaultRole = await tx.role.findFirst({
         where: {
-          name: ADMIN_USER_ROLE.name,
+          code: "admin",
           organizationId: org.id,
         },
       })
@@ -81,10 +124,12 @@ const createUser = async (data: UserProps, orgData: OrgDataProps) => {
       if (!defaultRole) {
         defaultRole = await tx.role.create({
           data: {
+            id: randomUUID(),
             ...ADMIN_USER_ROLE,
-            code: "ADMIN",
+            code: "admin",
             organizationId: org.id,
             permissions: ADMIN_USER_ROLE.permissions, // Ensure this is a string array
+            updatedAt: now,
           },
         })
       }
@@ -98,16 +143,19 @@ const createUser = async (data: UserProps, orgData: OrgDataProps) => {
       // Create user with role
       const newUser = await tx.user.create({
         data: {
+          id: randomUUID(),
           email,
           password: hashedPassword,
           firstName,
           lastName,
           organizationId: org.id,
-          token,
-          name,
+          verificationToken: token,
+          verificationTokenExpires: new Date(Date.now() + 1000 * 60 * 30),
           phone,
           image: image || "",
           isVerified: false, // Set to false to require email verification
+          preferredLocale: toPrismaLocale(orgData.defaultLocale),
+          updatedAt: now,
           roles: {
             connect: {
               id: defaultRole.id,
@@ -119,8 +167,15 @@ const createUser = async (data: UserProps, orgData: OrgDataProps) => {
         },
       })
 
+      await tx.passwordHistory.create({
+        data: {
+          userId: newUser.id,
+          passwordHash: hashedPassword,
+        },
+      })
+
       // Send verification email
-      const verificationCode = newUser?.token ?? ""
+      const verificationCode = newUser?.verificationToken ?? ""
 
       try {
         const { data: emailData, error: emailError } = await resend.emails.send({

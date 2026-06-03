@@ -8,32 +8,40 @@ import {
   BookOpen,
   Briefcase,
   Building2,
+  ChefHat,
   CircleDollarSign,
   Clock,
+  CreditCard,
   Cpu,
   Crown,
+  Database,
   Diamond,
   DollarSign,
+  Factory,
   FileText,
   Globe,
+  HardDrive,
   Hexagon,
   Layers,
   MapPin,
   Orbit,
   Package,
   Package2,
+  Receipt,
   Settings,
   Shield,
   ShoppingBag,
   ShoppingCart,
   Star,
   Target,
+  Truck,
   TrendingUp,
   Users,
   Users2,
   UserCheck,
   Wallet,
-  Zap
+  Zap,
+  Handshake
 } from "lucide-react";
 import type React from "react";
 
@@ -145,6 +153,65 @@ export const navigationConfig = [
     ],
   },
   {
+    title: "Production System",
+    icon: Factory,
+    permission: PERMISSIONS.PRODUCTION_READ,
+    gradient: "from-orange-600 via-red-600 to-rose-700",
+    glowColor: "shadow-orange-500/30",
+    badge: "Bakery",
+    description: "Recipe management & production tracking",
+    children: [
+      {
+        title: "Production Dashboard",
+        href: "/dashboard/production",
+        permission: PERMISSIONS.PRODUCTION_DASHBOARD_READ,
+        icon: Factory,
+      },
+      {
+        title: "Recipe Management",
+        href: "/dashboard/production/recipes",
+        permission: PERMISSIONS.RECIPE_READ,
+        icon: ChefHat,
+      },
+      {
+        title: "Production Batches",
+        href: "/dashboard/production/batches",
+        permission: PERMISSIONS.PRODUCTION_READ,
+        icon: Package,
+      },
+      {
+        title: "Production Tracking",
+        href: "/dashboard/production/tracking",
+        permission: PERMISSIONS.PRODUCTION_TRACKING_READ,
+        icon: Activity,
+      },
+      {
+        title: "Raw Materials",
+        href: "/dashboard/production/raw-materials",
+        permission: PERMISSIONS.RAW_MATERIALS_READ,
+        icon: Package2,
+      },
+      {
+        title: "Cost Analysis",
+        href: "/dashboard/production/costing",
+        permission: PERMISSIONS.PRODUCTION_COSTING_READ,
+        icon: DollarSign,
+      },
+      {
+        title: "Profitability Analytics",
+        href: "/dashboard/production/profitability",
+        permission: PERMISSIONS.PRODUCTION_PROFITABILITY_READ,
+        icon: TrendingUp,
+      },
+      {
+        title: "Production Planning",
+        href: "/dashboard/production/planning",
+        permission: PERMISSIONS.PRODUCTION_PLANNING_READ,
+        icon: Target,
+      },
+    ],
+  },
+  {
     title: "Sales",
     icon: CircleDollarSign,
     permission: PERMISSIONS.READ_SALES_ORDERS,
@@ -175,9 +242,9 @@ export const navigationConfig = [
       },
       {
         title: "Customers",
-        href: "/dashboard/sales/customers",
+        href: "/dashboard/customers",
         permission: PERMISSIONS.READ_CUSTOMERS,
-        icon: CircleDollarSign,
+        icon: Users,
 
       },
       {
@@ -186,6 +253,59 @@ export const navigationConfig = [
         permission: PERMISSIONS.OPERATE_POS,
         icon: CircleDollarSign,
 
+      },
+      {
+        title: "Daily Sales Analytics",
+        href: "/dashboard/sales/financial-analytics",
+        permission: PERMISSIONS.READ_SALES_ORDERS,
+        icon: BarChart3,
+      },
+    ],
+  },
+  {
+    title: "Client Orders",
+    icon: Receipt,
+    permission: PERMISSIONS.READ_SALES_ORDERS,
+    gradient: "from-indigo-600 via-purple-600 to-pink-700",
+    glowColor: "shadow-indigo-500/30",
+    badge: "New",
+    description: "Advanced order management system",
+    children: [
+      {
+        title: "All Orders",
+        href: "/dashboard/orders",
+        permission: PERMISSIONS.READ_SALES_ORDERS,
+        icon: Receipt,
+      },
+      {
+        title: "Create Order",
+        href: "/dashboard/orders/create",
+        permission: PERMISSIONS.CREATE_SALES_ORDERS,
+        icon: ShoppingCart,
+      },
+      {
+        title: "Order Analytics",
+        href: "/dashboard/orders/analytics",
+        permission: PERMISSIONS.READ_SALES_ORDERS,
+        icon: BarChart3,
+      },
+      {
+        title: "Payments",
+        href: "/dashboard/orders/payments",
+        permission: PERMISSIONS.READ_SALES_ORDERS,
+        icon: CreditCard,
+      },
+      {
+        title: "Deliveries",
+        href: "/dashboard/orders/deliveries",
+        permission: PERMISSIONS.READ_SALES_ORDERS,
+        icon: Truck,
+      },
+      {
+        title: "Order Reports",
+        href: "/dashboard/orders/reports",
+        permission: PERMISSIONS.READ_SALES_ORDERS,
+        icon: FileText,
       },
     ],
   },
@@ -302,13 +422,54 @@ export const navigationConfig = [
         title: "Suppliers",
         href: "/dashboard/purchases/suppliers",
         permission: PERMISSIONS.READ_SUPPLIERS,
-        icon: ShoppingCart,
+        icon: Building2,
+      },
+      {
+        title: "Create Supplier",
+        href: "/dashboard/purchases/suppliers/create",
+        permission: PERMISSIONS.CREATE_SUPPLIERS,
+        icon: Building2,
       },
       {
         title: "Supplier Items",
         href: "/dashboard/purchases/supplierItems",
         permission: PERMISSIONS.READ_SUPPLIERS,
         icon: ShoppingCart,
+      },
+    ],
+  },
+  {
+    title: "Commercial Agents",
+    icon: Handshake,
+    permission: PERMISSIONS.COMMERCIAL_AGENTS_READ,
+    gradient: "from-purple-600 via-violet-600 to-indigo-700",
+    glowColor: "shadow-purple-500/30",
+    badge: "Sales",
+    description: "Agent sales management",
+    children: [
+      {
+        title: "Agents Dashboard",
+        href: "/dashboard/commercial-agents",
+        permission: PERMISSIONS.COMMERCIAL_AGENTS_READ,
+        icon: Handshake,
+      },
+      {
+        title: "Agent Transactions",
+        href: "/dashboard/commercial-agents/transactions",
+        permission: PERMISSIONS.AGENT_TRANSACTIONS_READ,
+        icon: Receipt,
+      },
+      {
+        title: "Settlements",
+        href: "/dashboard/commercial-agents/settlements",
+        permission: PERMISSIONS.AGENT_SETTLEMENTS_READ,
+        icon: DollarSign,
+      },
+      {
+        title: "Agent Performance",
+        href: "/dashboard/commercial-agents/performance",
+        permission: PERMISSIONS.COMMERCIAL_AGENTS_READ,
+        icon: BarChart3,
       },
     ],
   },
@@ -337,7 +498,7 @@ export const navigationConfig = [
         title: "Roles & Permissions",
         href: "/dashboard/settings/roles",
         permission: PERMISSIONS.READ_ROLES,
-        icon: Settings,
+        icon: Shield,
       },
       {
         title: "Users & Invites",
@@ -362,6 +523,12 @@ export const navigationConfig = [
         href: "/dashboard/settings/change-password",
         permission: PERMISSIONS.PASSWORD_READ,
         icon: Settings,
+      },
+      {
+        title: "Photo Storage",
+        href: "/dashboard/settings/photo-storage",
+        permission: PERMISSIONS.MANAGE_SYSTEM_SETTINGS,
+        icon: HardDrive,
       },
     ],
   },
@@ -399,13 +566,13 @@ export const navigationConfig = [
       {
         title: "Customer Receivables",
         href: "/dashboard/finance/receivables",
-        permission: PERMISSIONS.DASHBOARD_READ,
+        permission: PERMISSIONS.CUSTOMER_RECEIVABLES_READ,
         icon: Users
       },
       {
         title: "Supplier Payables",
         href: "/dashboard/finance/payables",
-        permission: PERMISSIONS.DASHBOARD_READ,
+        permission: PERMISSIONS.SUPPLIER_PAYABLES_READ,
         icon: ShoppingCart
       },
       {
@@ -477,7 +644,7 @@ export const navigationConfig = [
       { title: "Sales Command", href: "/dashboard/sales", permission: PERMISSIONS.READ_SALES_ORDERS, icon: TrendingUp },
       { title: "Order Matrix", href: "/dashboard/sales/orders", permission: PERMISSIONS.READ_SALES_ORDERS, icon: FileText },
       { title: "POS Terminal", href: "/dashboard/pos", permission: PERMISSIONS.OPERATE_POS, icon: Zap },
-      { title: "Client Base", href: "/dashboard/sales/customers", permission: PERMISSIONS.READ_CUSTOMERS, icon: Users }
+      { title: "Client Base", href: "/dashboard/customers", permission: PERMISSIONS.READ_CUSTOMERS, icon: Users }
     ]
   },
   {
@@ -491,6 +658,7 @@ export const navigationConfig = [
     children: [
       { title: "Purchase Central", href: "/dashboard/purchase-orders", permission: PERMISSIONS.READ_PURCHASE_ORDERS, icon: Briefcase },
       { title: "Vendor Network", href: "/dashboard/purchases/suppliers", permission: PERMISSIONS.READ_SUPPLIERS, icon: Globe },
+      { title: "New Vendor", href: "/dashboard/purchases/suppliers/create", permission: PERMISSIONS.CREATE_SUPPLIERS, icon: Building2 },
       { title: "Goods Portal", href: "/dashboard/purchases/goods.receipts", permission: PERMISSIONS.RECEIVE_GOODS, icon: Package }
     ]
   },
@@ -539,6 +707,7 @@ export const navigationConfig = [
     children: [
       { title: "Location Grid", href: "/dashboard/settings/locations", permission: PERMISSIONS.READ_LOCATIONS, icon: Globe },
       { title: "Tax Engine", href: "/dashboard/settings/tax-rates", permission: PERMISSIONS.TAX_RATES_READ, icon: DollarSign },
+      { title: "Roles & Permissions", href: "/dashboard/settings/roles", permission: PERMISSIONS.READ_ROLES, icon: Shield },
       { title: "Company DNA", href: "/dashboard/settings/company", permission: PERMISSIONS.COMPANY_READ, icon: Building2 }
     ]
   }

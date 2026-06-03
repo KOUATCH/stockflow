@@ -47,7 +47,7 @@ export async function deleteSupplier(
     revalidateTag(`supplier-${id}`)
     revalidatePath('/dashboard/suppliers')
 
-    return { success: true, message: 'Supplier deleted successfully', data: null }
+    return { success: true, error: null, message: 'Supplier deleted successfully', data: null }
   } catch (error) {
     console.error('Error deleting supplier:', error)
     if (error instanceof Prisma.PrismaClientKnownRequestError) {

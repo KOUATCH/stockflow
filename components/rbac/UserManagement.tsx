@@ -16,19 +16,20 @@ import { useNotifications } from "@/components/notifications/NotificationProvide
 import { usePermissions } from "@/hooks/usePermissions";
 import { PermissionGate } from "./PermissionGate";
 import { Plus, Edit, Trash2, UserPlus, Mail, Phone, Calendar, Shield, UserCheck, UserX } from "lucide-react";
-import { getUsers, inviteUser, updateUser, toggleUserStatus, deleteUser } from "@/actions/users";
+import { getUsers, updateUser, toggleUserStatus, deleteUser } from "@/actions/users";
+import { sendInvite } from "@/actions/users/sendInvite";
 import { getRoles, assignRoleToUser, removeRoleFromUser } from "@/actions/roles";
 import { PERMISSIONS } from "@/lib/permissions";
 
 interface User {
   id: string;
   name: string;
-  firstName: string;
-  lastName: string;
+  firstName?: string | null;
+  lastName?: string | null;
   email: string;
-  phone?: string;
-  image?: string;
-  jobTitle?: string;
+  phone?: string | null;
+  image?: string | null;
+  jobTitle?: string | null;
   isActive: boolean;
   isVerified: boolean;
   createdAt: Date;
@@ -37,7 +38,7 @@ interface User {
     id: string;
     name: string;
     code: string;
-    description?: string;
+    description?: string | null;
   }[];
 }
 
@@ -45,7 +46,7 @@ interface Role {
   id: string;
   name: string;
   code: string;
-  description?: string;
+  description?: string | null;
   permissions: string[];
   _count: { users: number };
 }
@@ -59,7 +60,7 @@ export function UserManagement() {
   const [showEditDialog, setShowEditDialog] = useState(false);
   const [showRoleDialog, setShowRoleDialog] = useState(false);
 
-  const { success, error, formSuccess, formError } = useNotifications();
+  const { success, error: notifyError, formSuccess, formError } = useNotifications();
   const { user, hasPermission } = usePermissions();
 
   // Form states
@@ -94,14 +95,14 @@ export function UserManagement() {
       ]);
 
       if (usersResult.success) {
-        setUsers(usersResult.data);
+        setUsers(usersResult.data ?? []);
       }
 
       if (rolesResult.success) {
-        setRoles(rolesResult.data);
+        setRoles(rolesResult.data ?? []);
       }
     } catch (error) {
-      error("Load Error", "Failed to load user data");
+      notifyError("Load Error", "Failed to load user data");
     } finally {
       setLoading(false);
     }
@@ -111,21 +112,23 @@ export function UserManagement() {
     if (!user?.organizationId) return;
 
     try {
-      const result = await inviteUser({
-        ...inviteForm,
-        name: `${inviteForm.firstName} ${inviteForm.lastName}`,
-        image: "",
+      const selectedRole = roles.find((role) => role.id === inviteForm.roleId);
+      const result = await sendInvite({
+        email: inviteForm.email,
+        roleId: inviteForm.roleId,
         organizationId: user.organizationId,
         organizationName: user.organizationName || "",
+        name: selectedRole?.name ?? `${inviteForm.firstName} ${inviteForm.lastName}`,
+        roleName: selectedRole?.name,
       });
 
-      if (result.success) {
+      if (result.status === 200) {
         formSuccess("User Invitation", "User invited successfully");
         setShowInviteDialog(false);
         resetInviteForm();
         loadData();
       } else {
-        formError("User Invitation", result.error);
+        formError("User Invitation", result.error ?? "Failed to invite user");
       }
     } catch (error) {
       formError("User Invitation", "Failed to invite user");
@@ -144,7 +147,7 @@ export function UserManagement() {
         resetEditForm();
         loadData();
       } else {
-        formError("User Update", result.error);
+        formError("User Update", result.error ?? "Failed to update user");
       }
     } catch (error) {
       formError("User Update", "Failed to update user");
@@ -156,13 +159,13 @@ export function UserManagement() {
       const result = await toggleUserStatus(userId, isActive);
 
       if (result.success) {
-        success("User Status", result.message);
+        success("User Status", result.message ?? "User status updated successfully");
         loadData();
       } else {
-        error("User Status", result.error);
+        notifyError("User Status", result.error ?? "Failed to update user status");
       }
     } catch (error) {
-      error("User Status", "Failed to update user status");
+      notifyError("User Status", "Failed to update user status");
     }
   };
 
@@ -174,10 +177,10 @@ export function UserManagement() {
         success("User Deletion", "User deleted successfully");
         loadData();
       } else {
-        error("User Deletion", result.error);
+        notifyError("User Deletion", result.error ?? "Failed to delete user");
       }
     } catch (error) {
-      error("User Deletion", "Failed to delete user");
+      notifyError("User Deletion", "Failed to delete user");
     }
   };
 
@@ -189,10 +192,10 @@ export function UserManagement() {
         success("Role Assignment", "Role assigned successfully");
         loadData();
       } else {
-        error("Role Assignment", result.error);
+        notifyError("Role Assignment", result.error ?? "Failed to assign role");
       }
     } catch (error) {
-      error("Role Assignment", "Failed to assign role");
+      notifyError("Role Assignment", "Failed to assign role");
     }
   };
 
@@ -204,10 +207,10 @@ export function UserManagement() {
         success("Role Removal", "Role removed successfully");
         loadData();
       } else {
-        error("Role Removal", result.error);
+        notifyError("Role Removal", result.error ?? "Failed to remove role");
       }
     } catch (error) {
-      error("Role Removal", "Failed to remove role");
+      notifyError("Role Removal", "Failed to remove role");
     }
   };
 
@@ -235,8 +238,8 @@ export function UserManagement() {
   const openEditDialog = (user: User) => {
     setSelectedUser(user);
     setEditForm({
-      firstName: user.firstName,
-      lastName: user.lastName,
+      firstName: user.firstName || "",
+      lastName: user.lastName || "",
       phone: user.phone || "",
       jobTitle: user.jobTitle || "",
     });
@@ -270,7 +273,7 @@ export function UserManagement() {
           </p>
         </div>
 
-        <PermissionGate permission={PERMISSIONS.INVITE_USERS}>
+        <PermissionGate permission={PERMISSIONS.CREATE_USERS}>
           <Dialog open={showInviteDialog} onOpenChange={setShowInviteDialog}>
             <DialogTrigger asChild>
               <Button onClick={() => { resetInviteForm(); setShowInviteDialog(true); }}>
@@ -398,7 +401,7 @@ export function UserManagement() {
                   <TableCell>
                     <div className="flex items-center space-x-3">
                       <Avatar>
-                        <AvatarImage src={user.image} />
+                        <AvatarImage src={user.image ?? undefined} />
                         <AvatarFallback>{getUserInitials(user)}</AvatarFallback>
                       </Avatar>
                       <div>

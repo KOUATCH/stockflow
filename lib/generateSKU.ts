@@ -106,16 +106,13 @@ export const  generateStructuredSKU=(
 // console.log('Generated count:', skuGen.getGeneratedCount());
 
 // Simple function version (if you don't need tracking)
-export const  generateSimpleSKU=( length: number, prefix: string)=> {
+export const generateSimpleSKU = (length: number, prefix: string = '') => {
   const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789';
-  const timestamp = Date.now().toString(36).toUpperCase();
-      const random = Math.random().toString(36).substring(2, 6).toUpperCase();
-      const sku = `${prefix}-${timestamp}-${random}`;
-  let result = '';
+  let result = prefix;
+
   for (let i = 0; i < length; i++) {
     result += chars.charAt(Math.floor(Math.random() * chars.length));
   }
-  return sku;
-}
 
-console.log('Simple SKU:', generateSimpleSKU(5, "DBakes"));
+  return result;
+}

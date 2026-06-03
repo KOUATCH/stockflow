@@ -27,6 +27,7 @@ export function useCreateSalesOrder() {
   const queryClient = useQueryClient()
 
   return useMutation({
+    meta: { operation: 'create', entity: 'Sales Order' },
     mutationFn: createSalesOrder,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["sales-orders"] })
@@ -40,6 +41,7 @@ export function useUpdateSalesOrderStatus() {
   const queryClient = useQueryClient()
 
   return useMutation({
+    meta: { operation: 'update', entity: 'Sales Order Status' },
     mutationFn: ({ id, status }: { id: string; status: SalesOrderStatus }) => updateSalesOrderStatus(id, status),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["sales-orders"] })
@@ -52,6 +54,7 @@ export function useProcessPayment() {
   const queryClient = useQueryClient()
 
   return useMutation({
+    meta: { operation: 'process', entity: 'Payment' },
     mutationFn: processPayment,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["sales-orders"] })

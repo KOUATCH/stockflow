@@ -7,6 +7,13 @@ import { revalidatePath } from "next/cache";
 
 const updateUnitById=async (id: string, data: UnitProps) =>{
   try {
+    const { name, ...rest } = data as UnitProps & { name?: string };
+    const updateData = { ...rest };
+
+    if (!updateData.nameEn && name) {
+      updateData.nameEn = name;
+    }
+
     const unit = await db.unit.findUnique({
       where: { id },
     });
@@ -16,7 +23,7 @@ const updateUnitById=async (id: string, data: UnitProps) =>{
     }
  await db.unit.update({
   where:{id},
-  data:{...data}
+  data:updateData
  })
      revalidatePath("/inventory/units");
     return { success: true, data: unit };

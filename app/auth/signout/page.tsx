@@ -1,8 +1,14 @@
 import { signOut } from "@/auth"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { getRequestLocale } from "@/i18n/server-routing"
+import { localizePath } from "@/i18n/routing"
 
-export default function SignOutPage() {
+export default async function SignOutPage() {
+  const locale = await getRequestLocale()
+  const loginHref = localizePath("/login", locale)
+  const dashboardHref = localizePath("/dashboard", locale)
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
       <Card className="w-full max-w-md">
@@ -16,7 +22,7 @@ export default function SignOutPage() {
           <form
             action={async () => {
               "use server"
-              await signOut({ redirectTo: "/login" })
+              await signOut({ redirectTo: loginHref })
             }}
             className="space-y-4"
           >
@@ -26,7 +32,7 @@ export default function SignOutPage() {
           </form>
 
           <Button variant="outline" className="w-full" asChild>
-            <a href="/dashboard">Cancel</a>
+            <a href={dashboardHref}>Cancel</a>
           </Button>
         </CardContent>
       </Card>

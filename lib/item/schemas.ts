@@ -1,5 +1,4 @@
 import { Prisma } from '@prisma/client'
-import { revalidatePath, revalidateTag } from 'next/cache'
 import { z } from 'zod'
 import { itemStandardInclude } from './includes'
 
@@ -9,8 +8,10 @@ export const orgIdSchema = z.string().min(1, 'Organization ID is required')
 
 // Primitive fields
 export const basicInfoSchema = z.object({
-  name: z.string().min(1, 'Name is required').max(255),
-  description: z.string().optional().nullable(),
+  nameEn: z.string().max(255).optional(),
+  nameFr: z.string().optional().nullable(),
+  descriptionEn: z.string().optional().nullable(),
+  descriptionFr: z.string().optional().nullable(),
   imageUrls: z.string().optional().nullable(),
   thumbnail: z.string().optional().nullable(),
 })
@@ -108,7 +109,7 @@ export const listItemsSchema = z.object({
   page: z.coerce.number().int().min(1).default(1),
   pageSize: z.coerce.number().int().min(1).max(200).default(20),
   sortBy: z
-    .enum(['createdAt', 'updatedAt', 'name', 'sku', 'sellingPrice', 'costPrice'])
+    .enum(['createdAt', 'updatedAt', 'nameEn', 'sku', 'sellingPrice', 'costPrice'])
     .default('createdAt'),
   sortOrder: z.enum(['asc', 'desc']).default('desc'),
   categoryId: z.string().optional(),
@@ -163,18 +164,20 @@ export const deleteItemSchema = getItemSchema
 export const createItemSchema = z.object({
   organizationId: z.string().min(1, 'Organization ID is required'),
   // Core
-  name: z.string().min(1, 'Name is required').max(255),
+  nameEn: z.string().min(1, 'English name is required').max(255),
+  nameFr: z.string().optional().nullable(),
   sku: z.string().min(1, 'SKU is required').max(128),
 
   // Optionals
-  description: z.string().optional().nullable(),
-  imageUrls: z.string(),
+  descriptionEn: z.string().optional().nullable(),
+  descriptionFr: z.string().optional().nullable(),
+  imageUrls: z.string().optional().nullable(),
   thumbnail: z.string().optional().nullable(),
   barcode: z.string().optional().nullable(),
   dimensions: z.string().optional().nullable(),
   weight: z.coerce.number().min(0).optional().nullable(),
 
-  // Optional item codes (if present on your model)
+  // Optional item codes
   upc: z.string().optional().nullable(),
   ean: z.string().optional().nullable(),
   mpn: z.string().optional().nullable(),
@@ -235,14 +238,8 @@ export function slugify(input: string): string {
     .slice(0, 120)
 }
 
-// Centralized revalidation used by item mutations
-export function revalidateItems(id: string, organizationId: string) {
-  revalidateTag("items")
-  revalidateTag(`item-${id}`)
-  revalidateTag(`org-${organizationId}-items`)
-  revalidatePath("/dashboard/items")
-  revalidatePath(`/dashboard/items/${id}`)
-}
+// Note: Revalidation functions moved to @/lib/item/revalidation.ts
+// to avoid importing server-only functions in client components
 
 // // Zod schema for creating an item (aligns to imageUrls as a string)
 // export const createItemSchema = z.object({

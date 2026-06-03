@@ -1,19 +1,22 @@
 "use client"
 
 import {
-  getOrgPurchaseOrdersClientSafe,
   getOrgPurchaseOrdersByLocationClientSafe,
+  getOrgPurchaseOrdersClientSafe,
 } from "@/actions/purchaseOrderWorkflow/clientSafePurchaseOrderActions"
+import {
+  approvePurchaseOrder,
+  cancelPurchaseOrder,
+  closePurchaseOrder,
+  submitPurchaseOrder,
+} from "@/actions/purchaseOrderWorkflow/purchaseOrderSystemAction"
 import type { PurchaseOrderStatus, PurchaseOrderWithRelations } from "@/types/purchase-orders-system-types"
 import { useCallback, useEffect, useState } from "react"
-// Mock server actions - replace with real implementations
 
-const mockGetPurchaseOrders = async (OrganizationId: string, locationId?: string) => {
+const getPurchaseOrders = async (organizationId: string, locationId?: string) => {
   const result = locationId
-    ? await getOrgPurchaseOrdersByLocationClientSafe(OrganizationId, locationId)
-    : await getOrgPurchaseOrdersClientSafe(OrganizationId)
-
-  console.log({ purchaseOrders: result })
+    ? await getOrgPurchaseOrdersByLocationClientSafe(organizationId, locationId)
+    : await getOrgPurchaseOrdersClientSafe(organizationId)
 
   if (!result.success) {
     throw new Error(result.error || "Failed to fetch purchase orders")
@@ -21,22 +24,6 @@ const mockGetPurchaseOrders = async (OrganizationId: string, locationId?: string
 
   return result.data
 }
-//  const getUserID = async()=>{
-
-//  const { data: session } =await useSession()
-//  const user = session?.user
-//  const orgId = user?.organizationId || ""
-//    return orgId
-//   }
-const mockUpdatePurchaseOrderStatus = async (
-  id: string,
-  status: PurchaseOrderStatus,
-  reason?: string,
-): Promise<void> => {
-  await new Promise((resolve) => setTimeout(resolve, 500))
-  console.log(`[v0] Updated PO ${id} to status ${status}`, reason ? `Reason: ${reason}` : "")
-}
-
 
 export function useWorkflowData(organizationId: string, locationId: string | null) {
   const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrderWithRelations[]>([])
@@ -45,7 +32,6 @@ export function useWorkflowData(organizationId: string, locationId: string | nul
 
   const fetchPurchaseOrders = useCallback(async () => {
     if (!organizationId) {
-      console.log("[DEBUG] No organizationId provided, skipping fetch")
       setLoading(false)
       setPurchaseOrders([])
       return
@@ -54,56 +40,37 @@ export function useWorkflowData(organizationId: string, locationId: string | nul
     try {
       setLoading(true)
       setError(null)
-
-      console.log("[DEBUG] Fetching purchase orders:", {
-        organizationId,
-        locationId,
-        hasOrgId: !!organizationId,
-        hasLocationId: !!locationId,
-      })
-
-      const orders = await mockGetPurchaseOrders(organizationId, locationId || undefined)
-
-      console.log("[DEBUG] API Response:", {
-        dataLength: orders?.length || 0,
-        hasData: !!orders,
-        isArray: Array.isArray(orders),
-      })
-
-      if (Array.isArray(orders)) {
-        const validOrders = orders.filter((order: PurchaseOrderWithRelations) => {
-          const isValid = order && order.id && order.orderNumber
-          if (!isValid) {
-            console.warn("[DEBUG] Invalid order filtered out:", order)
-          }
-          return isValid
-        })
-
-        console.log("[DEBUG] Processed orders:", {
-          originalCount: orders.length,
-          validCount: validOrders.length,
-        })
-
-        setPurchaseOrders(validOrders)
-      } else {
-        console.warn("[DEBUG] No valid data received:", orders)
-        setPurchaseOrders([])
-      }
+      const orders = await getPurchaseOrders(organizationId, locationId || undefined)
+      setPurchaseOrders(orders.filter((order) => order.id && order.orderNumber))
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : "Failed to fetch purchase orders"
-      console.error("[DEBUG] Fetch error:", err)
-      setError(errorMessage)
+      setError(err instanceof Error ? err.message : "Failed to fetch purchase orders")
       setPurchaseOrders([])
     } finally {
       setLoading(false)
     }
   }, [organizationId, locationId])
 
-  const updateOrderStatus = useCallback(async (orderId: string, newStatus: PurchaseOrderStatus, reason?: string) => {
-    try {
-      await mockUpdatePurchaseOrderStatus(orderId, newStatus, reason)
+  const updateOrderStatus = useCallback(
+    async (orderId: string, newStatus: PurchaseOrderStatus, reason?: string) => {
+      if (!organizationId) {
+        throw new Error("Organization ID is required")
+      }
 
-      // Optimistically update local state
+      const result =
+        newStatus === "SUBMITTED"
+          ? await submitPurchaseOrder(orderId, organizationId)
+          : newStatus === "APPROVED"
+            ? await approvePurchaseOrder(orderId, organizationId, "system-user")
+            : newStatus === "CANCELLED"
+              ? await cancelPurchaseOrder(orderId, organizationId, reason)
+              : newStatus === "COMPLETED"
+                ? await closePurchaseOrder(orderId, organizationId)
+                : null
+
+      if (!result?.success) {
+        throw new Error(result?.error || "This purchase order status change is not supported from this workflow")
+      }
+
       setPurchaseOrders((prev) =>
         prev.map((order) =>
           order.id === orderId
@@ -116,11 +83,9 @@ export function useWorkflowData(organizationId: string, locationId: string | nul
             : order,
         ),
       )
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to update order status")
-      throw err
-    }
-  }, [])
+    },
+    [organizationId],
+  )
 
   useEffect(() => {
     fetchPurchaseOrders()
@@ -134,108 +99,3 @@ export function useWorkflowData(organizationId: string, locationId: string | nul
     updateOrderStatus,
   }
 }
-// export function useWorkflowData(organizationId: string, locationId: string | null) {
-//   const [purchaseOrders, setPurchaseOrders] = useState<PurchaseOrderWithRelations[]>([])
-//   const [loading, setLoading] = useState(true)
-//   const [error, setError] = useState<string | null>(null)
-
-//   const fetchPurchaseOrders = useCallback(async () => {
-//     try {
-//       setLoading(true)
-//       setError(null)
-
-//       console.log("[v0] Fetching purchase orders:", {
-//         organizationId,
-//         locationId,
-//         hasOrgId: !!organizationId,
-//         hasLocationId: !!locationId,
-//       })
-
-//       const response = await getOrgPurchaseOrderBYLocationId(organizationId || "", locationId || "")
-
-//       console.log("[v0] API Response:", {
-//         response,
-//         responseType: typeof response,
-//         isArray: Array.isArray(response),
-//         hasData: !!response?.data,
-//         dataLength: response?.data?.length || 0,
-//       })
-
-//       let orders: PurchaseOrderWithRelations[] = []
-
-//       if (response?.data && Array.isArray(response.data)) {
-//         orders = response.data
-//       } else if (Array.isArray(response)) {
-//         orders = response
-//       } else if (response && typeof response === "object" && response.data) {
-//         orders = Array.isArray(response.data) ? response.data : [response.data]
-//       } else {
-//         console.warn("[v0] Unexpected response format:", response)
-//         orders = []
-//       }
-
-//       const validOrders = orders.filter((order) => {
-//         const isValid = order && order.id && order.orderNumber
-//         if (!isValid) {
-//           console.warn("[v0] Invalid order filtered out:", order)
-//         }
-//         return isValid
-//       })
-
-//       console.log("[v0] Processed orders:", {
-//         originalCount: orders.length,
-//         validCount: validOrders.length,
-//         sampleOrders: validOrders.slice(0, 2).map((po) => ({
-//           id: po.id,
-//           orderNumber: po.orderNumber,
-//           status: po.status,
-//           locationId: po.locationId,
-//         })),
-//       })
-
-//       setPurchaseOrders(validOrders)
-//     } catch (err) {
-//       const errorMessage = err instanceof Error ? err.message : "Failed to fetch purchase orders"
-//       console.error("[v0] Fetch error:", err)
-//       setError(errorMessage)
-//       setPurchaseOrders([]) // Ensure we set empty array on error
-//     } finally {
-//       setLoading(false)
-//     }
-//   }, [organizationId, locationId]) // Added locationId to dependencies
-
-//   const updateOrderStatus = useCallback(async (orderId: string, newStatus: PurchaseOrderStatus, reason?: string) => {
-//     try {
-//       await mockUpdatePurchaseOrderStatus(orderId, newStatus, reason)
-
-//       // Optimistically update local state
-//       setPurchaseOrders((prev) =>
-//         prev.map((order) =>
-//           order.id === orderId
-//             ? {
-//                 ...order,
-//                 status: newStatus,
-//                 updatedAt: new Date(),
-//                 ...(newStatus === "APPROVED" && { approvedAt: new Date() }),
-//               }
-//             : order,
-//         ),
-//       )
-//     } catch (err) {
-//       setError(err instanceof Error ? err.message : "Failed to update order status")
-//       throw err
-//     }
-//   }, [])
-
-//   useEffect(() => {
-//     fetchPurchaseOrders()
-//   }, [fetchPurchaseOrders])
-
-//   return {
-//     purchaseOrders,
-//     loading,
-//     error,
-//     refetch: fetchPurchaseOrders,
-//     updateOrderStatus,
-//   }
-// }

@@ -5,7 +5,7 @@ import { Users, UserCheck, Coffee, Clock, TrendingUp, AlertTriangle } from 'luci
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
-import { PresenceOverview } from '@/types/presence';
+import { PresenceOverview } from '@/actions/presence/presence-actions';
 
 interface PresenceOverviewStatsProps {
   overview: PresenceOverview;

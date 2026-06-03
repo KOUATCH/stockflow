@@ -4,6 +4,13 @@ import { db } from "@/prisma/db"
 import type { TransactionReferenceType, TransactionType } from "@prisma/client"
 import { revalidatePath } from "next/cache"
 
+const toNumber = (value: unknown): number => {
+  if (value && typeof value === "object" && "toNumber" in value && typeof value.toNumber === "function") {
+    return value.toNumber()
+  }
+  return Number(value ?? 0)
+}
+
 // Create inventory transaction
 export async function createInventoryTransaction(data: {
   itemId: string
@@ -32,22 +39,63 @@ export async function createInventoryTransaction(data: {
       },
     })
 
-    const currentQuantity = currentLevel?.quantityOnHand || 0
+    const currentQuantity = toNumber(currentLevel?.quantityOnHand)
+    const quantityReserved = toNumber(currentLevel?.quantityReserved)
     const newQuantity = currentQuantity + data.quantity
-    const totalCost = (data.unitCost || 0) * Math.abs(data.quantity)
+    const unitCost = data.unitCost ?? toNumber(currentLevel?.averageCost)
+    const totalCost = unitCost * Math.abs(data.quantity)
+    const totalValue = unitCost * newQuantity
 
-    // Create transaction
-    const transaction = await db.inventoryTransaction.create({
-      data: {
-        ...data,
-        totalCost,
-        balanceAfter: newQuantity,
-      },
-      include: {
-        item: true,
-        location: true,
-        createdBy: true,
-      },
+    const transaction = await db.$transaction(async (tx) => {
+      await tx.inventoryLevel.upsert({
+        where: {
+          itemId_locationId: {
+            itemId: data.itemId,
+            locationId: data.locationId,
+          },
+        },
+        create: {
+          itemId: data.itemId,
+          locationId: data.locationId,
+          quantityOnHand: newQuantity,
+          quantityAvailable: newQuantity,
+          averageCost: unitCost,
+          totalValue,
+        },
+        update: {
+          quantityOnHand: newQuantity,
+          quantityAvailable: newQuantity - quantityReserved,
+          averageCost: unitCost,
+          totalValue,
+          lastTransactionAt: new Date(),
+        },
+      })
+
+      return tx.inventoryTransaction.create({
+        data: {
+          itemId: data.itemId,
+          locationId: data.locationId,
+          organizationId: data.organizationId,
+          type: data.type,
+          quantity: data.quantity,
+          unitCost,
+          totalCost,
+          notes: data.notes,
+          createdById: data.createdById,
+          referenceType: data.referenceType,
+          referenceId: data.referenceId,
+          referenceNumber: data.referenceNumber,
+          batchNumber: data.batchNumber,
+          serialNumbers: data.serialNumbers ?? [],
+          expiryDate: data.expiryDate,
+          balanceAfter: newQuantity,
+        },
+        include: {
+          item: true,
+          location: true,
+          createdBy: true,
+        },
+      })
     })
 
     revalidatePath("/inventory")
@@ -93,7 +141,7 @@ export async function getInventoryLevels(params: {
           },
           location: true,
         },
-        orderBy: [{ quantityAvailable: "asc" }, { item: { name: "asc" } }],
+        orderBy: [{ quantityAvailable: "asc" }, { item: { nameEn: "asc" } }],
         skip: (page - 1) * limit,
         take: limit,
       }),
@@ -196,7 +244,7 @@ export async function adjustInventory(data: {
       },
     })
 
-    const currentQuantity = currentLevel?.quantityOnHand || 0
+    const currentQuantity = toNumber(currentLevel?.quantityOnHand)
     const adjustmentQuantity = data.newQuantity - currentQuantity
 
     if (adjustmentQuantity === 0) {

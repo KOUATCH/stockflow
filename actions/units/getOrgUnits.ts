@@ -1,36 +1,33 @@
+"use server"
 
-"use server";
-import { db } from "@/prisma/db";
-import { UnitResponse } from "@/types/unit";
+import { listUnits } from "@/services/unit/unit.service"
+import type { UnitResponse } from "@/types/unit"
 
-// const   getBriefOrgunits = async () => {
 const getOrgUnits = async (orgId: string): Promise<UnitResponse> => {
   try {
-   
-    const units = await db.unit.findMany({
-      where: {
-        organizationId: orgId,
-      },
-     
-      orderBy: {
-        name: "desc",
-      },
-    });
-    if (!units) {
-      throw new Error("No units found for this organization");
+    if (!orgId) {
+      return {
+        success: false,
+        error: "Organization ID is required",
+        data: [],
+      }
     }
+
+    const units = await listUnits(orgId)
+
     return {
       success: true,
       error: null,
       data: units,
-    };
+    }
   } catch (error) {
-    console.error("Error fetching the count:", error);
+    console.error("Error fetching units:", error)
     return {
       success: false,
       error: error instanceof Error ? error.message : "Unknown error",
       data: [],
-    };
+    }
   }
 }
+
 export default getOrgUnits

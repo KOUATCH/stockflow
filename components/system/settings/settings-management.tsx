@@ -1,5 +1,6 @@
 "use client"
 
+import { notify } from "@/lib/notifications/notify"
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -12,8 +13,6 @@ import { Textarea } from "@/components/ui/textarea"
 import { Separator } from "@/components/ui/separator"
 import { Badge } from "@/components/ui/badge"
 import { Settings, Store, Bell, Shield, Database, Palette } from "lucide-react"
-import { useToast } from "@/hooks/use-toast"
-
 export default function SettingsManagement() {
   const [settings, setSettings] = useState({
     storeName: "My POS Store",
@@ -30,10 +29,8 @@ export default function SettingsManagement() {
     theme: "emerald",
   })
 
-  const { toast } = useToast()
-
   const handleSaveSettings = () => {
-    toast({
+    notify({
       title: "Settings Saved",
       description: "Your settings have been updated successfully.",
     })

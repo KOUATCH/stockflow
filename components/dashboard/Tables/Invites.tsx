@@ -3,6 +3,7 @@
 import { Badge } from "@/components/ui/badge"
 import { Input } from "@/components/ui/input"
 import { Table, TableBody, TableCaption, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import type { InviteStatus } from "@prisma/client"
 import { Search } from "lucide-react"
 import { useState } from "react"
 
@@ -11,7 +12,7 @@ export type InviteDataProps={
 id:string;
 email:string;
 createdAt:Date;
-status:boolean;
+status:InviteStatus;
 }
 export default function InviteTableWithSearch({data}:{data:InviteDataProps[]}) {
     const [searchTerm, setSearchTerm] = useState("")
@@ -61,12 +62,14 @@ export default function InviteTableWithSearch({data}:{data:InviteDataProps[]}) {
                   <TableCell className="font-medium">{invite.email}</TableCell>
                   <TableCell>{formatDate(invite.createdAt)}</TableCell>
                   <TableCell>
-                    {invite.status ? (
+                    {invite.status === "ACCEPTED" ? (
                       <Badge className="bg-green-500 hover:bg-green-600">Success</Badge>
-                    ) : (
+                    ) : invite.status === "PENDING" ? (
                       <Badge variant="outline" className="text-amber-500 border-amber-500">
                         Pending
                       </Badge>
+                    ) : (
+                      <Badge variant="secondary">{invite.status.toLowerCase()}</Badge>
                     )}
                   </TableCell>
                 </TableRow>
@@ -84,4 +87,3 @@ export default function InviteTableWithSearch({data}:{data:InviteDataProps[]}) {
     </div>
   )
 }
-

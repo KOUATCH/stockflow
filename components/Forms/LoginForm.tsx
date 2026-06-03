@@ -6,7 +6,9 @@ import { useForm } from "react-hook-form";
 
 import { LoginProps } from "@/types/types";
 import { signInWithCredentials } from "@/actions/auth";
-import { useRouter, useSearchParams } from "next/navigation";
+import { getLocaleFromPathname, localizePath } from "@/i18n/routing";
+import { DEFAULT_LOCALE } from "@/types/bilingual";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useNotifications } from "../notifications/NotificationProvider";
 import PasswordInput from "../FormInputs/PasswordInput";
 import SubmitButton from "../FormInputs/SubmitButton";
@@ -23,7 +25,14 @@ export default function LoginForm() {
     reset,
   } = useForm<LoginProps>();
   const params = useSearchParams();
-  const returnUrl = params.get("returnUrl") || "/dashboard";
+  const pathname = usePathname();
+  const locale = getLocaleFromPathname(pathname) ?? DEFAULT_LOCALE;
+  const localizedHref = (href: string) => localizePath(href, locale);
+  const requestedReturnUrl = params.get("returnUrl") || params.get("callbackUrl");
+  const returnUrl =
+    requestedReturnUrl?.startsWith("/") && !requestedReturnUrl.startsWith("//")
+      ? localizedHref(requestedReturnUrl)
+      : localizedHref("/dashboard");
   const [passErr, setPassErr] = useState("");
   const router = useRouter();
   const { formError, formSuccess } = useNotifications();
@@ -31,11 +40,8 @@ export default function LoginForm() {
     try {
       setLoading(true);
       setPassErr("");
-      console.log("Attempting to sign in with credentials:", data);
 
       const result = await signInWithCredentials(data);
-
-      console.log("SignIn response:", result);
 
       if (result.error) {
         setLoading(false);
@@ -85,7 +91,7 @@ export default function LoginForm() {
                 name="password"
                 icon={Lock}
                 placeholder="password"
-                forgotPasswordLink="/forgot-password"
+                forgotPasswordLink={localizedHref("/forgot-password")}
               />
               {passErr && <p className="text-red-500 text-xs">{passErr}</p>}
               <div>
@@ -126,7 +132,7 @@ export default function LoginForm() {
             <p className="mt-6  text-sm text-gray-500">
               Not a Registered ?{" "}
               <Link
-                href="/register"
+                href={localizedHref("/register")}
                 className="font-semibold leading-6 text-rose-600 hover:text-rose-500"
               >
                 Create Account

@@ -24,8 +24,8 @@ export interface SessionResponse<T = any> {
 
 // Extended session with relations
 export interface SessionWithDetails extends POSSession {
-  user?: Pick<User, 'id' | 'name' | 'firstName' | 'lastName'>
-  Location?: Pick<Location, 'id' | 'name' | 'organizationId'>
+  user?: Pick<User, 'id' | 'firstName' | 'lastName'>
+  location?: Pick<Location, 'id' | 'name' | 'organizationId'>
   cashDrawerTransactions?: (CashDrawerTransaction & {
     cashDrawer?: Pick<CashDrawer, 'id' | 'name' | 'currentBalance' | 'expectedBalance' | 'isOpen'>
   })[]

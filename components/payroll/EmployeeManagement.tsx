@@ -76,34 +76,11 @@ interface EmployeeManagementProps {
   organizationId: string
 }
 
-// Mock departments - replace with actual data
-const departments = [
-  'Sales',
-  'Marketing',
-  'Operations',
-  'IT',
-  'HR',
-  'Finance',
-  'Customer Service',
-  'Management'
-]
-
-// Mock job titles - replace with actual data
-const jobTitles = [
-  'Sales Associate',
-  'Senior Sales Associate',
-  'Marketing Specialist',
-  'Operations Manager',
-  'IT Specialist',
-  'HR Coordinator',
-  'Financial Analyst',
-  'Customer Service Rep',
-  'Store Manager',
-  'Assistant Manager'
-]
+// Dynamic data - fetched from database
 
 export default function EmployeeManagement({ organizationId }: EmployeeManagementProps) {
   const [employees, setEmployees] = useState<Employee[]>([])
+  const [departments, setDepartments] = useState<string[]>([])
   const [loading, setLoading] = useState(true)
   const [searchTerm, setSearchTerm] = useState('')
   const [departmentFilter, setDepartmentFilter] = useState('all')
@@ -116,34 +93,18 @@ export default function EmployeeManagement({ organizationId }: EmployeeManagemen
     setLoading(true)
     try {
       const result = await getEmployees(organizationId)
-      if (result.success) {
-        // Mock salary data for demonstration
-        const employeesWithSalary = result.data.map((emp: any) => ({
+      if (result.success && result.data) {
+        // Process real employee data
+        const processedEmployees = result.data.map((emp: any) => ({
           ...emp,
-          firstName: emp.firstName || emp.name?.split(' ')[0] || 'Unknown',
-          lastName: emp.lastName || emp.name?.split(' ').slice(1).join(' ') || 'User',
-          department: emp.department || emp.jobTitle || 'General',
-          salaryInfo: {
-            baseSalary: Math.floor(Math.random() * 5000) + 3000,
-            payFrequency: 'MONTHLY' as const,
-            currency: 'USD',
-            effectiveDate: new Date()
-          },
-          bankInfo: {
-            bankName: 'Chase Bank',
-            accountNumber: '****1234',
-            routingNumber: '021000021',
-            accountType: 'CHECKING' as const
-          },
-          taxInfo: {
-            taxId: Math.floor(Math.random() * 900 + 100).toString() + '-' +
-                   Math.floor(Math.random() * 90 + 10).toString() + '-' +
-                   Math.floor(Math.random() * 9000 + 1000).toString(),
-            exemptions: Math.floor(Math.random() * 3),
-            additionalWithholding: 0
-          }
+          firstName: emp.firstName || emp.name?.split(' ')[0] || '',
+          lastName: emp.lastName || emp.name?.split(' ').slice(1).join(' ') || '',
         }))
-        setEmployees(employeesWithSalary)
+        setEmployees(processedEmployees)
+
+        // Extract unique departments from employee data
+        const uniqueDepartments = [...new Set(result.data.map(emp => emp.department).filter(Boolean))]
+        setDepartments(uniqueDepartments)
       }
     } catch (error) {
       console.error('Error loading employees:', error)

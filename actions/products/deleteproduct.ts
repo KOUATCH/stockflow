@@ -10,7 +10,7 @@ export async function deleteProduct(id: string) {
     // Use a transaction for atomic operations
     return await db.$transaction(async (tx) => {
      
-const product= await tx.product.findUnique({
+const product= await tx.item.findUnique({
   where:{id},
 })
 
@@ -21,9 +21,13 @@ if(!product){
       data: null,
     };
 }
-   const deletedProduct=  await db.product.delete({
+   const deletedProduct=  await tx.item.update({
       where: {
         id,
+      },
+      data: {
+        deletedAt: new Date(),
+        isActive: false,
       },
     });
 
@@ -41,4 +45,3 @@ if(!product){
       data: null,
     };
 }}
-

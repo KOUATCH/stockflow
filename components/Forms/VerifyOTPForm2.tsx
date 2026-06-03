@@ -1,4 +1,6 @@
 "use client";
+
+import { notify } from "@/lib/notifications/notify"
 import verifyOTP from "@/actions/users/verifyOtp";
 import SubmitButton from "@/components/FormInputs/SubmitButton";
 import CustomCarousel from "@/components/frontend/custom-carousel";
@@ -17,12 +19,13 @@ import {
   InputOTPSeparator,
   InputOTPSlot,
 } from "@/components/ui/input-otp";
+import { getLocaleFromPathname, localizePath } from "@/i18n/routing";
+import { DEFAULT_LOCALE } from "@/types/bilingual";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { CheckCircle2, Loader2, PhoneCall } from "lucide-react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import React, { useState } from "react";
 import { useForm } from "react-hook-form";
-import { toast } from "sonner";
 import { z } from "zod";
 
 // Define the form schema with Zod
@@ -59,6 +62,10 @@ const VerifyOTPForm2=({
   const [loading, setLoading] = useState<boolean>(false);
   const [otpError, setOtpError] = useState<string>("");
   const [success, setSuccess] = useState<boolean>(false);
+  const router = useRouter()
+  const pathname = usePathname()
+  const locale = getLocaleFromPathname(pathname) ?? DEFAULT_LOCALE
+  const localizedHref = (href: string) => localizePath(href, locale)
  
   const [otpValue, setOtpValue] = useState<string>("");
 
@@ -73,8 +80,6 @@ const VerifyOTPForm2=({
     },
   });
   const onSubmit = async (): Promise<void> => {
-        const router = useRouter()
-    
     try {
       if (otpValue.length !== 6) {
         setOtpError("Please enter all 6 digits");
@@ -97,15 +102,15 @@ console.log({res})
         return;
       }
 
-      toast.success("Email verified successfully!");
+      notify.success("Email verified successfully!");
       setLoading(false);
       setSuccess(true);
-      router.push("/Login")
+      router.push(localizedHref("/login"))
 
     } catch (error) {
       setLoading(false);
       console.error("Network Error:", error);
-      toast.error("There was an error verifying your code. Please try again.");
+      notify.error("There was an error verifying your code. Please try again.");
     }
   };
 
@@ -148,7 +153,7 @@ console.log({res})
               <CardFooter className="flex flex-col space-y-3">
                 <Button
                   className="w-full"
-                  onClick={() => (window.location.href = "/login")}
+                  onClick={() => (window.location.href = localizedHref("/login"))}
                 >
                   Continue to Login
                 </Button>
@@ -245,7 +250,7 @@ console.log({res})
 
                 {/* <p className="mt-6 text-sm text-center text-gray-500">
                   <Link
-                    href="/login"
+                    href={localizedHref("/login")}
                     className="font-semibold leading-6 text-indigo-600 hover:text-indigo-500"
                   >
                     Back to Login

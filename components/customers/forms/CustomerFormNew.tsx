@@ -6,10 +6,12 @@ import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "
 import { Input } from "@/components/ui/input"
 import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
+import { getLocaleFromPathname, localizePath } from "@/i18n/routing"
+import { DEFAULT_LOCALE } from "@/types/bilingual"
 import { customerSchema, type CustomerFormData } from "@/validations/customer"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { Loader2, Save, X } from "lucide-react"
-import { useRouter } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 import { useForm } from "react-hook-form"
 
 interface CustomerFormNewProps {
@@ -19,6 +21,9 @@ interface CustomerFormNewProps {
 
 export function CustomerFormNew({ onSubmit, isLoading = false }: CustomerFormNewProps) {
   const router = useRouter()
+  const pathname = usePathname()
+  const locale = getLocaleFromPathname(pathname) ?? DEFAULT_LOCALE
+  const customersHref = localizePath("/dashboard/customers", locale)
   const { formSuccess, formError, operationStart } = useNotifications()
 
   const form = useForm<CustomerFormData>({
@@ -36,7 +41,7 @@ export function CustomerFormNew({ onSubmit, isLoading = false }: CustomerFormNew
     try {
       await onSubmit(data)
       form.reset()
-      router.push("/dashboard/customers")
+      router.push(customersHref)
       formSuccess("Customer created", `${data.name} has been added to your customer database`)
 
     } catch (error) {

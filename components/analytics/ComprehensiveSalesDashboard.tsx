@@ -8,7 +8,12 @@ import { RecentTransactionsCard } from "@/components/analytics/dashboard/recent-
 import { CashierPerformanceCard } from "@/components/analytics/dashboard/cashier-performance-card"
 import { AlertsCard } from "@/components/analytics/dashboard/alerts-card"
 
-export default function ComprehensiveSalesDashboard() {
+interface ComprehensiveSalesDashboardProps {
+  organizationId?: string
+  locationId?: string
+}
+
+export default function ComprehensiveSalesDashboard({ organizationId, locationId }: ComprehensiveSalesDashboardProps) {
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
@@ -16,7 +21,7 @@ export default function ComprehensiveSalesDashboard() {
       </div>
 
       {/* Key Metrics */}
-      <DashboardStats />
+      <DashboardStats organizationId={organizationId} locationId={locationId} />
 
       {/* Charts Row */}
       <div className="grid gap-6 md:grid-cols-2">

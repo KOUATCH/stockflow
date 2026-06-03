@@ -1,8 +1,13 @@
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
+import { getRequestLocale } from '@/i18n/server-routing'
+import { localizePath } from '@/i18n/routing'
 import { ShieldAlert } from 'lucide-react'
 
-export default function UnauthorizedPage() {
+export default async function UnauthorizedPage() {
+  const locale = await getRequestLocale()
+  const localizedHref = (href: string) => localizePath(href, locale)
+
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50">
       <div className="max-w-md w-full space-y-8 text-center">
@@ -12,7 +17,7 @@ export default function UnauthorizedPage() {
             Access Denied
           </h2>
           <p className="mt-2 text-sm text-gray-600">
-            You don't have permission to access this page.
+            You don&apos;t have permission to access this page.
           </p>
         </div>
         <div className="space-y-4">
@@ -21,12 +26,12 @@ export default function UnauthorizedPage() {
           </p>
           <div className="flex flex-col space-y-2">
             <Button asChild>
-              <Link href="/dashboard">
+              <Link href={localizedHref("/dashboard")}>
                 Go to Dashboard
               </Link>
             </Button>
             <Button variant="outline" asChild>
-              <Link href="/login">
+              <Link href={localizedHref("/login")}>
                 Sign Out & Try Again
               </Link>
             </Button>

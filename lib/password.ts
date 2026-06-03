@@ -1,32 +1,44 @@
-import * as bcrypt from "bcrypt"
+import argon2 from "argon2"
 
-/**
- * Hash a password using bcrypt
- * @param password - Plain text password to hash
- * @returns Promise<string> - Hashed password
- */
+const ARGON2ID_OPTIONS = {
+  type: argon2.argon2id,
+  memoryCost: 19_456,
+  timeCost: 2,
+  parallelism: 1,
+} satisfies argon2.Options
+
+function isArgon2Hash(value: string | null | undefined): value is string {
+  return typeof value === "string" && value.startsWith("$argon2")
+}
+
 export async function hashPassword(password: string): Promise<string> {
   try {
-    const saltRounds = 12
-    return await bcrypt.hash(password, saltRounds)
+    return await argon2.hash(password, ARGON2ID_OPTIONS)
   } catch (error) {
     console.error('Error hashing password:', error)
     throw new Error('Failed to hash password')
   }
 }
 
-/**
- * Verify a password against its bcrypt hash
- * @param password - Plain text password to verify
- * @param hash - The stored bcrypt password hash
- * @returns Promise<boolean> - True if password matches, false otherwise
- */
-export async function verifyPassword(password: string, hash: string): Promise<boolean> {
+export async function verifyPassword(
+  plainTextPasswordOrHash: string | null | undefined,
+  storedHashOrPlainTextPassword: string | null | undefined
+): Promise<boolean> {
   try {
-    return await bcrypt.compare(password, hash)
+    const storedHash = isArgon2Hash(plainTextPasswordOrHash)
+      ? plainTextPasswordOrHash
+      : storedHashOrPlainTextPassword
+    const plainTextPassword = isArgon2Hash(plainTextPasswordOrHash)
+      ? storedHashOrPlainTextPassword
+      : plainTextPasswordOrHash
+
+    if (!plainTextPassword || !isArgon2Hash(storedHash)) {
+      return false
+    }
+
+    return await argon2.verify(storedHash, plainTextPassword)
   } catch (error) {
     console.error('Error verifying password:', error)
     return false
   }
 }
-

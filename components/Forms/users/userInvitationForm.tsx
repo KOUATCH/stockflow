@@ -1,4 +1,6 @@
 "use client";
+
+import { notify } from "@/lib/notifications/notify"
 import { sendInvite } from "@/actions/users/sendInvite";
 import FormSelectInput from "@/components/FormInputs/FormSelectInput";
 import { Button } from "@/components/ui/button";
@@ -15,14 +17,13 @@ import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { Loader2, Plus, UserPlus } from "lucide-react";
 import { useState } from "react";
-import { toast } from "sonner";
-
 export type InviteData = {
   email: string;
   roleId: string;
   organizationId: string;
   organizationName: string;
-  name: string;
+  name?: string;
+  roleName?: string;
 }
 const UserInvitationForm = ({
   roles,
@@ -37,8 +38,9 @@ const UserInvitationForm = ({
   }[];
   organizationId: string;
   organizationName: string;
+  name?: string;
   email: string;
-  roleName: string;
+  roleName?: string;
 }) => {
   const [email, setEmail] = useState("");
   const [err, setErr] = useState("");
@@ -52,7 +54,7 @@ const UserInvitationForm = ({
       roleId: selectedRole.value as string,
       organizationId,
       organizationName,
-      roleName: selectedRole.label
+      name: selectedRole.label
 
     };
     setLoading(true);
@@ -61,21 +63,19 @@ const UserInvitationForm = ({
       return;
     }
 
-    console.log(data);
     try {
       const res = await sendInvite(data);
-      console.log(res);
       if (res.status !== 200) {
         setLoading(false);
-        toast.error(res.error);
+        notify.error(res.error);
         setErr(res?.error ?? "")
         return
       }
       setLoading(false)
-      toast.success("Invitation sent to user", { description: "Invitation successfully sent" });
+      notify.success("Invitation sent to user", { description: "Invitation successfully sent" });
     } catch (error) {
       setLoading(false);
-      toast.error("Something went wrong", { description: "Error found" });
+      notify.error("Something went wrong", { description: "Error found" });
     }
   };
   return (

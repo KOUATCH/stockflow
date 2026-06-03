@@ -218,5 +218,6 @@
   "github.copilot.nextEditSuggestions.fixes": false,
   "github.copilot.renameSuggestions.triggerAutomatically": false,
   "github.copilot.chat.reviewSelection.enabled": false,
+  "prisma.pinToPrisma6": false,
 }
   

@@ -1,5 +1,6 @@
 "use client";
 
+import { notify } from "@/lib/notifications/notify"
 import {
   Card,
   CardContent,
@@ -12,7 +13,7 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 
-import createUnits from "@/actions/units/createUnit22";
+import createUnits from "@/actions/units/createActionUnit";
 import updateUnitById from "@/actions/units/updateUnitById";
 import TextArea from "@/components/FormInputs/TextAreaInput";
 import TextInput from "@/components/FormInputs/TextInput";
@@ -20,8 +21,6 @@ import FormFooter from "@/components/Forms/FormFooter";
 import FormHeader from "@/components/Forms/FormHeader";
 import { UnitProps } from "@/types/types";
 import { Unit } from "@prisma/client";
-import { toast } from "sonner";
-
 export type SelectOptionProps = {
   label: string;
   value: string;
@@ -35,6 +34,7 @@ type UnitsFormProps = {
 const UnitForm = ({
   editingId,
   initialData,
+  organizationId,
 }: UnitsFormProps) => {
   const {
     register,
@@ -43,9 +43,10 @@ const UnitForm = ({
     formState: { errors },
   } = useForm<UnitProps>({
     defaultValues: {
-      name: initialData?.name,
+      nameEn: initialData?.nameEn || "",
+      nameFr: initialData?.nameFr || "",
       symbol: initialData?.symbol || "",
-      organizationId: initialData?.organizationId || "",
+      organizationId: initialData?.organizationId || organizationId,
     },
   });
   const router = useRouter();
@@ -59,14 +60,14 @@ const UnitForm = ({
       if (editingId) {
         await updateUnitById(editingId, data);
         setLoading(false);
-        toast.success("Updated Successfully!", { description: " Unit Updated successfully" });
+        notify.success("Updated Successfully!", { description: " Unit Updated successfully" });
         window.location.reload();
         reset()
       } else {
         await createUnits(data);
         setLoading(false);
         // Toast
-        toast.success("Successfully Created!", { description: " Unit Created successfully" });
+        notify.success("Successfully Created!", { description: " Unit Created successfully" });
         window.location.reload();
         reset()
       }
@@ -101,8 +102,16 @@ const UnitForm = ({
                   <TextInput
                     register={register}
                     errors={errors}
-                    label="Unit Name"
-                    name="name"
+                    label="English Unit Name"
+                    name="nameEn"
+                  />
+                </div>
+                <div className="grid gap-3">
+                  <TextInput
+                    register={register}
+                    errors={errors}
+                    label="French Unit Name"
+                    name="nameFr"
                   />
                 </div>
                 <div className="grid gap-3">

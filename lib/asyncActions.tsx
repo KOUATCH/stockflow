@@ -1,7 +1,7 @@
 "use client"
 
 import { getOrgPurchaseOrders } from "@/actions/purchaseOrderWorkflow/getOrgPurchaseOrders"
-// import { PurchaseOrderWorkflowPanel } from "@/components/purchaseOrderWorkflow/purchaseOrderWorkflowPanel" // Component removed in cleanup
+import { PurchaseOrderWorkflowPanel } from "@/components/purchaseOrderWorkflow/purchaseOrderWorkflowPanel"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"

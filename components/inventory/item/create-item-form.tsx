@@ -1,5 +1,6 @@
 'use client'
 
+import { notify } from "@/lib/notifications/notify"
 import { getLocationsClientSafe } from '@/actions/inventory/clientSafeInventoryData';
 import { createItemWithInventory } from '@/actions/itemsShow/create-item-with-inventory';
 import { Button } from '@/components/ui/button';
@@ -9,7 +10,6 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
 import { Textarea } from '@/components/ui/textarea';
-import { useToast } from '@/hooks/use-toast';
 import { ItemCreateWithInventoryDTO, Location } from '@/types/inventory';
 import { useEffect, useState } from 'react';
 import { useForm } from 'react-hook-form';
@@ -17,7 +17,6 @@ import { useForm } from 'react-hook-form';
 export function CreateItemForm({ onSuccess }: { onSuccess?: () => void }) {
   const [loading, setLoading] = useState(false);
   const [locations, setLocations] = useState<Location[]>([]);
-  const { toast } = useToast();
 
   const { register, handleSubmit, reset, setValue, watch, formState: { errors } } = useForm<ItemCreateWithInventoryDTO>();
 
@@ -38,21 +37,21 @@ export function CreateItemForm({ onSuccess }: { onSuccess?: () => void }) {
       const result = await createItemWithInventory(data);
 
       if (result.success) {
-        toast({
+        notify({
           title: "Item Created",
-          description: `${data.name} has been created successfully with initial inventory.`,
+          description: `${data.nameEn} has been created successfully with initial inventory.`,
         });
         reset();
         onSuccess?.();
       } else {
-        toast({
+        notify({
           title: "Error",
           description: result.error || "Failed to create item",
           variant: "destructive",
         });
       }
     } catch (error) {
-      toast({
+      notify({
         title: "Error",
         description: "An unexpected error occurred",
         variant: "destructive",
@@ -78,15 +77,24 @@ export function CreateItemForm({ onSuccess }: { onSuccess?: () => void }) {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="name">Item Name *</Label>
+                <Label htmlFor="nameEn">English Item Name *</Label>
                 <Input
-                  id="name"
-                  {...register('name', { required: 'Item name is required' })}
+                  id="nameEn"
+                  {...register('nameEn', { required: 'English item name is required' })}
                   placeholder="Enter item name"
                 />
-                {errors.name && (
-                  <p className="text-sm text-destructive">{errors.name.message}</p>
+                {errors.nameEn && (
+                  <p className="text-sm text-destructive">{errors.nameEn.message}</p>
                 )}
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="nameFr">French Item Name</Label>
+                <Input
+                  id="nameFr"
+                  {...register('nameFr')}
+                  placeholder="Enter French item name"
+                />
               </div>
 
               <div className="space-y-2">
@@ -138,11 +146,21 @@ export function CreateItemForm({ onSuccess }: { onSuccess?: () => void }) {
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="description">Description</Label>
+              <Label htmlFor="descriptionEn">English Description</Label>
               <Textarea
-                id="description"
-                {...register('description')}
+                id="descriptionEn"
+                {...register('descriptionEn')}
                 placeholder="Item description (optional)"
+                rows={3}
+              />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="descriptionFr">French Description</Label>
+              <Textarea
+                id="descriptionFr"
+                {...register('descriptionFr')}
+                placeholder="French item description (optional)"
                 rows={3}
               />
             </div>

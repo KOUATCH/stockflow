@@ -6,6 +6,7 @@ import { createRoleName } from "@/lib/createRoleName";
 import { db } from "@/prisma/db";
 import { RoleFormData } from "@/types/types";
 import { revalidatePath } from "next/cache";
+import { withDisplayRoleName } from "./role-utils";
 
 const  createRole=async(data: RoleFormData)=> {
   const user = await getAuthenticatedUser()
@@ -25,7 +26,7 @@ const  createRole=async(data: RoleFormData)=> {
     // Check if role with same name exists in the organization
     const existingRole = await db.role.findFirst({
       where: {
-        name: data.name,
+        nameEn: data.name,
         organizationId:user.organizationId
       },
     });
@@ -37,8 +38,8 @@ const  createRole=async(data: RoleFormData)=> {
     // Create role with permissions
     const role = await db.role.create({
       data: {
-        code: data.name,
-        name: createRoleName(data.name),
+        code: createRoleName(data.name),
+        nameEn: data.name,
         description: data.description,
         permissions: data.permissions,
         organizationId:user.organizationId
@@ -47,7 +48,7 @@ const  createRole=async(data: RoleFormData)=> {
     });
 
     revalidatePath("/dashboard/settings/roles");
-    return { success: true, data: role };
+    return { success: true, data: withDisplayRoleName(role) };
   } catch (error) {
     console.error("Error creating role:", error);
     return {

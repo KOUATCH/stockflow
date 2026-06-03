@@ -1,36 +1,53 @@
-import { unitAPI } from "@/services/unitAPI"
-import { useMutation, useQueryClient } from "@tanstack/react-query"
+import { useDeleteUnit as useDeleteUnitMutation } from "@/hooks/useUnits"
 import { useNotifications } from "@/components/notifications/NotificationProvider"
-import { UnitKeys } from "../../types/queryKeys"
 
 export function useDeleteUnit() {
-  const queryClient = useQueryClient()
   const { success, error } = useNotifications();
+  const deleteUnitMutation = useDeleteUnitMutation();
 
-  return useMutation({
-    mutationFn: async (id: string) => {
-      return await unitAPI.deleteUnit(id)
-    },
-    onSuccess: (_, deletedId) => {
-      success("Unit Deleted", "Unit has been successfully removed");
-
-      // Remove from cache and invalidate related queries
-      queryClient.removeQueries({ queryKey: UnitKeys.detail(deletedId) })
-      queryClient.invalidateQueries({ queryKey: UnitKeys.lists() })
-    },
-    onError: (err: Error) => {
-      error(
-        "Delete Failed",
-        err.message || "Unknown error occurred",
-        {
-          category: "error",
-          priority: "normal",
-          action: {
-            label: "Try Again",
-            onClick: () => console.log("Retry delete unit")
-          }
+  return {
+    ...deleteUnitMutation,
+    mutate: (id: string) => {
+      deleteUnitMutation.mutate(id, {
+        onSuccess: () => {
+          success("Unit Deleted", "Unit has been successfully removed");
+        },
+        onError: (err: Error) => {
+          error(
+            "Delete Failed",
+            err.message || "Unknown error occurred",
+            {
+              category: "error",
+              priority: "normal",
+              action: {
+                label: "Try Again",
+                onClick: () => console.log("Retry delete unit")
+              }
+            }
+          );
         }
-      );
+      });
     },
-  })
+    mutateAsync: async (id: string) => {
+      try {
+        const result = await deleteUnitMutation.mutateAsync(id);
+        success("Unit Deleted", "Unit has been successfully removed");
+        return result;
+      } catch (err: any) {
+        error(
+          "Delete Failed",
+          err.message || "Unknown error occurred",
+          {
+            category: "error",
+            priority: "normal",
+            action: {
+              label: "Try Again",
+              onClick: () => console.log("Retry delete unit")
+            }
+          }
+        );
+        throw err;
+      }
+    }
+  };
 }

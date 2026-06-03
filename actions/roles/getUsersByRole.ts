@@ -1,6 +1,7 @@
 "use server";
 
 import { db } from "@/prisma/db";
+import { displayUserName } from "./role-utils";
 
 
 
@@ -17,12 +18,19 @@ export async function getUsersByRole(roleId: string) {
       },
       select: {
         id: true,
-        name: true,
+        firstName: true,
+        lastName: true,
         email: true,
       },
     });
 
-    return { success: true, data: users };
+    return {
+      success: true,
+      data: users.map((user) => ({
+        ...user,
+        name: displayUserName(user),
+      })),
+    };
   } catch (error) {
     console.error("Error fetching users by role:", error);
     return {

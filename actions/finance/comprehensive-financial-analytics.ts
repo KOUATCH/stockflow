@@ -1,8 +1,10 @@
 "use server"
 
+import { getPayrollSummary } from "@/actions/payroll/payrollManagement"
 import { db } from "@/prisma/db"
-import { startOfDay, endOfDay, startOfMonth, startOfYear, subMonths, subYears } from "date-fns"
-import { getPayrollSummary, getPayrollExpenseAllocation } from "@/actions/payroll/payrollManagement"
+import { endOfDay, startOfDay, startOfMonth, subYears } from "date-fns"
+import { financialAction } from "@/lib/error-handling"
+import type { ServerActionResult } from "@/lib/error-handling/types"
 
 export interface FinancialMetrics {
   revenue: {
@@ -228,13 +230,18 @@ export interface FinancialMetrics {
   }
 }
 
-export async function getComprehensiveFinancialAnalytics(
-  organizationId: string,
-  startDate: Date,
-  endDate: Date,
-  comparisonPeriod: 'previous_period' | 'previous_year' | 'custom' = 'previous_period'
-): Promise<FinancialMetrics> {
-  try {
+export const getComprehensiveFinancialAnalytics = financialAction(
+  async ({
+    organizationId,
+    startDate,
+    endDate,
+    comparisonPeriod = 'previous_period'
+  }: {
+    organizationId: string
+    startDate: Date
+    endDate: Date
+    comparisonPeriod?: 'previous_period' | 'previous_year' | 'custom'
+  }): Promise<ServerActionResult<FinancialMetrics>> => {
     const start = startOfDay(startDate)
     const end = endOfDay(endDate)
 
@@ -260,7 +267,6 @@ export async function getComprehensiveFinancialAnalytics(
     const revenue = calculateRevenueMetrics(currentData, comparisonData)
     const profitability = calculateProfitabilityMetrics(currentData, comparisonData, payrollData.data)
     const expenses = calculateExpenseMetrics(currentData, comparisonData, budgetData, payrollData.data)
-    const payroll = calculatePayrollMetrics(payrollData.data)
     const cashFlow = calculateCashFlowMetrics(currentData, comparisonData)
     const assets = calculateAssetMetrics(currentData)
     const liabilities = calculateLiabilityMetrics(currentData)
@@ -274,27 +280,39 @@ export async function getComprehensiveFinancialAnalytics(
     const benchmarks = calculateBenchmarks(ratios, profitability)
 
     return {
-      revenue,
-      profitability,
-      expenses,
-      payroll,
-      cashFlow,
-      assets,
-      liabilities,
-      equity,
-      ratios,
-      taxes,
-      budgetAnalysis,
-      kpis,
-      forecasting,
-      alerts,
-      benchmarks
+      success: true,
+      data: {
+        revenue,
+        profitability,
+        expenses,
+        cashFlow,
+        assets,
+        liabilities,
+        equity,
+        ratios,
+        taxes,
+        budgetAnalysis,
+        kpis,
+        forecasting,
+        alerts,
+        benchmarks
+      }
     }
-  } catch (error) {
-    console.error("Error getting comprehensive financial analytics:", error)
-    throw new Error("Failed to get comprehensive financial analytics")
+  },
+  {
+    actionName: 'getComprehensiveFinancialAnalytics',
+    component: 'FinancialReporting',
+    businessContext: {
+      domain: 'financial',
+      operation: 'read',
+      resourceType: 'analytics',
+      criticalOperation: true
+    },
+    logLevel: 'error',
+    includeStackTrace: true,
+    notifyAdmin: true
   }
-}
+)
 
 async function fetchFinancialData(organizationId: string, start: Date, end: Date) {
   const [sales, expenses, inventory, customers, cashTransactions] = await Promise.all([
@@ -312,7 +330,7 @@ async function fetchFinancialData(organizationId: string, start: Date, end: Date
               select: {
                 costPrice: true,
                 sellingPrice: true,
-                category: { select: { title: true } }
+                category: { select: { titleEn: true } }
               }
             }
           }
@@ -346,8 +364,8 @@ async function fetchFinancialData(organizationId: string, start: Date, end: Date
     db.cashDrawerTransaction.findMany({
       where: {
         createdAt: { gte: start, lte: end },
-        posSession: {
-          terminal: {
+        session: {
+          station: {
             organizationId
           }
         }
@@ -406,7 +424,7 @@ function calculateRevenueMetrics(currentData: any, comparisonData: any) {
   const categoryRevenue = new Map()
   currentData.sales.forEach((sale: any) => {
     sale.lines.forEach((line: any) => {
-      const category = line.item?.category?.title || 'Uncategorized'
+      const category = line.item?.category?.titleEn || 'Uncategorized'
       categoryRevenue.set(category, (categoryRevenue.get(category) || 0) + line.lineTotal)
     })
   })
@@ -868,60 +886,113 @@ function calculateBenchmarks(ratios: any, profitability: any) {
   }
 }
 
-export async function getFinancialHealthScore(organizationId: string): Promise<number> {
-  const endDate = new Date()
-  const startDate = startOfMonth(endDate)
+export const getFinancialHealthScore = financialAction(
+  async ({ organizationId }: { organizationId: string }): Promise<ServerActionResult<number>> => {
+    const endDate = new Date()
+    const startDate = startOfMonth(endDate)
 
-  const metrics = await getComprehensiveFinancialAnalytics(organizationId, startDate, endDate)
+    const metricsResult = await getComprehensiveFinancialAnalytics({ organizationId, startDate, endDate })
 
-  // Calculate weighted score
-  let score = 0
+    if (!metricsResult.success) {
+      throw new Error('Failed to retrieve financial metrics for health score calculation')
+    }
 
-  // Profitability (30%)
-  score += Math.min(metrics.profitability.netMargin / 15 * 30, 30)
+    const metrics = metricsResult.data!
 
-  // Liquidity (25%)
-  score += Math.min(metrics.ratios.liquidity.currentRatio / 2 * 25, 25)
+    // Calculate weighted score
+    let score = 0
 
-  // Growth (20%)
-  score += Math.min(metrics.revenue.growth / 20 * 20, 20)
+    // Profitability (30%)
+    score += Math.min(metrics.profitability.netMargin / 15 * 30, 30)
 
-  // Leverage (15%)
-  score += Math.max(15 - (metrics.ratios.leverage.debtToEquity / 0.5 * 15), 0)
+    // Liquidity (25%)
+    score += Math.min(metrics.ratios.liquidity.currentRatio / 2 * 25, 25)
 
-  // Cash Flow (10%)
-  score += metrics.cashFlow.netCashFlow > 0 ? 10 : 0
+    // Growth (20%)
+    score += Math.min(metrics.revenue.growth / 20 * 20, 20)
 
-  return Math.round(Math.min(score, 100))
-}
+    // Leverage (15%)
+    score += Math.max(15 - (metrics.ratios.leverage.debtToEquity / 0.5 * 15), 0)
 
-export async function generateFinancialReport(
-  organizationId: string,
-  reportType: 'income_statement' | 'balance_sheet' | 'cash_flow' | 'comprehensive',
-  startDate: Date,
-  endDate: Date
-): Promise<any> {
-  const metrics = await getComprehensiveFinancialAnalytics(organizationId, startDate, endDate)
+    // Cash Flow (10%)
+    score += metrics.cashFlow.netCashFlow > 0 ? 10 : 0
 
-  switch (reportType) {
-    case 'income_statement':
-      return {
-        revenue: metrics.revenue,
-        expenses: metrics.expenses,
-        profitability: metrics.profitability
-      }
-    case 'balance_sheet':
-      return {
-        assets: metrics.assets,
-        liabilities: metrics.liabilities,
-        equity: metrics.equity
-      }
-    case 'cash_flow':
-      return {
-        cashFlow: metrics.cashFlow
-      }
-    case 'comprehensive':
-    default:
-      return metrics
+    return {
+      success: true,
+      data: Math.round(Math.min(score, 100))
+    }
+  },
+  {
+    actionName: 'getFinancialHealthScore',
+    component: 'FinancialReporting',
+    businessContext: {
+      domain: 'financial',
+      operation: 'read',
+      resourceType: 'healthScore',
+      criticalOperation: true
+    }
   }
-}
+)
+
+export const generateFinancialReport = financialAction(
+  async ({
+    organizationId,
+    reportType,
+    startDate,
+    endDate
+  }: {
+    organizationId: string
+    reportType: 'income_statement' | 'balance_sheet' | 'cash_flow' | 'comprehensive'
+    startDate: Date
+    endDate: Date
+  }): Promise<ServerActionResult<any>> => {
+    const metricsResult = await getComprehensiveFinancialAnalytics({ organizationId, startDate, endDate })
+
+    if (!metricsResult.success) {
+      throw new Error('Failed to retrieve financial metrics for report generation')
+    }
+
+    const metrics = metricsResult.data!
+
+    let reportData
+    switch (reportType) {
+      case 'income_statement':
+        reportData = {
+          revenue: metrics.revenue,
+          expenses: metrics.expenses,
+          profitability: metrics.profitability
+        }
+        break
+      case 'balance_sheet':
+        reportData = {
+          assets: metrics.assets,
+          liabilities: metrics.liabilities,
+          equity: metrics.equity
+        }
+        break
+      case 'cash_flow':
+        reportData = {
+          cashFlow: metrics.cashFlow
+        }
+        break
+      case 'comprehensive':
+      default:
+        reportData = metrics
+    }
+
+    return {
+      success: true,
+      data: reportData
+    }
+  },
+  {
+    actionName: 'generateFinancialReport',
+    component: 'FinancialReporting',
+    businessContext: {
+      domain: 'financial',
+      operation: 'read',
+      resourceType: 'report',
+      criticalOperation: true
+    }
+  }
+)

@@ -2,23 +2,25 @@
 
 import { auth } from "@/auth"
 import { db } from "@/prisma/db"
+import { stockFlowAction } from "@/lib/error-handling"
+import type { ServerActionResult } from "@/lib/error-handling/types"
 
 /**
  * Client-safe customer actions that don't use getAuthenticatedUser()
  */
 
-export async function getOrgCustomersClientSafe(organizationId?: string) {
-  try {
+export const getOrgCustomersClientSafe = stockFlowAction(
+  async (organizationId?: string): Promise<ServerActionResult<any>> => {
     const session = await auth()
 
     if (!session?.user) {
-      return { success: false, error: "Not authenticated", data: [] }
+      throw new Error('Not authenticated');
     }
 
     const userOrgId = organizationId || session.user.organizationId
 
     if (!userOrgId) {
-      return { success: false, error: "No organization ID", data: [] }
+      throw new Error('No organization ID');
     }
 
     const customers = await db.customer.findMany({
@@ -34,52 +36,42 @@ export async function getOrgCustomersClientSafe(organizationId?: string) {
         email: true,
         phone: true,
         address: true,
-        city: true,
-        state: true,
-        zipCode: true,
-        country: true,
-        dateOfBirth: true,
-        gender: true,
         notes: true,
         isActive: true,
         createdAt: true,
         updatedAt: true,
         // Include related data if needed
-        _count: {
-          select: {
-            sales: true,
-          },
-        },
       },
     })
 
     return {
       success: true,
-      data: customers,
-      error: null
+      data: customers
     }
-  } catch (error) {
-    console.error("Error fetching customers:", error)
-    return {
-      success: false,
-      error: "Failed to fetch customers",
-      data: []
+  },
+  {
+    actionName: 'getOrgCustomersClientSafe',
+    component: 'CustomerManagement',
+    businessContext: {
+      domain: 'customers',
+      operation: 'read',
+      resourceType: 'customers'
     }
   }
-}
+);
 
-export async function getCustomerByIdClientSafe(customerId: string, organizationId?: string) {
-  try {
+export const getCustomerByIdClientSafe = stockFlowAction(
+  async (customerId: string, organizationId?: string): Promise<ServerActionResult<any>> => {
     const session = await auth()
 
     if (!session?.user) {
-      return { success: false, error: "Not authenticated", data: null }
+      throw new Error('Not authenticated');
     }
 
     const userOrgId = organizationId || session.user.organizationId
 
     if (!userOrgId) {
-      return { success: false, error: "No organization ID", data: null }
+      throw new Error('No organization ID');
     }
 
     const customer = await db.customer.findFirst({
@@ -88,42 +80,26 @@ export async function getCustomerByIdClientSafe(customerId: string, organization
         organizationId: userOrgId,
       },
       include: {
-        sales: {
-          select: {
-            id: true,
-            saleNumber: true,
-            total: true,
-            status: true,
-            createdAt: true,
-          },
-          orderBy: {
-            createdAt: 'desc',
-          },
-          take: 10, // Last 10 sales
-        },
-        _count: {
-          select: {
-            sales: true,
-          },
-        },
+        _count: true,
       },
     })
 
     if (!customer) {
-      return { success: false, error: "Customer not found", data: null }
+      throw new Error('Customer not found');
     }
 
     return {
       success: true,
-      data: customer,
-      error: null
+      data: customer
     }
-  } catch (error) {
-    console.error("Error fetching customer:", error)
-    return {
-      success: false,
-      error: "Failed to fetch customer",
-      data: null
+  },
+  {
+    actionName: 'getCustomerByIdClientSafe',
+    component: 'CustomerManagement',
+    businessContext: {
+      domain: 'customers',
+      operation: 'read',
+      resourceType: 'customer'
     }
   }
-}
+);

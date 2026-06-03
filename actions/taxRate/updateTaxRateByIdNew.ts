@@ -1,47 +1,39 @@
 "use server"
 
-import { db } from "@/prisma/db"
+import { updateManagedTaxRate } from "@/actions/taxRate/tax-rate-management-actions"
+import type { TaxRateManagementInput } from "@/actions/taxRate/tax-rate-management-actions"
+import { getAuthenticatedUser } from "@/config/useAuth"
 import type { UpdateTaxRatePayload } from "@/types/taxRates"
-import { revalidatePath } from "next/cache"
+
+function normalizeTaxRateInput(data: UpdateTaxRatePayload): TaxRateManagementInput {
+  return {
+    nameEn: data.nameEn ?? data.taxRateName ?? data.name ?? "",
+    nameFr: data.nameFr ?? null,
+    rate: Number(data.rate ?? 0),
+    type: (data.type as TaxRateManagementInput["type"]) ?? "SALES",
+    isActive: data.isActive ?? true,
+  }
+}
 
 const updateTaxRateByIdNew = async (id: string, data: UpdateTaxRatePayload) => {
   try {
-    return await db.$transaction(async (tx) => {
-      const existingTaxRate = await tx.taxRate.findUnique({
-        where: { id },
-      })
+    const user = await getAuthenticatedUser()
 
-      if (!existingTaxRate) {
-        return {
-          error: "TaxRate not found",
-          success: false,
-          data: null,
-        }
-      }
-
-      const { id: _id, createdAt, ...rest } = data
-      // Remove organizationId if it's null, as Prisma expects undefined for optional fields
-      // Ensure organizationId is undefined if null to satisfy Prisma types
-      const updateFields = {
-        ...rest,
-        ...(rest.organizationId === null
-          ? { organizationId: undefined }
-          : { organizationId: rest.organizationId }),
-      }
-
-      const updatedTaxRate = await tx.taxRate.update({
-        where: { id },
-        data: updateFields,
-      })
-
-      revalidatePath("/inventory/taxRates")
-
+    if (!user?.organizationId) {
       return {
-        data: updatedTaxRate, // Return updated data instead of old data
-        success: true,
-        error: null,
+        success: false,
+        data: null,
+        error: "Organization is required",
       }
-    })
+    }
+
+    const result = await updateManagedTaxRate(user.organizationId, id, normalizeTaxRateInput(data))
+
+    return {
+      data: result.data ?? null,
+      success: result.success,
+      error: result.error ?? null,
+    }
   } catch (error) {
     console.error("Error updating taxRate:", error)
     return {

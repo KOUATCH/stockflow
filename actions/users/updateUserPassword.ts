@@ -1,8 +1,11 @@
 "use server";
 import { PasswordProps } from "@/components/Forms/ChangePasswordForm";
 import { adminPermissions } from "@/config/permissions";
+import { getAuthenticatedUser } from "@/config/useAuth";
+import { hasAppPermission } from "@/lib/security/server-authz";
 import { db } from "@/prisma/db";
 import { hashPassword, verifyPassword } from "@/lib/password";
+import { checkPasswordPolicy } from "@/services/auth/password-policy";
 import { revalidatePath } from "next/cache";
 import { Resend } from "resend";
 
@@ -30,30 +33,61 @@ const ADMIN_USER_ROLE = {
 };
 
 export async function updateUserPassword(id: string, data: PasswordProps) {
-  const existingUser = await db.user.findUnique({
+  const authUser = await getAuthenticatedUser();
+
+  if (id !== authUser.id && !hasAppPermission(authUser, "users.password.reset")) {
+    return { error: "Forbidden", status: 403 };
+  }
+
+  const existingUser = await db.user.findFirst({
     where: {
       id,
+      organizationId: authUser.organizationId,
     },
   });
+
+  if (!existingUser) {
+    return { error: "User not found", status: 404 };
+  }
+
   // Check if the Old Passw = User Pass
   let passwordMatch: boolean = false;
   //Check if Password is correct
-  if (existingUser && existingUser.password) {
+  if (existingUser.password) {
     // if user exists and password exists
     passwordMatch = await verifyPassword(existingUser.password, data.oldPassword);
   }
   if (!passwordMatch) {
     return { error: "Old Password Incorrect", status: 403 };
   }
+  const passwordPolicy = await checkPasswordPolicy({
+    password: data.newPassword,
+    userId: existingUser.id,
+    email: existingUser.email,
+  });
+
+  if (!passwordPolicy.ok) {
+    return { error: passwordPolicy.message, status: 400 };
+  }
+
   const hashedPassword = await hashPassword(data.newPassword);
   try {
-    const updatedUser = await db.user.update({
-      where: {
-        id,
-      },
-      data: {
-        password: hashedPassword,
-      },
+    await db.$transaction(async (tx) => {
+      await tx.user.update({
+        where: {
+          id,
+        },
+        data: {
+          password: hashedPassword,
+        },
+      });
+
+      await tx.passwordHistory.create({
+        data: {
+          userId: id,
+          passwordHash: hashedPassword,
+        },
+      });
     });
     revalidatePath("/dashboard/clients");
     return { error: null, status: 200 };
@@ -66,10 +100,11 @@ export async function resetUserPassword(
   token: string,
   newPassword: string
 ) {
-  const user = await db.user.findUnique({
+  const user = await db.user.findFirst({
     where: {
       email,
-      token,
+      verificationToken: token,
+      verificationTokenExpires: { gt: new Date() },
     },
   });
   if (!user) {
@@ -79,16 +114,40 @@ export async function resetUserPassword(
       data: null,
     };
   }
+  const passwordPolicy = await checkPasswordPolicy({
+    password: newPassword,
+    userId: user.id,
+    email: user.email,
+  });
+
+  if (!passwordPolicy.ok) {
+    return {
+      status: 400,
+      error: passwordPolicy.message,
+      data: null,
+    };
+  }
+
   const hashedPassword = await hashPassword(newPassword);
   try {
-    const updatedUser = await db.user.update({
-      where: {
-        email,
-        token,
-      },
-      data: {
-        password: hashedPassword,
-      },
+    await db.$transaction(async (tx) => {
+      await tx.user.update({
+        where: {
+          id: user.id,
+        },
+        data: {
+          password: hashedPassword,
+          verificationToken: null,
+          verificationTokenExpires: null,
+        },
+      });
+
+      await tx.passwordHistory.create({
+        data: {
+          userId: user.id,
+          passwordHash: hashedPassword,
+        },
+      });
     });
     return {
       status: 200,

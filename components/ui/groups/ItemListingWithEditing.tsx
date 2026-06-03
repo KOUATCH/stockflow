@@ -1,5 +1,6 @@
 "use client"
 
+import { notify } from "@/lib/notifications/notify"
 import ItemFormForEditing from "@/components/dashboard/items/ItemFormForEditing"
 import ImageUploadButton from "@/components/FormInputs/ImageUploadButton"
 import { type Column, ConfirmationDialog, DataTable, EntityForm, TableActions } from "@/components/ui/data-table"
@@ -22,7 +23,6 @@ import { DollarSign } from "lucide-react"
 import Link from "next/link"
 import { useCallback, useState } from "react"
 import { useForm } from "react-hook-form"
-import { toast } from "sonner"
 import * as XLSX from "xlsx"
 import { z } from "zod"
 
@@ -179,11 +179,11 @@ const ItemListingWithEditing = ({
       const fileName = `Items_${format(new Date(), "yyyy-MM-dd")}.xlsx`
       XLSX.writeFile(workbook, fileName)
 
-      toast.success("Export successful", {
+      notify.success("Export successful", {
         description: `Items exported to ${fileName}`,
       })
     } catch (error) {
-      toast.error("Export failed", {
+      notify.error("Export failed", {
         description: error instanceof Error ? error.message : "Unknown error occurred",
       })
     }
@@ -209,10 +209,10 @@ const ItemListingWithEditing = ({
     if (currentSku) {
       try {
         await navigator.clipboard.writeText(currentSku)
-        toast.success("SKU copied to clipboard!")
+        notify.success("SKU copied to clipboard!")
       } catch (err) {
         console.error("Failed to copy SKU:", err)
-        toast.error("Failed to copy SKU to clipboard")
+        notify.error("Failed to copy SKU to clipboard")
       }
     }
   }
@@ -246,19 +246,19 @@ const ItemListingWithEditing = ({
 
       createItemMutation.mutateAsync(newItemData, {
         onSuccess: async () => {
-          toast.success("Item added successfully")
+          notify.success("Item added successfully")
           setFormDialogOpen(false)
           resetFormToDefaults()
           await refetch()
         },
         onError: (error: any) => {
-          toast.error("Failed to add item", {
+          notify.error("Failed to add item", {
             description: error?.message || "Unknown error occurred",
           })
         },
       })
     } catch (error) {
-      toast.error("An unexpected error occurred", {
+      notify.error("An unexpected error occurred", {
         description: error instanceof Error ? error.message : "Unknown error",
       })
     }
@@ -347,11 +347,11 @@ const ItemListingWithEditing = ({
     if (itemToDelete) {
       deleteItemMutation.mutate(itemToDelete.id!, {
         onSuccess: () => {
-          toast.success("Item deleted successfully")
+          notify.success("Item deleted successfully")
           refetch()
         },
         onError: (error: any) => {
-          toast.error("Failed to delete item", {
+          notify.error("Failed to delete item", {
             description: error?.message || "Unknown error occurred",
           })
         },

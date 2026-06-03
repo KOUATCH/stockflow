@@ -1,32 +1,37 @@
 "use client";
 
+import { signInWithCredentials } from "@/actions/auth";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { TooltipProvider } from "@/components/ui/tooltip";
-import { LoginProps } from "@/types/types";
+import { localizePath } from "@/i18n/routing";
 import { cn } from "@/lib/utils";
+import { LoginProps } from "@/types/types";
 import {
   AlertCircle,
-  ArrowLeft,
-  CheckCircle,
+  ArrowRight,
+  Building2,
+  CheckCircle2,
   Eye,
   EyeOff,
+  Fingerprint,
+  KeyRound,
   Loader2,
   Lock,
   Mail,
-  Plus,
-  User,
-  Key
+  ShieldCheck,
 } from "lucide-react";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
+import type { ComponentType } from "react";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
-import Logo from "../global/Logo";
+import { AuthFormCard } from "./AuthLayout";
+import { authCopy, getAuthLocale } from "./auth-copy";
 import { useNotifications } from "../notifications/NotificationProvider";
-import { signInWithCredentials } from "@/actions/auth";
+
+const inputClass =
+  "auth-input h-12 rounded-xl border-[#9fb4bb]/30 bg-white/72 pl-11 text-[#132028] placeholder:text-[#7f969f] shadow-sm outline-none transition-all focus:border-[#2f7df6] focus:ring-4 focus:ring-[#2f7df6]/15 dark:border-white/10 dark:bg-[#0f171d]/72 dark:text-white dark:placeholder:text-[#7f969f]";
 
 export default function EnhancedLoginForm() {
   const [loading, setLoading] = useState(false);
@@ -43,253 +48,283 @@ export default function EnhancedLoginForm() {
   } = useForm<LoginProps>();
 
   const params = useSearchParams();
-  const returnUrl = params.get("returnUrl") || "/dashboard";
-  const router = useRouter();
-  const { formError, formSuccess, info } = useNotifications();
+  const pathname = usePathname();
+  const locale = getAuthLocale(pathname);
+  const copy = authCopy[locale].login;
+  const localizedHref = (href: string) => localizePath(href, locale);
+  const requestedReturnUrl = params.get("returnUrl") || params.get("callbackUrl");
+  const returnUrl =
+    requestedReturnUrl?.startsWith("/") && !requestedReturnUrl.startsWith("//")
+      ? localizedHref(requestedReturnUrl)
+      : localizedHref("/dashboard");
+  const { formError, formSuccess } = useNotifications();
 
-  // Watch email for validation
   const emailValue = watch("email");
 
+  const handleUnavailableMethod = () => {
+    formError(copy.unavailableTitle, copy.unavailableBody, copy.unavailableHint);
+  };
+
   useEffect(() => {
-    if (emailValue) {
-      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-      setIsEmailValid(emailRegex.test(emailValue));
+    if (!emailValue) {
+      setIsEmailValid(false);
+      return;
     }
+
+    setIsEmailValid(/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailValue));
   }, [emailValue]);
 
   const onSubmit = async (data: LoginProps) => {
     try {
       setLoading(true);
-      setLoginAttempts(prev => prev + 1);
+      setLoginAttempts((prev) => prev + 1);
 
-      // Add security delay for multiple attempts
       if (loginAttempts > 2) {
-        await new Promise(resolve => setTimeout(resolve, 2000));
+        await new Promise((resolve) => setTimeout(resolve, 1200));
       }
 
-      // Use custom auth action
       const result = await signInWithCredentials(data);
-
-      console.log("Login result:", result); // Debug log
 
       if (result.error) {
         setLoading(false);
-        formError(
-          "Authentication Failed",
-          result.error,
-          `Attempt ${loginAttempts + 1}/5`
-        );
-      } else if (result.success) {
-        formSuccess("Login Successful", result.message || "Welcome back!");
+        formError(copy.errors.authFailed, result.error, `${copy.errors.attempt} ${loginAttempts + 1}/5`);
+        return;
+      }
+
+      if (result.success) {
+        formSuccess(copy.successTitle, result.message || copy.successBody);
         reset();
         setLoading(false);
-        // Redirect will be handled by middleware
         window.location.href = returnUrl;
-      } else {
-        // This should not happen, but let's log it for debugging
-        console.error("Unexpected login result:", result);
-        setLoading(false);
-        formError(
-          "Unexpected Error",
-          "An unexpected error occurred during login",
-          "Please try again"
-        );
+        return;
       }
-    } catch (error) {
+
+      setLoading(false);
+      formError(copy.errors.unexpectedTitle, copy.errors.unexpectedBody, copy.errors.tryAgain);
+    } catch {
       setLoading(false);
       formError(
-        "Connection Error",
-        "Unable to connect to authentication service. Please try again.",
-        "Network or server error"
+        copy.errors.connectionTitle,
+        copy.errors.connectionBody,
+        copy.errors.connectionHint
       );
     }
   };
 
   return (
-    <TooltipProvider>
-      {/* Enhanced Header matching PO style */}
-      <div className="flex items-center justify-between bg-gradient-to-r from-emerald-50 via-teal-50 to-cyan-50 dark:from-slate-800 dark:via-slate-700 dark:to-slate-800 p-6 rounded-2xl shadow-xl border border-emerald-200/60 dark:border-slate-600/60 backdrop-blur-sm mb-8">
-        <div className="flex items-center gap-4">
-          <div className="p-3 rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg">
-            <User className="h-8 w-8" />
+    <AuthFormCard>
+      <div className="mb-6 flex items-start justify-between gap-4">
+        <div>
+          <div className="mb-4 inline-flex h-12 w-12 items-center justify-center rounded-xl bg-[#10181d] text-white shadow-[0_16px_36px_rgba(16,24,29,0.16)] ring-1 ring-white/25 dark:bg-white/[0.08] dark:text-[#8fb7ff] dark:ring-white/10">
+            <KeyRound className="h-5 w-5" />
           </div>
-          <div>
-            <h1 className="text-4xl font-heading font-bold bg-gradient-to-r from-emerald-600 to-teal-600 bg-clip-text text-transparent">
-              Sign In
-            </h1>
-            <p className="text-muted-foreground text-lg mt-1">
-              Access your StockFlow dashboard
-            </p>
-          </div>
+          <p className="text-xs font-bold uppercase tracking-[0.18em] text-[#58707a] dark:text-[#8fa4ab]">
+            {copy.badge}
+          </p>
+          <h2 className="mt-2 text-2xl font-black text-[#111a20] dark:text-white">{copy.title}</h2>
+          <p className="mt-2 text-sm leading-6 text-[#58707a] dark:text-[#9fb4bb]">
+            {copy.subtitle}
+          </p>
         </div>
-        <div className="flex items-center gap-3">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={() => router.back()}
-            className="flex items-center gap-2 bg-white/80 backdrop-blur-sm shadow-sm hover:shadow-md transition-all"
-          >
-            <ArrowLeft className="w-4 h-4" />
-            Back
-          </Button>
+        <span className="hidden shrink-0 rounded-full border border-[#2dd4bf]/30 bg-[rgba(45,212,191,0.12)] px-3 py-1.5 text-xs font-black uppercase tracking-[0.12em] text-[#178e83] dark:text-[#7de8dc] sm:inline-flex">
+          {copy.accessLevel}
+        </span>
+      </div>
+
+      <div className="mb-6 rounded-xl border border-[#9fb4bb]/25 bg-[#e2ecef]/78 p-3 dark:border-white/10 dark:bg-white/[0.04]">
+        <div className="mb-3 px-1">
+          <p className="text-sm font-black text-[#132028] dark:text-white">{copy.methodTitle}</p>
+          <p className="mt-1 text-xs font-semibold leading-5 text-[#58707a] dark:text-[#8fa4ab]">{copy.methodSubtitle}</p>
+        </div>
+        <div className="grid gap-2 sm:grid-cols-3">
+          <AuthMethodButton
+            icon={Building2}
+            label={copy.sso}
+            hint={copy.ssoHint}
+            onClick={handleUnavailableMethod}
+          />
+          <AuthMethodButton
+            icon={Fingerprint}
+            label={copy.passkey}
+            hint={copy.passkeyHint}
+            onClick={handleUnavailableMethod}
+          />
+          <AuthMethodButton
+            icon={Lock}
+            label={copy.passwordMethod}
+            hint={copy.passwordHint}
+            active
+          />
         </div>
       </div>
 
-      {/* Login Form Card */}
-      <Card className="shadow-2xl border-white/20 bg-white/80 dark:bg-slate-800/80 backdrop-blur-xl hover:shadow-3xl transition-all duration-300">
-        <CardHeader className="text-center pb-4">
-          <div className="flex justify-center mb-4">
-            <Logo />
-          </div>
-          <CardTitle className="flex items-center justify-center gap-2">
-            <Key className="h-5 w-5 text-emerald-600" />
-            Account Login
-          </CardTitle>
-          <CardDescription>
-            Enter your credentials to access your dashboard
-          </CardDescription>
-        </CardHeader>
+      <div className="mb-5 flex items-center gap-3">
+        <span className="h-px flex-1 bg-[#9fb4bb]/30 dark:bg-white/10" />
+        <span className="text-xs font-bold uppercase tracking-[0.14em] text-[#7f969f]">{copy.divider}</span>
+        <span className="h-px flex-1 bg-[#9fb4bb]/30 dark:bg-white/10" />
+      </div>
 
-        <CardContent className="p-6 sm:p-8">
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
-            {/* Email Field */}
-            <div className="space-y-2">
-              <Label htmlFor="email" className="flex items-center gap-2">
-                <Mail className="h-4 w-4" />
-                Email Address
-                {isEmailValid && (
-                  <CheckCircle className="h-4 w-4 text-green-500" />
-                )}
-              </Label>
-              <div className="relative">
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="john@company.com"
-                  className={cn(
-                    "pl-10 h-12 transition-all duration-200",
-                    "focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500",
-                    errors.email && "border-red-500 focus:border-red-500 focus:ring-red-500/20",
-                    isEmailValid && "border-green-500 focus:border-green-500 focus:ring-green-500/20"
-                  )}
-                  {...register("email", {
-                    required: "Email is required",
-                    pattern: {
-                      value: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
-                      message: "Please enter a valid email address"
-                    }
-                  })}
-                />
-                <Mail className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-              </div>
-              {errors.email && (
-                <p className="text-sm text-red-600 flex items-center gap-1">
-                  <AlertCircle className="h-4 w-4" />
-                  {errors.email.message}
-                </p>
-              )}
-            </div>
-
-            {/* Password Field */}
-            <div className="space-y-2">
-              <Label htmlFor="password" className="flex items-center gap-2">
-                <Lock className="h-4 w-4" />
-                Password
-              </Label>
-              <div className="relative">
-                <Input
-                  id="password"
-                  type={showPassword ? "text" : "password"}
-                  placeholder="Enter your password"
-                  className={cn(
-                    "pl-10 pr-10 h-12 transition-all duration-200",
-                    "focus:ring-2 focus:ring-emerald-500/20 focus:border-emerald-500",
-                    errors.password && "border-red-500 focus:border-red-500 focus:ring-red-500/20"
-                  )}
-                  {...register("password", {
-                    required: "Password is required",
-                    minLength: {
-                      value: 6,
-                      message: "Password must be at least 6 characters"
-                    }
-                  })}
-                />
-                <Lock className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="absolute right-2 top-1/2 transform -translate-y-1/2 h-6 w-6 p-0"
-                  onClick={() => setShowPassword(!showPassword)}
-                >
-                  {showPassword ? (
-                    <EyeOff className="h-4 w-4 text-gray-400" />
-                  ) : (
-                    <Eye className="h-4 w-4 text-gray-400" />
-                  )}
-                </Button>
-              </div>
-              {errors.password && (
-                <p className="text-sm text-red-600 flex items-center gap-1">
-                  <AlertCircle className="h-4 w-4" />
-                  {errors.password.message}
-                </p>
-              )}
-            </div>
-
-            {/* Remember & Forgot */}
-            <div className="flex items-center justify-between">
-              <label className="flex items-center space-x-2 cursor-pointer">
-                <input type="checkbox" className="rounded border-gray-300" />
-                <span className="text-sm text-gray-600">Remember me</span>
-              </label>
-              <Link
-                href="/forgot-password"
-                className="text-sm text-emerald-600 hover:text-emerald-500 transition-colors"
-              >
-                Forgot password?
-              </Link>
-            </div>
-
-            {/* Login Button */}
-            <Button
-              type="submit"
-              disabled={loading}
+      <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+        <div className="space-y-2">
+          <Label htmlFor="email" className="flex items-center gap-2 text-sm font-bold text-[#253943] dark:text-[#d3ddd8]">
+            {copy.email}
+            {isEmailValid ? <CheckCircle2 className="h-4 w-4 text-[#2ec98a]" /> : null}
+          </Label>
+          <div className="relative">
+            <Mail className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[#7f969f]" />
+            <Input
+              id="email"
+              type="email"
+              placeholder={copy.emailPlaceholder}
               className={cn(
-                "w-full h-12 bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600",
-                "hover:from-emerald-700 hover:via-teal-700 hover:to-cyan-700",
-                "shadow-lg hover:shadow-xl transition-all duration-300",
-                "disabled:opacity-50 disabled:cursor-not-allowed"
+                inputClass,
+                errors.email && "border-[#ef6a6a] focus:border-[#ef6a6a] focus:ring-[#ef6a6a]/15",
+                isEmailValid && "border-[#2ec98a]/70 focus:border-[#2ec98a]"
               )}
-            >
-              {loading ? (
-                <div className="flex items-center gap-2">
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                  Signing in...
-                </div>
-              ) : (
-                <div className="flex items-center gap-2">
-                  <Key className="h-4 w-4" />
-                  Sign In
-                </div>
-              )}
-            </Button>
+              {...register("email", {
+                required: copy.errors.emailRequired,
+                pattern: {
+                  value: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
+                  message: copy.errors.emailInvalid,
+                },
+              })}
+            />
+          </div>
+          {errors.email ? (
+            <p className="flex items-center gap-1.5 text-sm font-medium text-[#ef6a6a]">
+              <AlertCircle className="h-4 w-4" />
+              {errors.email.message}
+            </p>
+          ) : null}
+        </div>
 
-            {/* Sign Up Link */}
-            <div className="text-center pt-4 border-t">
-              <p className="text-gray-600">
-                Don't have an account?{" "}
-                <Link
-                  href="/auth/register"
-                  className="text-emerald-600 hover:text-emerald-500 font-semibold transition-colors"
-                >
-                  Create Account
-                </Link>
-              </p>
-            </div>
-          </form>
-        </CardContent>
-      </Card>
-    </TooltipProvider>
+        <div className="space-y-2">
+          <Label htmlFor="password" className="text-sm font-bold text-[#253943] dark:text-[#d3ddd8]">
+            {copy.password}
+          </Label>
+          <div className="relative">
+            <Lock className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-[#7f969f]" />
+            <Input
+              id="password"
+              type={showPassword ? "text" : "password"}
+              placeholder={copy.passwordPlaceholder}
+              className={cn(
+                inputClass,
+                "pr-12",
+                errors.password && "border-[#ef6a6a] focus:border-[#ef6a6a] focus:ring-[#ef6a6a]/15"
+              )}
+              {...register("password", {
+                required: copy.errors.passwordRequired,
+                minLength: {
+                  value: 6,
+                  message: copy.errors.passwordMin,
+                },
+              })}
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword((value) => !value)}
+              className="absolute right-3 top-1/2 flex h-8 w-8 -translate-y-1/2 items-center justify-center rounded-lg text-[#7f969f] transition hover:bg-[#2f7df6]/10 hover:text-[#2f7df6] dark:hover:bg-white/[0.07] dark:hover:text-white"
+              aria-label={showPassword ? copy.hidePassword : copy.showPassword}
+            >
+              {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+            </button>
+          </div>
+          {errors.password ? (
+            <p className="flex items-center gap-1.5 text-sm font-medium text-[#ef6a6a]">
+              <AlertCircle className="h-4 w-4" />
+              {errors.password.message}
+            </p>
+          ) : null}
+        </div>
+
+        <div className="flex items-center justify-between gap-3">
+          <label className="flex cursor-pointer items-center gap-2 text-sm font-medium text-[#58707a] dark:text-[#9fb4bb]">
+            <input
+              type="checkbox"
+              className="h-4 w-4 rounded border-[#9fb4bb]/40 bg-white text-[#2f7df6] focus:ring-[#2f7df6]/30 dark:border-white/10 dark:bg-[#0f171d]"
+            />
+            {copy.remember}
+          </label>
+          <Link href={localizedHref("/forgot-password")} className="text-sm font-bold text-[#2f7df6] transition hover:text-[#1f6feb] dark:text-[#8fb7ff]">
+            {copy.forgot}
+          </Link>
+        </div>
+
+        <Button
+          type="submit"
+          disabled={loading}
+          className="h-12 w-full rounded-xl bg-gradient-to-r from-[#2f7df6] to-[#2dd4bf] text-sm font-black text-white shadow-[0_16px_36px_rgba(47,125,246,0.24)] transition hover:opacity-95 disabled:cursor-not-allowed disabled:opacity-60"
+        >
+          {loading ? (
+            <span className="flex items-center gap-2">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              {copy.loading}
+            </span>
+          ) : (
+            <span className="flex items-center gap-2">
+              {copy.submit}
+              <ArrowRight className="h-4 w-4" />
+            </span>
+          )}
+        </Button>
+      </form>
+
+      <div className="mt-6 rounded-xl border border-[#2dd4bf]/25 bg-[rgba(45,212,191,0.10)] p-4 dark:border-[#2dd4bf]/20 dark:bg-[rgba(45,212,191,0.07)]">
+        <div className="flex items-start gap-3">
+          <ShieldCheck className="mt-0.5 h-5 w-5 shrink-0 text-[#2ec98a]" />
+          <p className="text-sm leading-6 text-[#58707a] dark:text-[#9fb4bb]">
+            {copy.secureNote}
+          </p>
+        </div>
+      </div>
+
+      <p className="mt-6 text-center text-sm text-[#58707a] dark:text-[#9fb4bb]">
+        {copy.newHere}{" "}
+        <Link href={localizedHref("/register")} className="font-black text-[#2f7df6] transition hover:text-[#1f6feb] dark:text-[#8fb7ff]">
+          {copy.createAccount}
+        </Link>
+      </p>
+    </AuthFormCard>
+  );
+}
+
+function AuthMethodButton({
+  icon: Icon,
+  label,
+  hint,
+  active,
+  onClick,
+}: {
+  icon: ComponentType<{ className?: string }>;
+  label: string;
+  hint: string;
+  active?: boolean;
+  onClick?: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={cn(
+        "flex min-h-[76px] items-center gap-3 rounded-xl border px-3 py-3 text-left transition-all",
+        active
+          ? "border-[#2f7df6]/35 bg-white text-[#132028] shadow-sm dark:border-[#8fb7ff]/25 dark:bg-[#0f171d]/72 dark:text-white"
+          : "border-[#9fb4bb]/25 bg-white/45 text-[#253943] hover:border-[#2f7df6]/35 hover:bg-white dark:border-white/10 dark:bg-white/[0.035] dark:text-[#d3ddd8] dark:hover:bg-white/[0.07]"
+      )}
+    >
+      <span
+        className={cn(
+          "flex h-10 w-10 shrink-0 items-center justify-center rounded-lg",
+          active ? "bg-[#2f7df6]/12 text-[#2f7df6] dark:text-[#8fb7ff]" : "bg-[#132028]/6 text-[#58707a] dark:bg-white/[0.06] dark:text-[#9fb4bb]"
+        )}
+      >
+        <Icon className="h-4 w-4" />
+      </span>
+      <span className="min-w-0">
+        <span className="block text-sm font-black">{label}</span>
+        <span className="mt-0.5 block text-xs font-semibold text-[#7f969f]">{hint}</span>
+      </span>
+    </button>
   );
 }

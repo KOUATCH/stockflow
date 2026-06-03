@@ -173,22 +173,22 @@ export function FinancialReportExporter() {
 
   const handleExport = async () => {
     if (!selectedTemplate || selectedSections.length === 0) {
-      error("Please select a template and at least one section")
+      error("Export Not Ready", "Please select a template and at least one section.")
       return
     }
 
     setIsExporting(true)
-    info("Generating financial report...")
+    info("Generating Report", "Financial report generation is in progress.")
 
     // Simulate export process
     setTimeout(() => {
       setIsExporting(false)
-      success(`Financial report exported successfully as ${selectedFormat.toUpperCase()}`)
+      success("Report Exported", `Financial report exported successfully as ${selectedFormat.toUpperCase()}.`)
     }, 3000)
   }
 
   const handleScheduleExport = () => {
-    info("Scheduled export has been configured")
+    info("Export Scheduled", "Scheduled export has been configured.")
   }
 
   const getStatusIcon = (status: string) => {

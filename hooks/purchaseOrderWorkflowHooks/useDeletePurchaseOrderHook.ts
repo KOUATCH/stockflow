@@ -1,6 +1,6 @@
 'use client'
 
-import { deletePurchaseOrder } from '@/actions/purchaseOrders/deletePurchaseOrder';
+import { deletePurchaseOrder } from '@/actions/purchaseOrderWorkflow/purchaseOrderSystemAction';
 import type {
   PaginatedPurchaseOrdersResponse,
   PurchaseOrderResponse,
@@ -24,9 +24,10 @@ export function useDeletePurchaseOrderHook() {
   const qc = useQueryClient()
 
   return useMutation<PurchaseOrderResponse<null>, Error, Variables, Context>({
+    meta: { operation: 'delete', entity: 'Purchase Order' },
     mutationFn: async ({ id, organizationId }) => {
       const res = await deletePurchaseOrder(id, organizationId)
-      if (!res?.success) throw new Error(res?.message || 'Failed to delete purchase order')
+      if (!res?.success) throw new Error(res?.error || res?.message || 'Failed to delete purchase order')
       return res
     },
 

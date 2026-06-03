@@ -9,6 +9,7 @@ export function useUpdateTaxRate() {
   const { formSuccess, formError } = useNotifications();
 
   return useMutation({
+    meta: { operation: 'update', entity: 'Tax Rate' },
     mutationFn: async ({ id, data }: { id: string; data: UpdateTaxRatePayload }) => {
       const result = await updateTaxRateByIdNew(id, data)
 

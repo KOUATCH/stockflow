@@ -3,10 +3,29 @@
 import { db } from "@/prisma/db";
 import { StockAdjustmentData, TransactionType } from "@/types/inventory";
 import { revalidatePath } from "next/cache";
+import { inventoryAction } from "@/lib/error-handling";
+import type { ServerActionResult } from "@/lib/error-handling/types";
 
-export async function adjustStock(adjustments: StockAdjustmentData[], organizationId: string, userId: string) {
+type DecimalLike = { toNumber?: () => number; toString: () => string } | number | string | null | undefined;
 
-  try {
+function toNumber(value: DecimalLike): number {
+  if (value == null) return 0;
+  if (typeof value === "number") return value;
+  if (typeof value === "string") return Number(value) || 0;
+  if (typeof value.toNumber === "function") return value.toNumber();
+  return Number(value.toString()) || 0;
+}
+
+export const adjustStock = inventoryAction(
+  async ({
+    adjustments,
+    organizationId,
+    userId
+  }: {
+    adjustments: StockAdjustmentData[]
+    organizationId: string
+    userId: string
+  }): Promise<ServerActionResult<any>> => {
     const result = await db.$transaction(async (tx) => {
       const processedAdjustments = [];
 
@@ -35,13 +54,17 @@ export async function adjustStock(adjustments: StockAdjustmentData[], organizati
           throw new Error(`No inventory level found for item ${itemId} at location ${locationId}`);
         }
 
-        const newQuantityOnHand = Math.max(0, currentLevel.quantityOnHand + adjustmentQuantity);
-        const newQuantityAvailable = Math.max(0, newQuantityOnHand - currentLevel.quantityReserved);
+        const currentQuantityOnHand = toNumber(currentLevel.quantityOnHand);
+        const currentQuantityReserved = toNumber(currentLevel.quantityReserved);
+        const currentAverageCost = toNumber(currentLevel.averageCost);
+        const effectiveUnitCost = unitCost || currentAverageCost;
+        const newQuantityOnHand = Math.max(0, currentQuantityOnHand + adjustmentQuantity);
+        const newQuantityAvailable = Math.max(0, newQuantityOnHand - currentQuantityReserved);
         
         // Calculate new average cost using weighted average
-        let newAverageCost = currentLevel.averageCost;
+        let newAverageCost = currentAverageCost;
         if (adjustmentQuantity > 0 && unitCost) {
-          const totalCurrentValue = currentLevel.averageCost * currentLevel.quantityOnHand;
+          const totalCurrentValue = currentAverageCost * currentQuantityOnHand;
           const adjustmentValue = unitCost * adjustmentQuantity;
           newAverageCost = (totalCurrentValue + adjustmentValue) / newQuantityOnHand;
         }
@@ -66,10 +89,10 @@ export async function adjustStock(adjustments: StockAdjustmentData[], organizati
         // Create inventory transaction
         const transaction = await tx.inventoryTransaction.create({
           data: {
-            type: TransactionType.ADJUSTMENT_IN,
+            type: adjustmentQuantity >= 0 ? TransactionType.ADJUSTMENT_IN : TransactionType.ADJUSTMENT_OUT,
             quantity: adjustmentQuantity,
-            unitCost: unitCost || currentLevel.averageCost,
-            totalCost: (unitCost || currentLevel.averageCost) * Math.abs(adjustmentQuantity),
+            unitCost: effectiveUnitCost,
+            totalCost: effectiveUnitCost * Math.abs(adjustmentQuantity),
             notes: notes || `Stock adjustment`,
             itemId,
             locationId,
@@ -91,19 +114,21 @@ export async function adjustStock(adjustments: StockAdjustmentData[], organizati
       return {
         success: true,
         data: processedAdjustments,
-        error: null,
       };
     });
 
     revalidatePath("/inventory/levels");
     revalidatePath("/inventory/transactions");
     return result;
-  } catch (error) {
-    console.error("Error adjusting stock:", error);
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : "Unknown error",
-      data: null,
-    };
+  },
+  {
+    actionName: 'adjustStock',
+    component: 'StockAdjustmentForm',
+    businessContext: {
+      domain: 'inventory',
+      operation: 'update',
+      resourceType: 'stockAdjustment',
+      criticalOperation: false
+    }
   }
-}
+)

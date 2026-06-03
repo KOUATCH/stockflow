@@ -1,8 +1,10 @@
 "use client"
 
-import { createInventoryTransactions, createPayment, createPOSSession, createSale, getActivePOSSession, updateInventoryLevels } from "@/actions/pos/POSActionFinal"
+import { notify } from "@/lib/notifications/notify"
+import { createInventoryTransactions, createPayment, createPOSSession, createSale, getActivePOSSession, updateInventoryLevels } from "@/actions/newPOSSession/pos/POSActionFinal"
 
 import { useNotifications } from "@/components/notifications/NotificationProvider"
+import SalesReceiptModal from "@/components/receipts/SalesReceiptModal"
 import { Customer } from "@/lib/cashSystem/db"
 import { CartItem } from "@/lib/cashSystem/types"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
@@ -110,13 +112,15 @@ interface pOSStationProps {
   userId: string
 }
 
-export function pOSStation({ organizationId, locationId, terminalId, userId }: pOSStationProps): ReactElement {
+export function POSStation({ organizationId, locationId, terminalId, userId }: pOSStationProps): ReactElement {
   const [cart, setCart] = useState<CartItem[]>([])
   const [searchTerm, setSearchTerm] = useState("")
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null)
   const [selectedCategory, setSelectedCategory] = useState<string>("all")
   const [isPaymentDialogOpen, setIsPaymentDialogOpen] = useState(false)
   const [isCustomerDialogOpen, setIsCustomerDialogOpen] = useState(false)
+  const [isReceiptModalOpen, setIsReceiptModalOpen] = useState(false)
+  const [completedSaleData, setCompletedSaleData] = useState<any>(null)
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>(PaymentMethod.CASH)
   const [cashTendered, setCashTendered] = useState("")
   const [currentTime, setCurrentTime] = useState(new Date())
@@ -161,17 +165,19 @@ export function pOSStation({ organizationId, locationId, terminalId, userId }: p
 
   const notifications = useNotifications()
   const queryClient = useQueryClient()
+  const isMissingOrganization = !organizationId
   //   const authSession = useSession()
   // const user= authSession.data?.user
   // const userOrgId = user?.organizationId
-  if (!organizationId) {
-    toast({
+  useEffect(() => {
+    if (!isMissingOrganization) return
+
+    notify({
       variant: "destructive",
       title: "Error",
       description: "User organization not found.",
     })
-    return <></>
-  }
+  }, [isMissingOrganization])
 
   // const { data: itemsData, error } = useOrgItemsWithInventoryLevelsLocation(organizationId, locationId)
   const {
@@ -183,7 +189,7 @@ export function pOSStation({ organizationId, locationId, terminalId, userId }: p
     enabled: !!organizationId && !!locationId
   })
   if (error) {
-    toast({
+    notify({
       variant: "destructive",
       title: "Error",
       description: itemsData?.message || "Failed to load items.",
@@ -219,7 +225,7 @@ export function pOSStation({ organizationId, locationId, terminalId, userId }: p
   useEffect(() => {
     if (locationId && cart.length > 0) {
       clearCart()
-      toast({
+      notify({
         title: "Location Changed",
         description: "Cart cleared due to location change. Items are now filtered for the new location.",
       })
@@ -243,6 +249,7 @@ export function pOSStation({ organizationId, locationId, terminalId, userId }: p
   }, [customers]);
 
   const createSaleMutation = useMutation<any, unknown, any>({
+    meta: { operation: 'create', entity: 'Sale' , suppressSuccessNotification: true, suppressErrorNotification: true },
     mutationFn: createSale, // Use createSale instead of createSale1
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["sales-orders"] })
@@ -251,7 +258,7 @@ export function pOSStation({ organizationId, locationId, terminalId, userId }: p
     },
     onError: (error) => {
       console.error("Sale creation failed:", error)
-      toast({
+      notify({
         variant: "destructive",
         title: "Sale Failed",
         description: "Failed to create sale. Please try again.",
@@ -267,7 +274,7 @@ export function pOSStation({ organizationId, locationId, terminalId, userId }: p
   //   },
   //   onError: (error) => {
   //     console.error("Sales order creation failed:", error)
-  //     toast({
+  //     notify({
   //       variant: "destructive",
   //       title: "Sales Order Failed",
   //       description: "Failed to create sales order. Please try again.",
@@ -276,13 +283,14 @@ export function pOSStation({ organizationId, locationId, terminalId, userId }: p
   // })
 
   const createPaymentMutation = useMutation({
+    meta: { operation: 'create', entity: 'Payment' , suppressSuccessNotification: true, suppressErrorNotification: true },
     mutationFn: createPayment,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["payments"] })
     },
     onError: (error) => {
       console.error("Payment creation failed:", error)
-      toast({
+      notify({
         variant: "destructive",
         title: "Payment Failed",
         description: "Failed to process payment. Please try again.",
@@ -291,6 +299,7 @@ export function pOSStation({ organizationId, locationId, terminalId, userId }: p
   })
 
   const updateInventoryMutation = useMutation({
+    meta: { operation: 'update', entity: 'Inventory' },
     mutationFn: updateInventoryLevels,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["inventory-levels"] })
@@ -299,6 +308,7 @@ export function pOSStation({ organizationId, locationId, terminalId, userId }: p
   })
 
   const createTransactionsMutation = useMutation({
+    meta: { operation: 'create', entity: 'Transactions' },
     mutationFn: createInventoryTransactions,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["inventory-transactions"] })
@@ -358,7 +368,7 @@ export function pOSStation({ organizationId, locationId, terminalId, userId }: p
 
   // const processPayment = async () => {
   //   if (!currentSession) {
-  //     toast({
+  //     notify({
   //       variant: "destructive",
   //       title: "No Active Session",
   //       description: "Please start a POS session before processing payments.",
@@ -367,7 +377,7 @@ export function pOSStation({ organizationId, locationId, terminalId, userId }: p
   //   }
 
   //   if (!cashDrawerStatus.isOpen && paymentMethod === PaymentMethod.CASH) {
-  //     toast({
+  //     notify({
   //       variant: "destructive",
   //       title: "Cash Drawer Closed",
   //       description: "Please open the cash drawer before processing cash payments.",
@@ -381,7 +391,7 @@ export function pOSStation({ organizationId, locationId, terminalId, userId }: p
   //   try {
   //     const inventoryCheck = validateInventory()
   //     if (!inventoryCheck.valid) {
-  //       toast({
+  //       notify({
   //         variant: "destructive",
   //         title: "Inventory Error",
   //         description: inventoryCheck.message,
@@ -390,7 +400,7 @@ export function pOSStation({ organizationId, locationId, terminalId, userId }: p
   //       return
   //     }
 
-  //     toast({
+  //     notify({
   //       title: "Processing Payment",
   //       description: "Please wait while we process your transaction...",
   //     })
@@ -532,7 +542,7 @@ export function pOSStation({ organizationId, locationId, terminalId, userId }: p
   //     setIsPaymentDialogOpen(false)
   //     setCashTendered("")
 
-  //     toast({
+  //     notify({
   //       title: "Sale Completed Successfully!",
   //       description: `Receipt #${salesOrder.orderNumber} - Total: $${calculateTotal().toFixed(2)}`,
   //     })
@@ -544,7 +554,7 @@ export function pOSStation({ organizationId, locationId, terminalId, userId }: p
   //     })
 
   //     if (lowStockItems && lowStockItems.length > 0) {
-  //       toast({
+  //       notify({
   //         title: "Low Stock Alert",
   //         description: `${lowStockItems.length} item(s) are running low on stock.`,
   //         variant: "destructive",
@@ -552,7 +562,7 @@ export function pOSStation({ organizationId, locationId, terminalId, userId }: p
   //     }
   //   } catch (error) {
   //     console.error("Payment processing error:", error)
-  //     toast({
+  //     notify({
   //       variant: "destructive",
   //       title: "Payment Failed",
   //       description: error instanceof Error ? error.message : "An unexpected error occurred",
@@ -565,7 +575,7 @@ export function pOSStation({ organizationId, locationId, terminalId, userId }: p
   // Updated processPayment function
   const processPayment = async () => {
     if (!currentSession) {
-      toast({
+      notify({
         variant: "destructive",
         title: "No Active Session",
         description: "Please start a POS session before processing payments.",
@@ -574,7 +584,7 @@ export function pOSStation({ organizationId, locationId, terminalId, userId }: p
     }
 
     if (!cashDrawerStatus.isOpen && paymentMethod === PaymentMethod.CASH) {
-      toast({
+      notify({
         variant: "destructive",
         title: "Cash Drawer Closed",
         description: "Please open the cash drawer before processing cash payments.",
@@ -588,7 +598,7 @@ export function pOSStation({ organizationId, locationId, terminalId, userId }: p
     try {
       const inventoryCheck = validateInventory()
       if (!inventoryCheck.valid) {
-        toast({
+        notify({
           variant: "destructive",
           title: "Inventory Error",
           description: inventoryCheck.message,
@@ -597,7 +607,7 @@ export function pOSStation({ organizationId, locationId, terminalId, userId }: p
         return
       }
 
-      toast({
+      notify({
         title: "Processing Payment",
         description: "Please wait while we process your transaction...",
       })
@@ -682,12 +692,37 @@ export function pOSStation({ organizationId, locationId, terminalId, userId }: p
         }))
       }
 
+      // Prepare sale data for receipt
+      const receiptSaleData = {
+        saleId: saleResult.saleId,
+        customerName: selectedCustomer?.name,
+        customerEmail: selectedCustomer?.email,
+        customerPhone: selectedCustomer?.phone,
+        items: cart.map(item => ({
+          name: item.name,
+          sku: item.itemSku || item.sku || `SKU-${item.itemId}`,
+          quantity: item.quantity,
+          unitPrice: item.price,
+          totalPrice: item.lineTotal
+        })),
+        subtotal: calculateSubtotal(),
+        tax: calculateTax(),
+        total: calculateTotal(),
+        paymentMethod: paymentMethod.toString(),
+        cashier: "Current User", // Replace with actual user name when available
+        terminal: terminalId,
+        createdAt: new Date()
+      };
+
+      setCompletedSaleData(receiptSaleData);
+      setIsReceiptModalOpen(true);
+
       // Clear cart and close dialog
       clearCart()
       setIsPaymentDialogOpen(false)
       setCashTendered("")
 
-      toast({
+      notify({
         title: "Sale Completed Successfully!",
         description: `Sale ID: ${saleResult.saleId} - Total: $${calculateTotal().toFixed(2)}`,
       })
@@ -699,7 +734,7 @@ export function pOSStation({ organizationId, locationId, terminalId, userId }: p
       })
 
       if (lowStockItems && lowStockItems.length > 0) {
-        toast({
+        notify({
           title: "Low Stock Alert",
           description: `${lowStockItems.length} item(s) are running low on stock.`,
           variant: "destructive",
@@ -707,7 +742,7 @@ export function pOSStation({ organizationId, locationId, terminalId, userId }: p
       }
     } catch (error) {
       console.error("Payment processing error:", error)
-      toast({
+      notify({
         variant: "destructive",
         title: "Payment Failed",
         description: error instanceof Error ? error.message : "An unexpected error occurred",
@@ -733,7 +768,7 @@ export function pOSStation({ organizationId, locationId, terminalId, userId }: p
     const availableStock = item.inventoryLevels?.[0]?.quantityAvailable ?? 0
 
     if (currentQuantityInCart >= availableStock && availableStock > 0) {
-      toast({
+      notify({
         variant: "destructive",
         title: "Insufficient Stock",
         description: `Cannot add more ${item.name}. Only ${availableStock} in stock.`,
@@ -775,7 +810,7 @@ export function pOSStation({ organizationId, locationId, terminalId, userId }: p
       ])
     }
 
-    toast({
+    notify({
       title: "Item Added",
       description: `${item.name} added to cart`,
     })
@@ -794,7 +829,7 @@ export function pOSStation({ organizationId, locationId, terminalId, userId }: p
     const availableStock = item?.inventoryLevels?.[0]?.quantityAvailable ?? 0
 
     if (item && quantity > availableStock && availableStock > 0) {
-      toast({
+      notify({
         variant: "destructive",
         title: "Insufficient Stock",
         description: `Cannot set quantity to ${quantity}. Only ${availableStock} in stock.`,
@@ -865,7 +900,7 @@ export function pOSStation({ organizationId, locationId, terminalId, userId }: p
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     if (cart.length === 0) {
-      toast({
+      notify({
         variant: "destructive",
         title: "Empty Cart",
         description: "Please add items to cart before processing payment.",
@@ -907,7 +942,7 @@ export function pOSStation({ organizationId, locationId, terminalId, userId }: p
             })
           }
 
-          toast({
+          notify({
             title: "Session Restored",
             description: `Continuing session ${session.sessionNumber}`,
           })
@@ -942,12 +977,12 @@ export function pOSStation({ organizationId, locationId, terminalId, userId }: p
               lastActivity: new Date(),
             })
 
-            toast({
+            notify({
               title: "New Session Started",
               description: `Session ${session.sessionNumber} created successfully`,
             })
           } else {
-            toast({
+            notify({
               variant: "destructive",
               title: "Session Error",
               description: newSessionResult.error || "Failed to create POS session",
@@ -956,7 +991,7 @@ export function pOSStation({ organizationId, locationId, terminalId, userId }: p
         }
       } catch (error) {
         console.error("Failed to initialize session:", error)
-        toast({
+        notify({
           variant: "destructive",
           title: "Session Error",
           description: "Failed to initialize POS session",
@@ -972,6 +1007,7 @@ export function pOSStation({ organizationId, locationId, terminalId, userId }: p
 
   // Also add a session management mutation
   const createSessionMutation = useMutation({
+    meta: { operation: 'create', entity: 'Session' , suppressSuccessNotification: true, suppressErrorNotification: true },
     mutationFn: createPOSSession,
     onSuccess: (result) => {
       if (result.success && result.data) {
@@ -992,7 +1028,7 @@ export function pOSStation({ organizationId, locationId, terminalId, userId }: p
     },
     onError: (error) => {
       console.error("Session creation failed:", error)
-      toast({
+      notify({
         variant: "destructive",
         title: "Session Failed",
         description: "Failed to create POS session",
@@ -1014,6 +1050,11 @@ export function pOSStation({ organizationId, locationId, terminalId, userId }: p
       console.error("Failed to start new session:", error)
     }
   }
+
+  if (isMissingOrganization) {
+    return <></>
+  }
+
   return (
     <div className={`p-6 space-y-6 transition-colors duration-300 ${isDarkMode ? "dark" : ""}`}>
       <div className="flex items-center justify-between">
@@ -1625,9 +1666,33 @@ export function pOSStation({ organizationId, locationId, terminalId, userId }: p
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Sales Receipt Modal */}
+      {isReceiptModalOpen && completedSaleData && (
+        <SalesReceiptModal
+          isOpen={isReceiptModalOpen}
+          onClose={() => setIsReceiptModalOpen(false)}
+          saleData={completedSaleData}
+          businessInfo={{
+            name: "StockFlow Retail",
+            address: "123 Business Avenue, Suite 100",
+            city: "Business City, BC 12345",
+            phone: "+1 (555) 123-BUSI",
+            email: "contact@stockflow.com",
+            website: "www.stockflow.com",
+            taxId: "TAX123456789"
+          }}
+          locationInfo={{
+            name: "Main Store Location",
+            address: "456 Store Street",
+            city: "Store City, SC 67890",
+            phone: "+1 (555) 456-STORE"
+          }}
+        />
+      )}
     </div>
   )
 }
 
-export { pOSStation as pOSStationRecent }
-export default pOSStation
+export { POSStation as pOSStation, POSStation as pOSStationRecent }
+export default POSStation

@@ -121,7 +121,8 @@ export default function LocationFormForEditing({
         return
       }
 
-      const updateData = {
+      const updateData: LocationDTO = {
+        ...locationData,
         ...data,
         id: locationData.id,
       }
@@ -160,7 +161,7 @@ export default function LocationFormForEditing({
   //   setIsSubmitting(true)
   //   try {
   //     if (!locationData) {
-  //       toast.error("Location data is missing. Cannot update tracking.")
+  //       notify.error("Location data is missing. Cannot update tracking.")
   //       return
   //     }
 
@@ -176,18 +177,18 @@ export default function LocationFormForEditing({
   //       },
   //       {
   //         onSuccess: async () => {
-  //           toast.success("Tracking information updated successfully")
+  //           notify.success("Tracking information updated successfully")
   //           onSuccess?.()
   //         },
   //         onError: (error: any) => {
-  //           toast.error("Failed to update tracking information", {
+  //           notify.error("Failed to update tracking information", {
   //             description: error?.message || "Unknown error occurred",
   //           })
   //         },
   //       },
   //     )
   //   } catch (error) {
-  //     toast.error("Failed to update tracking information")
+  //     notify.error("Failed to update tracking information")
   //   } finally {
   //     setIsSubmitting(false)
   //   }

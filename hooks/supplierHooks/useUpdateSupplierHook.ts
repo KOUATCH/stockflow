@@ -8,6 +8,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 export function useUpdateSupplierHook() {
   const qc = useQueryClient()
   return useMutation({
+    meta: { operation: 'update', entity: 'Supplier' },
     mutationFn: async (payload: UpdateSupplierDTO) => {
       const res = await updateSupplier(payload)
       return res as SupplierResponse<SupplierWithRelations>

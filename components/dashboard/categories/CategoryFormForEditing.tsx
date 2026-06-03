@@ -1,19 +1,19 @@
 "use client"
 
+import { notify } from "@/lib/notifications/notify"
 import ImageUploadButton from "@/components/FormInputs/ImageUploadButton"
 import { type Column, ConfirmationDialog, DataTable, EntityForm, TableActions } from "@/components/ui/data-table"
 import { FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { useCreateACategory, useDeleteACategory } from "@/hooks/categoriesHooks"
-import { useOrgCategories, useUpdateACategory } from "@/hooks/useAllCategoriesQueries"
+import { useOrgCategories, useUpdateACategory } from "@/hooks/useAllCategoriesqueries"
 import { generateSlug } from "@/lib/generateSlug"
 import type { BriefCategoryPayload } from "@/types/category"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { format } from "date-fns"
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { useForm } from "react-hook-form"
-import { toast } from "sonner"
 import * as XLSX from "xlsx"
 import { z } from "zod"
 
@@ -192,11 +192,11 @@ const CategoryFormForEditing = ({ title, organizationId, editingId, initialData 
         // Export to file
         XLSX.writeFile(workbook, fileName)
 
-        toast.success("Export successful", {
+        notify.success("Export successful", {
           description: `Categories exported to ${fileName}`,
         })
       } catch (error) {
-        toast.error("Export failed", {
+        notify.error("Export failed", {
           description: error instanceof Error ? error.message : "Unknown error occurred",
         })
       }
@@ -249,22 +249,24 @@ const CategoryFormForEditing = ({ title, organizationId, editingId, initialData 
           id: crypto.randomUUID(),
           ...rest,
           title: data.title,
+          titleEn: data.title,
           slug: generateSlug(data.title, data.description),
           organizationId: organizationId || "",
           createdAt: new Date(),
           description: data.description || "",
+          descriptionEn: data.description || "",
           imageUrl: data.imageUrl || "",
         }
 
         createCategoryMutation.mutate(newCategoryData, {
           onSuccess: async () => {
-            toast.success("Category added successfully")
+            notify.success("Category added successfully")
             setFormDialogOpen(false)
             resetFormToDefaults()
             await refetch()
           },
           onError: (error: any) => {
-            toast.error("Failed to add category", {
+            notify.error("Failed to add category", {
               description: error?.message || "Unknown error occurred",
             })
           },
@@ -275,7 +277,9 @@ const CategoryFormForEditing = ({ title, organizationId, editingId, initialData 
           ...data,
           id: categoryToEdit.id,
           title: data.title,
+          titleEn: data.title,
           description: data.description || categoryToEdit.description,
+          descriptionEn: data.description || categoryToEdit.descriptionEn || categoryToEdit.description || "",
           slug: generateSlug(data.title, data.description || ""),
           imageUrl: data.imageUrl || categoryToEdit.imageUrl,
           createdAt: data.createdAt || new Date(categoryToEdit.createdAt || Date.now()),
@@ -289,13 +293,13 @@ const CategoryFormForEditing = ({ title, organizationId, editingId, initialData 
           },
           {
             onSuccess: async () => {
-              toast.success("Category updated successfully")
+              notify.success("Category updated successfully")
               setFormDialogOpen(false)
               resetFormToDefaults()
               await refetch()
             },
             onError: (error: any) => {
-              toast.error("Failed to update category", {
+              notify.error("Failed to update category", {
                 description: error?.message || "Unknown error occurred",
               })
             },
@@ -303,7 +307,7 @@ const CategoryFormForEditing = ({ title, organizationId, editingId, initialData 
         )
       }
     } catch (error) {
-      toast.error("An unexpected error occurred", {
+      notify.error("An unexpected error occurred", {
         description: error instanceof Error ? error.message : "Unknown error",
       })
     }
@@ -361,11 +365,11 @@ const CategoryFormForEditing = ({ title, organizationId, editingId, initialData 
     if (categoryToDelete) {
       deleteCategoryMutation.mutate(categoryToDelete.id, {
         onSuccess: () => {
-          toast.success("Category deleted successfully")
+          notify.success("Category deleted successfully")
           refetch()
         },
         onError: (error: any) => {
-          toast.error("Failed to delete category", {
+          notify.error("Failed to delete category", {
             description: error?.message || "Unknown error occurred",
           })
         },

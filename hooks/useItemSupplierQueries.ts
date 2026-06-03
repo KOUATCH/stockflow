@@ -1,6 +1,15 @@
 "use client"
 
-import { itemSupplierAPI } from "@/services/itemSupplierAPI"
+import { notify } from "@/lib/notifications/notify"
+import {
+  getItemSuppliers,
+  getItemSupplierById,
+  getAllOrgItemSuppliers,
+  getItemSuppliersByItemId,
+  createItemSupplier,
+  updateItemSupplier as updateItemSupplierAction,
+  deleteItemSupplier
+} from "@/actions/suppliers/itemSupplierActions"
 import type {
   ItemSupplierDTO,
   UpdateItemSupplierDTO,
@@ -15,8 +24,6 @@ import {
   type UseQueryOptions,
   type UseMutationOptions,
 } from "@tanstack/react-query"
-import { toast } from "sonner"
-
 // Types
 interface ItemSupplierFilters {
   organizationId?: string
@@ -32,6 +39,67 @@ interface ItemSupplierFilters {
 interface DeleteItemSupplierParams {
   id: string
   organizationId?: string
+}
+
+type CreateItemSupplierMutationContext = {
+  previousLists: unknown
+  previousOrgData: unknown
+  tempId: string
+}
+
+type UpdateItemSupplierMutationContext = {
+  previousDetail: unknown
+  previousLists: unknown
+}
+
+type DeleteItemSupplierMutationContext = {
+  previousData: Map<string, unknown>
+  queryKeys: Array<readonly unknown[]>
+}
+
+function toNumberOrUndefined(value: unknown): number | undefined {
+  if (value === null || value === undefined) return undefined
+  if (typeof value === "number") return value
+  if (typeof value === "string") {
+    const parsed = Number(value)
+    return Number.isFinite(parsed) ? parsed : undefined
+  }
+
+  const maybeDecimal = value as { toNumber?: () => number }
+  if (typeof maybeDecimal.toNumber === "function") {
+    return maybeDecimal.toNumber()
+  }
+
+  return undefined
+}
+
+function toItemSupplierDTO(data: unknown): ItemSupplierDTO {
+  const itemSupplier = data as ItemSupplierDTO & { unitCost?: unknown }
+  return {
+    ...itemSupplier,
+    unitCost: toNumberOrUndefined(itemSupplier.unitCost),
+  }
+}
+
+function toBriefItemSupplierDTO(data: unknown): BriefItemSupplierDTO {
+  const itemSupplier = data as BriefItemSupplierDTO & { unitCost?: unknown }
+  return {
+    ...itemSupplier,
+    unitCost: toNumberOrUndefined(itemSupplier.unitCost),
+  }
+}
+
+function toItemSupplierActionData(data: CreateItemSupplierDTO | UpdateItemSupplierDTO) {
+  return {
+    itemId: data.itemId,
+    supplierId: data.supplierId,
+    supplierProductCode: data.supplierSku ?? undefined,
+    unitCost: data.unitCost,
+    minimumOrderQuantity: data.minOrderQty,
+    leadTimeDays: data.leadTime,
+    isPreferred: data.isPreferred,
+    notes: data.notes ?? undefined,
+  }
 }
 
 // Centralized Query Keys
@@ -54,7 +122,10 @@ export function useItemSuppliers(
 ) {
   return useQuery({
     queryKey: ItemSupplierKeys.list(filters),
-    queryFn: () => itemSupplierAPI.getItemSuppliers(filters),
+    queryFn: async () => {
+      const result = await getItemSuppliers(filters.organizationId)
+      return result.data?.map(toItemSupplierDTO) || []
+    },
     staleTime: 5 * 60 * 1000, // 5 minutes
     ...options,
   })
@@ -63,7 +134,11 @@ export function useItemSuppliers(
 export function useItemSupplier(id: string, options?: Omit<UseQueryOptions<ItemSupplierDTO>, "queryKey" | "queryFn">) {
   return useQuery({
     queryKey: ItemSupplierKeys.detail(id),
-    queryFn: () => itemSupplierAPI.getItemSupplier(id),
+    queryFn: async () => {
+      const result = await getItemSupplierById(id)
+      if (!result.success || !result.data) throw new Error(result.error || "Failed to fetch item supplier")
+      return toItemSupplierDTO(result.data)
+    },
     enabled: Boolean(id),
     staleTime: 5 * 60 * 1000,
     ...options,
@@ -79,7 +154,10 @@ export function useOrgItemSuppliers(
 ) {
   return useQuery({
     queryKey: ItemSupplierKeys.briefOrgItemSuppliers(organizationId),
-    queryFn: () => itemSupplierAPI.getAllOrgItemSuppliers(organizationId),
+    queryFn: async () => {
+      const result = await getAllOrgItemSuppliers(organizationId)
+      return result.data?.map(toBriefItemSupplierDTO) || []
+    },
     enabled: Boolean(organizationId) && (options?.enabled ?? true),
     initialData: options?.initialData,
     staleTime: 5 * 60 * 1000,
@@ -89,25 +167,38 @@ export function useOrgItemSuppliers(
 export function useSuspenseItemSuppliers(organizationId: string) {
   return useSuspenseQuery({
     queryKey: ItemSupplierKeys.briefOrgItemSuppliers(organizationId),
-    queryFn: () => itemSupplierAPI.getAllOrgItemSuppliers(organizationId),
+    queryFn: async () => {
+      const result = await getAllOrgItemSuppliers(organizationId)
+      return result.data?.map(toBriefItemSupplierDTO) || []
+    },
   })
 }
 
 export function useItemSuppliersForItem(itemId: string) {
   return useQuery({
     queryKey: ItemSupplierKeys.itemSuppliers(itemId),
-    queryFn: () => itemSupplierAPI.getItemSuppliersByItemId(itemId),
+    queryFn: async () => {
+      const result = await getItemSuppliersByItemId(itemId)
+      return result.data?.map(toItemSupplierDTO) || []
+    },
     enabled: Boolean(itemId),
     staleTime: 5 * 60 * 1000,
   })
 }
 
 // Mutation Hooks
-export function useCreateItemSupplier(options?: UseMutationOptions<ItemSupplierDTO, Error, CreateItemSupplierDTO>) {
+export function useCreateItemSupplier(
+  options?: UseMutationOptions<ItemSupplierDTO, Error, CreateItemSupplierDTO, CreateItemSupplierMutationContext>,
+) {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: (data: CreateItemSupplierDTO) => itemSupplierAPI.createItemSupplier(data),
+    meta: { operation: 'create', entity: 'Item Supplier' , suppressSuccessNotification: true, suppressErrorNotification: true },
+    mutationFn: async (data: CreateItemSupplierDTO) => {
+      const result = await createItemSupplier(toItemSupplierActionData(data))
+      if (!result.success || !result.data) throw new Error(result.error || 'Failed to create item supplier')
+      return toItemSupplierDTO(result.data)
+    },
     onMutate: async (variables) => {
       // Cancel outgoing queries
       await queryClient.cancelQueries({ queryKey: ItemSupplierKeys.lists() })
@@ -143,7 +234,7 @@ export function useCreateItemSupplier(options?: UseMutationOptions<ItemSupplierD
       return { previousLists, previousOrgData, tempId }
     },
     onSuccess: (data, variables, context) => {
-      toast.success("Item supplier created successfully", {
+      notify.success("Item supplier created successfully", {
         description: `Supplier relationship has been established`,
       })
 
@@ -160,7 +251,7 @@ export function useCreateItemSupplier(options?: UseMutationOptions<ItemSupplierD
       }
     },
     onError: (error, variables, context) => {
-      toast.error("Failed to create item supplier", {
+      notify.error("Failed to create item supplier", {
         description: error.message || "Unknown error occurred",
       })
 
@@ -179,11 +270,21 @@ export function useCreateItemSupplier(options?: UseMutationOptions<ItemSupplierD
   })
 }
 
-export function useUpdateItemSupplier(options?: UseMutationOptions<ItemSupplierDTO, Error, UpdateItemSupplierDTO>) {
+export function useUpdateItemSupplier(
+  options?: UseMutationOptions<ItemSupplierDTO, Error, UpdateItemSupplierDTO, UpdateItemSupplierMutationContext>,
+) {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: (data: UpdateItemSupplierDTO) => itemSupplierAPI.updateItemSupplier(data),
+    meta: { operation: 'update', entity: 'Item Supplier' , suppressSuccessNotification: true, suppressErrorNotification: true },
+    mutationFn: async (data: UpdateItemSupplierDTO) => {
+      const result = await updateItemSupplierAction({
+        id: data.id,
+        ...toItemSupplierActionData(data)
+      })
+      if (!result.success || !result.data) throw new Error(result.error || 'Failed to update item supplier')
+      return toItemSupplierDTO(result.data)
+    },
     onMutate: async (variables) => {
       // Cancel outgoing queries
       await queryClient.cancelQueries({ queryKey: ItemSupplierKeys.detail(variables.id) })
@@ -206,7 +307,7 @@ export function useUpdateItemSupplier(options?: UseMutationOptions<ItemSupplierD
       return { previousDetail, previousLists }
     },
     onSuccess: (data, variables) => {
-      toast.success("Item supplier updated successfully", {
+      notify.success("Item supplier updated successfully", {
         description: "Supplier information has been updated",
       })
 
@@ -223,7 +324,7 @@ export function useUpdateItemSupplier(options?: UseMutationOptions<ItemSupplierD
       queryClient.invalidateQueries({ queryKey: ItemSupplierKeys.supplierItems(data.supplierId) })
     },
     onError: (error, variables, context) => {
-      toast.error("Failed to update item supplier", {
+      notify.error("Failed to update item supplier", {
         description: error.message || "Unknown error occurred",
       })
 
@@ -239,14 +340,21 @@ export function useUpdateItemSupplier(options?: UseMutationOptions<ItemSupplierD
   })
 }
 
-export function useDeleteItemSupplier(options?: UseMutationOptions<void, Error, DeleteItemSupplierParams>) {
+export function useDeleteItemSupplier(
+  options?: UseMutationOptions<void, Error, DeleteItemSupplierParams, DeleteItemSupplierMutationContext>,
+) {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: ({ id }: DeleteItemSupplierParams) => itemSupplierAPI.deleteItemSupplier(id),
-    onMutate: async ({ id, organizationId }) => {
+    meta: { operation: 'delete', entity: 'Item Supplier' , suppressSuccessNotification: true, suppressErrorNotification: true },
+    mutationFn: async ({ id }: DeleteItemSupplierParams) => {
+      const result = await deleteItemSupplier(id)
+      if (!result.success) throw new Error(result.error || 'Failed to delete item supplier')
+      return undefined
+    },
+    onMutate: async ({ id, organizationId }): Promise<DeleteItemSupplierMutationContext> => {
       // Build query keys based on available data
-      const queryKeys = [
+      const queryKeys: DeleteItemSupplierMutationContext["queryKeys"] = [
         ItemSupplierKeys.lists(),
         ItemSupplierKeys.detail(id),
         ...(organizationId ? [ItemSupplierKeys.briefOrgItemSuppliers(organizationId)] : []),
@@ -299,7 +407,7 @@ export function useDeleteItemSupplier(options?: UseMutationOptions<void, Error, 
       return { previousData, queryKeys }
     },
     onSuccess: (_, { id }) => {
-      toast.success("Item supplier deleted successfully", {
+      notify.success("Item supplier deleted successfully", {
         description: "Supplier relationship has been removed",
       })
 
@@ -310,7 +418,7 @@ export function useDeleteItemSupplier(options?: UseMutationOptions<void, Error, 
       queryClient.invalidateQueries({ queryKey: ItemSupplierKeys.lists() })
     },
     onError: (error, { id }, context) => {
-      toast.error("Failed to delete item supplier", {
+      notify.error("Failed to delete item supplier", {
         description: error.message || "Unknown error occurred",
       })
 
@@ -365,13 +473,20 @@ export function usePrefetchItemSupplier() {
     prefetchDetail: (id: string) =>
       queryClient.prefetchQuery({
         queryKey: ItemSupplierKeys.detail(id),
-        queryFn: () => itemSupplierAPI.getItemSupplier(id),
+        queryFn: async () => {
+          const result = await getItemSupplierById(id)
+          if (!result.success || !result.data) throw new Error(result.error || "Failed to fetch item supplier")
+          return toItemSupplierDTO(result.data)
+        },
         staleTime: 5 * 60 * 1000,
       }),
     prefetchList: (filters: ItemSupplierFilters = {}) =>
       queryClient.prefetchQuery({
         queryKey: ItemSupplierKeys.list(filters),
-        queryFn: () => itemSupplierAPI.getItemSuppliers(filters),
+        queryFn: async () => {
+          const result = await getItemSuppliers(filters.organizationId)
+          return result.data?.map(toItemSupplierDTO) || []
+        },
         staleTime: 5 * 60 * 1000,
       }),
   }

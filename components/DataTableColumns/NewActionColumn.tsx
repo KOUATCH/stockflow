@@ -1,5 +1,6 @@
 "use client";
 
+import { notify } from "@/lib/notifications/notify"
 import {
   AlertDialog,
   AlertDialogCancel,
@@ -13,8 +14,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { Pencil, Trash } from "lucide-react";
 import Link from "next/link";
-import { toast } from "sonner";
-
 type ActionColumnProps = {
   // The model name for display in messages
   modelName: string;
@@ -33,10 +32,10 @@ const NewActionColumn = ({
  const handleDelete=async()=> {
     try {
       await onDelete();
-      toast.success(`${modelName} Deleted Successfully`,{description:`"${modelName}  deletion Successful"`});
+      notify.success(`${modelName} Deleted Successfully`,{description:`"${modelName}  deletion Successful"`});
     } catch (error) {
       console.error(error);
-      toast.error(`${modelName} couldn't delete`,{description:`"Error in ${modelName} deletion ,problem encountered"`});
+      notify.error(`${modelName} couldn't delete`,{description:`"Error in ${modelName} deletion ,problem encountered"`});
     }
   }
 

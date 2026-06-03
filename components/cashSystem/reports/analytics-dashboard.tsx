@@ -75,14 +75,22 @@ export function AnalyticsDashboard({ locationId, organizationId }: AnalyticsDash
   const [summary, setSummary] = useState<DashboardSummary | null>(null)
   const [salesData, setSalesData] = useState<any>(null)
   const [isLoading, setIsLoading] = useState(true)
+  const [isRefreshing, setIsRefreshing] = useState(false)
   const [lastUpdated, setLastUpdated] = useState<Date>(new Date())
   const [dateRange, setDateRange] = useState(7) // Days
+  const [error, setError] = useState<string | null>(null)
 
-  const loadDashboardData = async () => {
+  const loadDashboardData = async (isRefresh = false) => {
     if (!organizationId || !locationId) return
 
     try {
-      setIsLoading(true)
+      if (isRefresh) {
+        setIsRefreshing(true)
+      } else {
+        setIsLoading(true)
+      }
+      setError(null)
+
       const [summaryData, analyticsData] = await Promise.all([
         getDashboardSummary(organizationId, locationId),
         getSalesAnalytics(organizationId, locationId, subDays(new Date(), dateRange), new Date()),
@@ -93,16 +101,31 @@ export function AnalyticsDashboard({ locationId, organizationId }: AnalyticsDash
       setLastUpdated(new Date())
     } catch (error) {
       console.error("Error loading dashboard data:", error)
+      setError("Failed to load analytics data. Please try refreshing.")
     } finally {
       setIsLoading(false)
+      setIsRefreshing(false)
     }
   }
 
+  const handleRefresh = () => {
+    loadDashboardData(true)
+  }
+
   useEffect(() => {
-    loadDashboardData()
-    // Auto-refresh every 2 minutes for real-time updates
-    const interval = setInterval(loadDashboardData, 2 * 60 * 1000)
-    return () => clearInterval(interval)
+    // Only load data and set interval if we have valid IDs
+    if (organizationId && locationId) {
+      loadDashboardData()
+      // Auto-refresh every 5 minutes for real-time updates (less aggressive)
+      const interval = setInterval(() => loadDashboardData(true), 5 * 60 * 1000)
+      return () => clearInterval(interval)
+    } else {
+      // Clear loading state if IDs are not available
+      setIsLoading(false)
+      setSummary(null)
+      setSalesData(null)
+      setError(null)
+    }
   }, [organizationId, locationId, dateRange])
 
   const exportData = () => {
@@ -125,6 +148,31 @@ export function AnalyticsDashboard({ locationId, organizationId }: AnalyticsDash
     URL.revokeObjectURL(url)
   }
 
+  // Show error state if required IDs are missing
+  if (!organizationId || !locationId) {
+    return (
+      <div className="space-y-6">
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-yellow-600" />
+              Configuration Required
+            </CardTitle>
+            <CardDescription>
+              Please configure your organization and location settings to view analytics data.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="text-center py-8 text-muted-foreground">
+              <Package className="h-12 w-12 mx-auto mb-3 opacity-50" />
+              <p>Organization ID and Location ID are required to load analytics data.</p>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+    )
+  }
+
   if (isLoading || !summary) {
     return (
       <div className="space-y-6">
@@ -144,26 +192,50 @@ export function AnalyticsDashboard({ locationId, organizationId }: AnalyticsDash
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-3xl font-bold text-balance">Analytics Dashboard</h1>
-          <p className="text-muted-foreground">
-            Last updated: {format(lastUpdated, "MMM dd, yyyy HH:mm")} • Auto-refresh every 2 minutes
-          </p>
+          <div className="flex items-center gap-2 mt-1">
+            <p className="text-muted-foreground">
+              Last updated: {format(lastUpdated, "MMM dd, yyyy HH:mm")}
+            </p>
+            <span className="text-muted-foreground">•</span>
+            <div className="flex items-center gap-1">
+              <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" />
+              <p className="text-sm text-muted-foreground">Auto-refresh every 5 minutes</p>
+            </div>
+            {error && (
+              <>
+                <span className="text-muted-foreground">•</span>
+                <p className="text-sm text-red-600">{error}</p>
+              </>
+            )}
+          </div>
         </div>
         <div className="flex gap-2">
           <select
             value={dateRange}
             onChange={(e) => setDateRange(Number(e.target.value))}
-            className="px-3 py-2 border rounded-lg"
+            className="px-3 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            disabled={isLoading || isRefreshing}
           >
             <option value={1}>Last 24 hours</option>
             <option value={7}>Last 7 days</option>
             <option value={30}>Last 30 days</option>
             <option value={90}>Last 90 days</option>
           </select>
-          <Button variant="outline" size="sm" onClick={loadDashboardData}>
-            <RefreshCw className="h-4 w-4 mr-2" />
-            Refresh
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleRefresh}
+            disabled={isLoading || isRefreshing}
+          >
+            <RefreshCw className={`h-4 w-4 mr-2 ${isRefreshing ? "animate-spin" : ""}`} />
+            {isRefreshing ? "Refreshing..." : "Refresh"}
           </Button>
-          <Button variant="outline" size="sm" onClick={exportData}>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={exportData}
+            disabled={isLoading || isRefreshing || !summary || !salesData}
+          >
             <Download className="h-4 w-4 mr-2" />
             Export
           </Button>
@@ -171,7 +243,7 @@ export function AnalyticsDashboard({ locationId, organizationId }: AnalyticsDash
       </div>
 
       {/* Enhanced Key Metrics */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className={`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 transition-opacity ${isRefreshing ? "opacity-75" : "opacity-100"}`}>
         <Card className="relative overflow-hidden">
           <CardContent className="p-4">
             <div className="flex items-center gap-3">

@@ -1,8 +1,9 @@
 "use server"
 
 import { db } from "@/prisma/db"
-import type { CustomerFinancialAccount, CustomerTransaction, CustomerPayment, CustomerDebt } from "@/types/retailFinance"
-import { startOfDay, endOfDay, differenceInDays } from "date-fns"
+import type { CustomerDebt, CustomerFinancialAccount, CustomerPayment, CustomerTransaction } from "@/types/retailFinance"
+import type { PaymentMethod, PaymentStatus } from "@prisma/client"
+import { differenceInDays } from "date-fns"
 
 export class CustomerFinancialManager {
 
@@ -16,7 +17,7 @@ export class CustomerFinancialManager {
         include: {
           salesOrders: {
             include: {
-              salesOrderLines: {
+              lines: {
                 include: {
                   item: true
                 }
@@ -80,7 +81,7 @@ export class CustomerFinancialManager {
       where: { customerId },
       include: {
         payments: true,
-        salesOrderLines: {
+        lines: {
           include: { item: true }
         }
       },
@@ -144,7 +145,7 @@ export class CustomerFinancialManager {
       id: payment.id,
       date: payment.processedAt || payment.createdAt,
       amount: payment.amount,
-      method: payment.method as any,
+      method: payment.method === 'DIGITAL' ? 'BANK_TRANSFER' : payment.method,
       reference: payment.paymentNumber,
       appliedTo: [payment.salesOrder?.orderNumber || ''],
       notes: payment.notes || undefined
@@ -156,7 +157,7 @@ export class CustomerFinancialManager {
    */
   static async recordCustomerPayment(customerId: string, paymentData: {
     amount: number
-    method: 'CASH' | 'CARD' | 'BANK_TRANSFER' | 'CHECK' | 'MOBILE_MONEY'
+    method: PaymentMethod
     reference?: string
     appliedToInvoices?: string[]
     notes?: string
@@ -193,7 +194,7 @@ export class CustomerFinancialManager {
             paymentNumber: `PAY-${Date.now()}-${Math.random().toString(36).substr(2, 6)}`,
             amount: paymentAmount,
             method: paymentData.method,
-            status: 'PAID',
+            status: 'PAID' as PaymentStatus,
             salesOrderId: order.id,
             transactionId: paymentData.reference || undefined,
             notes: paymentData.notes || undefined,

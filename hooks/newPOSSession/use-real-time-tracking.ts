@@ -1,8 +1,8 @@
 "use client"
 
+import { notify } from "@/lib/notifications/notify"
 import { getCashDrawerSummary, getCurrentSession } from "@/actions/newPOSSession/cash-drawer/cash-drawer-actions"
 import { useInventorySummary, useLowStockItems } from "@/hooks/newPOSSession/use-items-with-inventory"
-import { useToast } from "@/hooks/use-toast"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { useCallback, useEffect, useState } from "react"
 
@@ -82,8 +82,6 @@ export function useRealTimeBalanceTracking(
     criticalStockItems: 0,
     systemUptime: 0,
   })
-  const { toast } = useToast()
-  const queryClient = useQueryClient()
 
   // Get current session with enhanced error handling
   const { data: session, error: sessionError } = useQuery({
@@ -131,8 +129,8 @@ export function useRealTimeBalanceTracking(
         return [newAlert, ...prev.slice(0, 99)] // Keep last 100 alerts
       })
 
-      // Enhanced toast notification with action buttons
-      toast({
+      // Enhanced provider notification with action buttons
+      notify({
         variant: alert.severity === "critical" || alert.severity === "high" ? "destructive" : "default",
         title: alert.title,
         description: alert.message,
@@ -160,7 +158,7 @@ export function useRealTimeBalanceTracking(
 
       return newAlert.id
     },
-    [toast, enableAudioAlerts],
+    [enableAudioAlerts],
   )
 
   const acknowledgeAlert = useCallback((alertId: string) => {
@@ -295,7 +293,6 @@ export function useLowStockMonitoring(
   const { pollingInterval = 60000, lowStockThreshold = 10, criticalStockThreshold = 2, enabled = true } = options
   const [previousLowStockCount, setPreviousLowStockCount] = useState<number>(0)
   const [previousCriticalStockCount, setPreviousCriticalStockCount] = useState<number>(0)
-  const { toast } = useToast()
 
   const { data: lowStockItems } = useLowStockItems(locationId, organizationId, {
     enabled: Boolean(locationId && organizationId && enabled),
@@ -318,7 +315,7 @@ export function useLowStockMonitoring(
 
       // Critical stock alert
       if (newCriticalItems > 0) {
-        toast({
+        notify({
           variant: "destructive",
           title: "Critical Stock Alert",
           description: `${newCriticalItems} item(s) are critically low on stock (≤${criticalStockThreshold} units)`,
@@ -327,7 +324,7 @@ export function useLowStockMonitoring(
       }
       // Low stock alert
       else if (newLowStockItems > 0) {
-        toast({
+        notify({
           title: "Low Stock Alert",
           description: `${newLowStockItems} item(s) are running low on stock`,
         })
@@ -336,7 +333,7 @@ export function useLowStockMonitoring(
       setPreviousLowStockCount(lowStockItems.length)
       setPreviousCriticalStockCount(criticalStockItems.length)
     }
-  }, [lowStockItems, previousLowStockCount, previousCriticalStockCount, criticalStockThreshold, toast])
+  }, [lowStockItems, previousLowStockCount, previousCriticalStockCount, criticalStockThreshold])
 
   return {
     lowStockItems: lowStockItems || [],
@@ -363,7 +360,6 @@ export function useSessionTimeoutMonitoring(
 ) {
   const { warningIntervals = [1, 0.5, 0.25], maxSessionHours = 12, enabled = true } = options
   const [warningsShown, setWarningsShown] = useState<Set<number>>(new Set())
-  const { toast } = useToast()
 
   const { data: session } = useQuery({
     queryKey: ["session-timeout", sessionId],
@@ -385,7 +381,7 @@ export function useSessionTimeoutMonitoring(
         if (sessionDurationHours >= warningThreshold && !warningsShown.has(warningHours)) {
           const severity = warningHours <= 0.25 ? "critical" : warningHours <= 0.5 ? "high" : "medium"
 
-          toast({
+          notify({
             variant: severity === "critical" ? "destructive" : "default",
             title: "Session Timeout Warning",
             description: `Your session has been active for ${sessionDurationHours.toFixed(1)} hours. ${warningHours <= 0.25 ? "URGENT: " : ""}Please consider closing and reconciling ${warningHours <= 0.5 ? "immediately" : "soon"}.`,
@@ -401,7 +397,7 @@ export function useSessionTimeoutMonitoring(
         setWarningsShown(new Set())
       }
     }
-  }, [session, maxSessionHours, warningIntervals, warningsShown, toast])
+  }, [session, maxSessionHours, warningIntervals, warningsShown])
 
   return {
     session,
@@ -428,9 +424,6 @@ export function useSystemMonitoring(
 ) {
   const { pollingInterval = 30000, enabled = true } = options
   const [systemAlerts, setSystemAlerts] = useState<Alert[]>([])
-  const { toast } = useToast()
-
-  // Monitor overall system health
   const { data: systemMetrics } = useQuery({
     queryKey: ["system-metrics", organizationId, locationId],
     queryFn: async () => {

@@ -279,7 +279,7 @@ export function CashReconciliationReportComponent({ locationId, organizationId }
               <Label htmlFor="startDate">Start Date</Label>
               <DatePicker
                 date={startDate}
-                onDateChange={setStartDate}
+                onDateChange={(date) => setStartDate(date!)}
                 placeholder="Select start date"
                 maxDate={endDate}
               />
@@ -289,7 +289,7 @@ export function CashReconciliationReportComponent({ locationId, organizationId }
               <Label htmlFor="endDate">End Date</Label>
               <DatePicker
                 date={endDate}
-                onDateChange={setEndDate}
+                onDateChange={(date) => setEndDate(date!)}
                 placeholder="Select end date"
                 minDate={startDate}
                 maxDate={new Date()}

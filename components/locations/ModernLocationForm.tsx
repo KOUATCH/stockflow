@@ -44,7 +44,7 @@ const locationCreationSchema = z.object({
     .min(2, "Code must be at least 2 characters")
     .max(20, "Code must be less than 20 characters")
     .regex(/^[A-Z0-9-_]+$/, "Code can only contain uppercase letters, numbers, hyphens, and underscores"),
-  type: z.enum(["WAREHOUSE", "STORE", "DISTRIBUTION_CENTER", "OFFICE"], {
+  type: z.enum(["WAREHOUSE", "STORE", "DISTRIBUTION_CENTER", "SUPPLIER", "CUSTOMER", "MANUFACTURING", "QUARANTINE", "DAMAGED", "TRANSIT", "VIRTUAL"], {
     required_error: "Please select a location type"
   }),
   address: z.string().optional(),
@@ -81,6 +81,8 @@ export function ModernLocationForm({
   const [completedSteps, setCompletedSteps] = useState<Set<FormStep>>(new Set())
   const { success, error, warning, info, operationStart, operationComplete } = useNotifications()
 
+  // Component state tracking
+
   // Welcome notification when component mounts
   useEffect(() => {
     info("Get Started", "Complete each step to create your new location. Start with the basic information!")
@@ -114,11 +116,24 @@ export function ModernLocationForm({
     const fieldsByStep: Record<FormStep, (keyof LocationCreationFormData)[]> = {
       basic: ['name', 'code'],
       details: ['type'],
-      contact: ['address', 'phone', 'email']
+      contact: [] // No required fields in contact step - all are optional
     }
 
     const fieldsToValidate = fieldsByStep[step]
-    const result = await form.trigger(fieldsToValidate)
+
+    // If there are no fields to validate (like contact step), consider it valid
+    let result = true;
+    if (fieldsToValidate.length > 0) {
+      result = await form.trigger(fieldsToValidate)
+    }
+
+    // For contact step, also validate email format if it's provided
+    if (step === 'contact') {
+      const emailValue = form.getValues('email');
+      if (emailValue && emailValue.trim() !== '') {
+        result = await form.trigger(['email']) && result;
+      }
+    }
 
     if (result) {
       setCompletedSteps(prev => new Set(prev).add(step))
@@ -132,6 +147,7 @@ export function ModernLocationForm({
 
   const handleNext = async () => {
     const isValid = await validateStep(currentStep)
+
     if (isValid && currentStepIndex < FORM_STEPS.length - 1) {
       const nextStep = FORM_STEPS[currentStepIndex + 1]
       setCurrentStep(nextStep.id)
@@ -176,13 +192,17 @@ export function ModernLocationForm({
             formData.append(key, String(value))
           }
         })
-        await action(formData)
-      }
 
-      operationComplete("Location Created", `${data.name} has been successfully created with code: ${data.code}`)
-    } catch (error) {
-      console.log("Failed to create location:", error)
-      operationComplete("Creation Failed", "Failed to create location. Please check your information and try again.")
+        await action(formData)
+
+        // If we reach here, the action was successful
+        operationComplete("Location Created", `${data.name} has been successfully created with code: ${data.code}`)
+      } else {
+        error("Configuration Error", "No action provided for location creation")
+      }
+    } catch (err) {
+      const errorMessage = err instanceof Error ? err.message : "Failed to create location. Please check your information and try again."
+      error("Creation Failed", errorMessage)
     }
   }
 
@@ -362,7 +382,13 @@ export function ModernLocationForm({
                         <SelectItem value="WAREHOUSE">📦 Warehouse</SelectItem>
                         <SelectItem value="STORE">🏪 Store</SelectItem>
                         <SelectItem value="DISTRIBUTION_CENTER">🚚 Distribution Center</SelectItem>
-                        <SelectItem value="OFFICE">🏢 Office</SelectItem>
+                        <SelectItem value="SUPPLIER">Supplier</SelectItem>
+                        <SelectItem value="CUSTOMER">Customer</SelectItem>
+                        <SelectItem value="MANUFACTURING">Manufacturing</SelectItem>
+                        <SelectItem value="QUARANTINE">Quarantine</SelectItem>
+                        <SelectItem value="DAMAGED">Damaged</SelectItem>
+                        <SelectItem value="TRANSIT">Transit</SelectItem>
+                        <SelectItem value="VIRTUAL">Virtual</SelectItem>
                       </SelectContent>
                     </Select>
                     <FormDescription className="text-sm text-slate-500 dark:text-slate-400">

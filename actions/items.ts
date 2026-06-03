@@ -3,25 +3,56 @@
 import { db } from "@/prisma/db";
 import { revalidatePath } from "next/cache";
 
+function normalizeItemMutationData(itemData: any) {
+  const { name, description, imageUrls, ...rest } = itemData;
+  const data = { ...rest };
+
+  if (!data.nameEn && name) {
+    data.nameEn = name;
+  }
+
+  if (!data.descriptionEn && description) {
+    data.descriptionEn = description;
+  }
+
+  if (imageUrls !== undefined) {
+    data.imageUrls = Array.isArray(imageUrls) ? imageUrls : [imageUrls];
+  }
+
+  return data;
+}
+
+const itemRelationsInclude = {
+  category: true,
+  brand: true,
+  unit: true,
+} as const;
+
+function mapLegacyItemShape(item: any) {
+  return {
+    ...item,
+    name: item.nameEn ?? item.nameFr ?? "",
+    description: item.descriptionEn ?? item.descriptionFr ?? null,
+    categories: item.category,
+    brands: item.brand,
+    units: item.unit,
+  };
+}
+
 // Get all items for an organization
 export async function getItems() {
   try {
 
     const items = await db.item.findMany({
       orderBy: {
-        name: "desc",
+        nameEn: "desc",
       },
-      include: {
-        category: true,
-        brand: true,
-        location: true,
-        unit: true,
-      }
+      include: itemRelationsInclude,
     });
 
     return {
       success: true,
-      data: items,
+      data: items.map(mapLegacyItemShape),
     };
   } catch (error) {
     console.error("Error fetching items:", error);
@@ -41,19 +72,14 @@ export async function getItemsByOrganization(organizationId: string) {
         organizationId,
       },
       orderBy: {
-        name: "desc",
+        nameEn: "desc",
       },
-      include: {
-        category: true,
-        brand: true,
-        location: true,
-        unit: true,
-      }
+      include: itemRelationsInclude,
     });
 
     return {
       success: true,
-      data: items,
+      data: items.map(mapLegacyItemShape),
     };
   } catch (error) {
     console.error("Error fetching items by organization:", error);
@@ -74,22 +100,28 @@ export async function getBriefItems(organizationId?: string) {
       where: whereClause,
       select: {
         id: true,
-        name: true,
+        nameEn: true,
+        nameFr: true,
         sku: true,
-        buyingPrice: true,
+        costPrice: true,
         sellingPrice: true,
-        qty: true,
+        minStockLevel: true,
         categoryId: true,
         brandId: true,
       },
       orderBy: {
-        name: "asc",
+        nameEn: "asc",
       },
     });
 
     return {
       success: true,
-      data: items,
+      data: items.map((item) => ({
+        ...item,
+        name: item.nameEn,
+        buyingPrice: item.costPrice,
+        qty: item.minStockLevel,
+      })),
     };
   } catch (error) {
     console.error("Error fetching brief items:", error);
@@ -105,20 +137,15 @@ export async function createItem(itemData: any) {
   try {
 
     const newItem = await db.item.create({
-      data: itemData,
-      include: {
-        category: true,
-        brand: true,
-        location: true,
-        unit: true,
-      }
+      data: normalizeItemMutationData(itemData),
+      include: itemRelationsInclude,
     });
 
     revalidatePath("/dashboard/inventory/items");
 
     return {
       success: true,
-      data: newItem,
+      data: mapLegacyItemShape(newItem),
     };
   } catch (error) {
     console.error("Error creating item:", error);
@@ -135,20 +162,15 @@ export async function updateItem(itemId: string, itemData: any) {
 
     const updatedItem = await db.item.update({
       where: { id: itemId },
-      data: itemData,
-      include: {
-        category: true,
-        brand: true,
-        location: true,
-        unit: true,
-      }
+      data: normalizeItemMutationData(itemData),
+      include: itemRelationsInclude,
     });
 
     revalidatePath("/dashboard/inventory/items");
 
     return {
       success: true,
-      data: updatedItem,
+      data: mapLegacyItemShape(updatedItem),
     };
   } catch (error) {
     console.error("Error updating item:", error);

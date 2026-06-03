@@ -15,13 +15,25 @@ const updateLocationById = async (id: string, data: LocationDTO) => {
       if (!location) {
         throw new Error("location not found");
       }
-      await tx.location.update({
+      const updatedLocation = await tx.location.update({
         where: { id },
-        data: { ...data }
+        data: {
+          name: data.name,
+          code: data.code,
+          type: data.type,
+          address: data.address,
+          phone: data.phone,
+          email: data.email,
+          isActive: data.isActive,
+          isDefault: data.isDefault,
+          managerId: data.managerId,
+          allowNegativeStock: data.allowNegativeStock,
+          requiresApproval: data.requiresApproval,
+        }
       })
       revalidatePath("/inventory/locations");
       return {
-        data: location,
+        data: updatedLocation,
         success: true,
         error: null,
       }

@@ -34,6 +34,7 @@ export function useToggleSupplierActive(
 ) {
   const qc = useQueryClient()
   return useMutation({
+    meta: { operation: 'toggle', entity: 'Supplier Active' },
     mutationFn: toggleAction,
     onSuccess: async (_data, variables) => {
       await Promise.all([
@@ -47,6 +48,7 @@ export function useToggleSupplierActive(
 export function useDeleteSupplier(deleteAction: (id: string, organizationId: string) => Promise<any>) {
   const qc = useQueryClient()
   return useMutation({
+    meta: { operation: 'delete', entity: 'Supplier' },
     mutationFn: ({ id, organizationId }: { id: string; organizationId: string }) => deleteAction(id, organizationId),
     onSuccess: async (_d, vars) => {
       await qc.invalidateQueries({ queryKey: ["suppliers", vars.organizationId] })
@@ -59,6 +61,7 @@ export function useUpsertSupplier(
 ) {
   const qc = useQueryClient()
   return useMutation({
+    meta: { operation: 'update', entity: 'Supplier' },
     mutationFn: upsertAction,
     onSuccess: async (d) => {
       await Promise.all([

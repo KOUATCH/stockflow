@@ -1,22 +1,14 @@
 "use client"
 
-import { useState } from "react"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { useMemo } from "react"
+import type { CellContext } from "@tanstack/react-table"
 import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { useNotifications } from "@/components/notifications/NotificationProvider"
 import {
   Users,
   TrendingUp,
   TrendingDown,
-  DollarSign,
   ShoppingCart,
-  Target,
-  ArrowUpDown,
-  Search,
   Eye,
   Download,
   Star,
@@ -25,9 +17,23 @@ import {
 } from "lucide-react"
 import type { CustomerPerformance } from "@/types/financialTypes"
 
+import {
+  EnhancedDataTable,
+  createTableConfig,
+  createToolbarConfig,
+  createTextFilter,
+  createSelectFilter,
+  type EnhancedColumnDef,
+} from '@/components/ui/enhanced-data-table'
+
 interface CustomerPerformanceTableProps {
   customers: CustomerPerformance[]
+  loading?: boolean
+  onViewCustomer?: (customerId: string) => void
+  onExport?: (data: CustomerPerformance[], format: string) => void
 }
+
+type CustomerPerformanceCellContext = CellContext<CustomerPerformance, unknown>
 
 // Mock customer performance data
 const mockCustomerData: CustomerPerformance[] = [
@@ -208,38 +214,13 @@ const mockCustomerData: CustomerPerformance[] = [
   }
 ]
 
-export function CustomerPerformanceTable({ customers = mockCustomerData }: CustomerPerformanceTableProps) {
-  const [searchQuery, setSearchQuery] = useState("")
-  const [sortField, setSortField] = useState<keyof CustomerPerformance["metrics"]>("totalRevenue")
-  const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc")
-  const [riskFilter, setRiskFilter] = useState<string>("all")
+export function CustomerPerformanceTable({
+  customers = mockCustomerData,
+  loading = false,
+  onViewCustomer = (customerId: string) => console.log("View customer:", customerId),
+  onExport = (data: CustomerPerformance[], format: string) => console.log("Export:", format, data)
+}: CustomerPerformanceTableProps) {
   const { info, success } = useNotifications()
-
-  const filteredAndSortedCustomers = customers
-    .filter(customer => {
-      const matchesSearch = customer.customerName.toLowerCase().includes(searchQuery.toLowerCase())
-      const matchesRisk = riskFilter === "all" || customer.risk.creditRisk === riskFilter
-      return matchesSearch && matchesRisk
-    })
-    .sort((a, b) => {
-      const aValue = a.metrics[sortField] as number
-      const bValue = b.metrics[sortField] as number
-
-      if (sortDirection === "asc") {
-        return aValue - bValue
-      } else {
-        return bValue - aValue
-      }
-    })
-
-  const handleSort = (field: keyof CustomerPerformance["metrics"]) => {
-    if (field === sortField) {
-      setSortDirection(sortDirection === "asc" ? "desc" : "asc")
-    } else {
-      setSortField(field)
-      setSortDirection("desc")
-    }
-  }
 
   const formatCurrency = (amount: number) => {
     return new Intl.NumberFormat("en-US", {
@@ -254,16 +235,16 @@ export function CustomerPerformanceTable({ customers = mockCustomerData }: Custo
     return `${value.toFixed(1)}%`
   }
 
-  const getRiskColor = (risk: string) => {
+  const getRiskVariant = (risk: string) => {
     switch (risk) {
       case "low":
-        return "bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300 border-green-200 dark:border-green-700"
+        return "default" as const
       case "medium":
-        return "bg-amber-100 text-amber-700 dark:bg-amber-900/30 dark:text-amber-300 border-amber-200 dark:border-amber-700"
+        return "secondary" as const
       case "high":
-        return "bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300 border-red-200 dark:border-red-700"
+        return "destructive" as const
       default:
-        return "bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400 border-slate-200 dark:border-slate-700"
+        return "outline" as const
     }
   }
 
@@ -286,216 +267,286 @@ export function CustomerPerformanceTable({ customers = mockCustomerData }: Custo
     return <div className="h-3 w-3" />
   }
 
-  const handleViewCustomer = (customerId: string) => {
-    info("Customer Details", `Opening detailed analysis for customer ${customerId}`)
+  const handleViewCustomer = (customer: CustomerPerformance) => {
+    info("Customer Details", `Opening detailed analysis for ${customer.customerName}`)
+    onViewCustomer(customer.customerId)
   }
 
-  const handleExportData = () => {
-    success("Export Started", "Customer performance data is being prepared for download")
+  const handleExportData = (data: CustomerPerformance[], format: string) => {
+    success("Export Started", `Customer performance data is being prepared for download as ${format}`)
+    onExport(data, format)
   }
+
+  const columns = useMemo<EnhancedColumnDef<CustomerPerformance>[]>(() => [
+    {
+      accessorKey: "customerName",
+      header: "Customer",
+      cell: ({ row }: CustomerPerformanceCellContext) => {
+        const customer = row.original;
+        return (
+          <div className="flex items-center gap-2">
+            <div className="font-semibold">{customer.customerName}</div>
+            {customer.metrics.lifetimeValue > 400000 && (
+              <span title="High Value Customer">
+                <Star className="h-3 w-3 text-amber-500 fill-amber-500" />
+              </span>
+            )}
+          </div>
+        );
+      },
+      options: {
+        searchable: true,
+        sortable: true,
+        width: 200,
+      },
+    },
+    {
+      accessorKey: "metrics.totalRevenue",
+      header: "Revenue",
+      cell: ({ row }: CustomerPerformanceCellContext) => {
+        const customer = row.original;
+        return (
+          <div className="flex flex-col">
+            <span className="font-semibold">
+              {formatCurrency(customer.metrics.totalRevenue)}
+            </span>
+            <span className="text-xs text-muted-foreground">
+              Avg: {formatCurrency(customer.metrics.averageOrderValue)}
+            </span>
+          </div>
+        );
+      },
+      options: {
+        sortable: true,
+        isNumeric: true,
+        align: 'right',
+        width: 140,
+      },
+    },
+    {
+      accessorKey: "metrics.totalOrders",
+      header: "Orders",
+      cell: ({ row }: CustomerPerformanceCellContext) => {
+        const orders = row.original.metrics.totalOrders;
+        return (
+          <div className="flex items-center gap-2">
+            <ShoppingCart className="h-4 w-4 text-muted-foreground" />
+            <span className="font-medium">{orders}</span>
+          </div>
+        );
+      },
+      options: {
+        sortable: true,
+        isNumeric: true,
+        width: 100,
+      },
+    },
+    {
+      accessorKey: "metrics.grossProfitMargin",
+      header: "Margin",
+      cell: ({ row }: CustomerPerformanceCellContext) => {
+        const customer = row.original;
+        return (
+          <div className="flex flex-col">
+            <span className="font-semibold">
+              {formatPercentage(customer.metrics.grossProfitMargin)}
+            </span>
+            <span className="text-xs text-muted-foreground">
+              {formatCurrency(customer.metrics.grossProfit)}
+            </span>
+          </div>
+        );
+      },
+      options: {
+        sortable: true,
+        isNumeric: true,
+        align: 'right',
+        width: 120,
+      },
+    },
+    {
+      accessorKey: "metrics.lifetimeValue",
+      header: "LTV",
+      cell: ({ row }: CustomerPerformanceCellContext) => {
+        const ltv = row.original.metrics.lifetimeValue;
+        return (
+          <div className="font-semibold">
+            {formatCurrency(ltv)}
+          </div>
+        );
+      },
+      options: {
+        sortable: true,
+        isNumeric: true,
+        align: 'right',
+        width: 120,
+      },
+    },
+    {
+      accessorKey: "trends.revenueGrowth",
+      header: "Growth",
+      cell: ({ row }: CustomerPerformanceCellContext) => {
+        const growth = row.original.trends.revenueGrowth;
+        return (
+          <div className="flex items-center gap-1">
+            {getTrendIcon(growth)}
+            <span className={`text-sm font-medium ${
+              growth > 0 ? 'text-green-600' : growth < 0 ? 'text-red-600' : 'text-muted-foreground'
+            }`}>
+              {growth > 0 ? '+' : ''}{formatPercentage(growth)}
+            </span>
+          </div>
+        );
+      },
+      options: {
+        sortable: true,
+        isNumeric: true,
+        width: 100,
+      },
+    },
+    {
+      accessorKey: "risk.creditRisk",
+      header: "Risk",
+      cell: ({ row }: CustomerPerformanceCellContext) => {
+        const risk = row.original.risk.creditRisk;
+        return (
+          <Badge variant={getRiskVariant(risk)} className="flex items-center gap-1 w-fit">
+            {getRiskIcon(risk)}
+            <span className="capitalize">{risk}</span>
+          </Badge>
+        );
+      },
+      options: {
+        filterable: true,
+        width: 100,
+      },
+    },
+  ], [formatCurrency, formatPercentage])
+
+  const tableConfig = useMemo(() => createTableConfig({
+    searchable: true,
+    sortable: true,
+    filterable: true,
+    exportable: true,
+    selectable: true,
+    paginated: true,
+    showRowNumbers: false,
+    stickyHeader: true,
+    striped: true,
+    hoverable: true,
+  }), [])
+
+  const toolbarConfig = useMemo(() => createToolbarConfig({
+    title: "Customer Performance Analysis",
+    description: "Detailed customer metrics and profitability analysis",
+    actions: [
+      {
+        label: "Export",
+        icon: <Download className="h-4 w-4" />,
+        onClick: () => handleExportData(customers, 'xlsx'),
+        variant: "outline",
+      },
+    ],
+    bulkActions: [
+      {
+        label: "Export Selected",
+        icon: <Download className="h-4 w-4" />,
+        onClick: (selectedRows: CustomerPerformance[]) => handleExportData(selectedRows, 'csv'),
+        variant: "outline",
+      },
+      {
+        label: "View Details",
+        icon: <Eye className="h-4 w-4" />,
+        onClick: (selectedRows: CustomerPerformance[]) => {
+          selectedRows.forEach((customer) => onViewCustomer(customer.customerId));
+        },
+        variant: "outline",
+      },
+    ],
+    filters: [
+      createTextFilter("customerName", "Customer Name", "Search customers..."),
+      createSelectFilter("risk.creditRisk", "Risk Level", [
+        { label: "Low Risk", value: "low" },
+        { label: "Medium Risk", value: "medium" },
+        { label: "High Risk", value: "high" },
+      ]),
+      createSelectFilter("metrics.paymentHistory", "Payment History", [
+        { label: "Excellent", value: "excellent" },
+        { label: "Good", value: "good" },
+        { label: "Poor", value: "poor" },
+      ]),
+    ],
+    search: {
+      enabled: true,
+      placeholder: "Search customers...",
+    },
+    export: {
+      enabled: true,
+      formats: ["csv", "xlsx", "pdf"],
+      filename: "customer-performance",
+      customExporter: handleExportData,
+    },
+  }), [customers, onViewCustomer])
+
+  // Summary stats
+  const summary = useMemo(() => {
+    const totalRevenue = customers.reduce((sum, customer) => sum + customer.metrics.totalRevenue, 0)
+    const totalOrders = customers.reduce((sum, customer) => sum + customer.metrics.totalOrders, 0)
+    const avgMargin = customers.reduce((sum, customer) => sum + customer.metrics.grossProfitMargin, 0) / customers.length
+    const highRiskCount = customers.filter(customer => customer.risk.creditRisk === 'high').length
+
+    return {
+      totalRevenue,
+      totalOrders,
+      avgMargin,
+      highRiskCount,
+      customerCount: customers.length,
+    }
+  }, [customers])
 
   return (
-    <Card className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-lg border-0 shadow-xl">
-      <CardHeader className="bg-gradient-to-r from-teal-50 to-cyan-50 dark:from-teal-900/20 dark:to-cyan-900/20 border-b border-teal-200/60 dark:border-teal-700/60">
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="p-2 rounded-lg bg-gradient-to-br from-teal-500 to-cyan-600 shadow-lg">
-              <Users className="w-5 h-5 text-white" />
+    <EnhancedDataTable
+      data={customers}
+      columns={columns}
+      config={tableConfig}
+      toolbar={toolbarConfig}
+      loading={loading}
+      onRowClick={handleViewCustomer}
+      emptyStateConfig={{
+        enabled: true,
+        title: "No Customer Performance Data",
+        description: "Customer performance metrics will appear here once data is available.",
+        icon: <Users className="h-12 w-12 text-muted-foreground/50" />,
+      }}
+      loadingConfig={{
+        enabled: true,
+        skeletonRows: 8,
+        loadingMessage: "Loading customer performance data...",
+      }}
+      customFooter={
+        <div className="bg-gradient-to-r from-teal-50/50 to-cyan-50/50 dark:from-teal-900/10 dark:to-cyan-900/10 p-4 border-t">
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
+            <div>
+              <div className="text-xl font-bold text-primary">{summary.customerCount}</div>
+              <div className="text-xs text-muted-foreground">Total Customers</div>
             </div>
             <div>
-              <CardTitle className="text-lg font-semibold text-slate-900 dark:text-white">
-                Customer Performance Analysis
-              </CardTitle>
-              <CardDescription className="text-slate-600 dark:text-slate-400">
-                Detailed customer metrics and profitability analysis
-              </CardDescription>
+              <div className="text-xl font-bold text-green-600">{formatCurrency(summary.totalRevenue)}</div>
+              <div className="text-xs text-muted-foreground">Total Revenue</div>
+            </div>
+            <div>
+              <div className="text-xl font-bold text-blue-600">{formatPercentage(summary.avgMargin)}</div>
+              <div className="text-xs text-muted-foreground">Avg Margin</div>
+            </div>
+            <div>
+              <div className="text-xl font-bold text-red-600">{summary.highRiskCount}</div>
+              <div className="text-xs text-muted-foreground">High Risk</div>
             </div>
           </div>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleExportData}
-            className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm"
-          >
-            <Download className="w-4 h-4 mr-2" />
-            Export
-          </Button>
         </div>
-
-        {/* Filters */}
-        <div className="flex flex-col sm:flex-row gap-4 mt-4">
-          <div className="relative flex-1 max-w-md">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-400" />
-            <Input
-              placeholder="Search customers..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10 bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm"
-            />
-          </div>
-
-          <Select value={riskFilter} onValueChange={setRiskFilter}>
-            <SelectTrigger className="w-40 bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm">
-              <SelectValue placeholder="All Risk Levels" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">All Risk Levels</SelectItem>
-              <SelectItem value="low">Low Risk</SelectItem>
-              <SelectItem value="medium">Medium Risk</SelectItem>
-              <SelectItem value="high">High Risk</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
-      </CardHeader>
-
-      <CardContent className="p-0">
-        <div className="overflow-x-auto">
-          <Table>
-            <TableHeader>
-              <TableRow className="border-slate-200 dark:border-slate-700 bg-slate-50/80 dark:bg-slate-800/80">
-                <TableHead className="font-semibold text-slate-700 dark:text-slate-300">Customer</TableHead>
-                <TableHead className="font-semibold text-slate-700 dark:text-slate-300">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-auto p-0 hover:bg-transparent font-semibold"
-                    onClick={() => handleSort("totalRevenue")}
-                  >
-                    Revenue
-                    <ArrowUpDown className="ml-2 h-3 w-3" />
-                  </Button>
-                </TableHead>
-                <TableHead className="font-semibold text-slate-700 dark:text-slate-300">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-auto p-0 hover:bg-transparent font-semibold"
-                    onClick={() => handleSort("totalOrders")}
-                  >
-                    Orders
-                    <ArrowUpDown className="ml-2 h-3 w-3" />
-                  </Button>
-                </TableHead>
-                <TableHead className="font-semibold text-slate-700 dark:text-slate-300">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-auto p-0 hover:bg-transparent font-semibold"
-                    onClick={() => handleSort("grossProfitMargin")}
-                  >
-                    Margin
-                    <ArrowUpDown className="ml-2 h-3 w-3" />
-                  </Button>
-                </TableHead>
-                <TableHead className="font-semibold text-slate-700 dark:text-slate-300">
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    className="h-auto p-0 hover:bg-transparent font-semibold"
-                    onClick={() => handleSort("lifetimeValue")}
-                  >
-                    LTV
-                    <ArrowUpDown className="ml-2 h-3 w-3" />
-                  </Button>
-                </TableHead>
-                <TableHead className="font-semibold text-slate-700 dark:text-slate-300">Growth</TableHead>
-                <TableHead className="font-semibold text-slate-700 dark:text-slate-300">Risk</TableHead>
-                <TableHead className="w-[70px]"></TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredAndSortedCustomers.map((customer) => (
-                <TableRow
-                  key={customer.customerId}
-                  className="group border-slate-200/60 dark:border-slate-700/60 hover:bg-slate-50/80 dark:hover:bg-slate-800/80 transition-colors"
-                >
-                  <TableCell className="py-4">
-                    <div className="flex items-center gap-3">
-                      <div className="flex items-center gap-2">
-                        <div className="font-semibold text-slate-900 dark:text-white">
-                          {customer.customerName}
-                        </div>
-                        {customer.metrics.lifetimeValue > 400000 && (
-                          <Star className="h-3 w-3 text-amber-500 fill-amber-500" />
-                        )}
-                      </div>
-                    </div>
-                  </TableCell>
-                  <TableCell className="py-4">
-                    <div className="flex flex-col">
-                      <span className="font-semibold text-slate-900 dark:text-white">
-                        {formatCurrency(customer.metrics.totalRevenue)}
-                      </span>
-                      <span className="text-xs text-slate-500 dark:text-slate-400">
-                        Avg: {formatCurrency(customer.metrics.averageOrderValue)}
-                      </span>
-                    </div>
-                  </TableCell>
-                  <TableCell className="py-4">
-                    <div className="flex items-center gap-2">
-                      <ShoppingCart className="h-4 w-4 text-slate-400" />
-                      <span className="font-medium text-slate-900 dark:text-white">
-                        {customer.metrics.totalOrders}
-                      </span>
-                    </div>
-                  </TableCell>
-                  <TableCell className="py-4">
-                    <div className="flex flex-col">
-                      <span className="font-semibold text-slate-900 dark:text-white">
-                        {formatPercentage(customer.metrics.grossProfitMargin)}
-                      </span>
-                      <span className="text-xs text-slate-500 dark:text-slate-400">
-                        {formatCurrency(customer.metrics.grossProfit)}
-                      </span>
-                    </div>
-                  </TableCell>
-                  <TableCell className="py-4">
-                    <div className="font-semibold text-slate-900 dark:text-white">
-                      {formatCurrency(customer.metrics.lifetimeValue)}
-                    </div>
-                  </TableCell>
-                  <TableCell className="py-4">
-                    <div className="flex items-center gap-1">
-                      {getTrendIcon(customer.trends.revenueGrowth)}
-                      <span className={`text-sm font-medium ${
-                        customer.trends.revenueGrowth > 0 ? 'text-green-600' : customer.trends.revenueGrowth < 0 ? 'text-red-600' : 'text-slate-600'
-                      }`}>
-                        {customer.trends.revenueGrowth > 0 ? '+' : ''}{formatPercentage(customer.trends.revenueGrowth)}
-                      </span>
-                    </div>
-                  </TableCell>
-                  <TableCell className="py-4">
-                    <Badge className={getRiskColor(customer.risk.creditRisk)}>
-                      {getRiskIcon(customer.risk.creditRisk)}
-                      <span className="ml-1 capitalize">{customer.risk.creditRisk}</span>
-                    </Badge>
-                  </TableCell>
-                  <TableCell className="py-4">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => handleViewCustomer(customer.customerId)}
-                      className="opacity-0 group-hover:opacity-100 transition-opacity"
-                    >
-                      <Eye className="h-4 w-4" />
-                    </Button>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </div>
-
-        {filteredAndSortedCustomers.length === 0 && (
-          <div className="text-center py-12">
-            <Users className="w-12 h-12 text-slate-400 mx-auto mb-3" />
-            <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-2">No Customers Found</h3>
-            <p className="text-slate-600 dark:text-slate-400">
-              No customers match your current search and filter criteria.
-            </p>
-          </div>
-        )}
-      </CardContent>
-    </Card>
+      }
+      ariaLabel="Customer performance analysis table"
+      ariaDescription="Table showing customer metrics, profitability analysis, and risk assessment"
+    />
   )
 }

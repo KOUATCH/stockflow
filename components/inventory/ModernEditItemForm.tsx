@@ -7,8 +7,10 @@ import { useNotifications } from '@/components/notifications/NotificationProvide
 
 interface ItemData {
   id: string
-  name: string
-  description?: string | null
+  nameEn: string
+  nameFr?: string | null
+  descriptionEn?: string | null
+  descriptionFr?: string | null
   sku: string
   barcode?: string | null
   costPrice: number
@@ -34,11 +36,12 @@ interface ModernEditItemFormProps {
   onSubmit?: (data: ItemCreationFormData) => Promise<void>
   isLoading?: boolean
   onCancel?: () => void
-  categories?: Array<{ id: string; name: string }>
-  brands?: Array<{ id: string; name: string }>
-  units?: Array<{ id: string; name: string }>
-  taxRate?: Array<{ id: string; name: string; rate: number }>
+  categories?: Array<{ id: string; titleEn: string; titleFr?: string | null }>
+  brands?: Array<{ id: string; brandName: string }>
+  units?: Array<{ id: string; nameEn: string; nameFr?: string | null; symbol: string }>
+  taxRate?: Array<{ id: string; nameEn: string; nameFr?: string | null; rate: number }>
   organizationId: string
+  itemId?: string
 }
 
 export function ModernEditItemForm({
@@ -51,7 +54,8 @@ export function ModernEditItemForm({
   brands = [],
   units = [],
   taxRate = [],
-  organizationId
+  organizationId,
+  itemId
 }: ModernEditItemFormProps) {
   const router = useRouter()
   const { success } = useNotifications()
@@ -61,14 +65,16 @@ export function ModernEditItemForm({
     if (onSubmit) {
       await onSubmit(data)
     }
-    success("Item Updated", `${data.name} has been successfully updated`)
+    success("Item Updated", `${data.nameEn} has been successfully updated`)
     router.push('/dashboard/inventory/items')
   }
 
   // Convert item data to form data format
   const initialData: Partial<ItemCreationFormData> = {
-    name: itemData.name || "",
-    description: itemData.description || "",
+    nameEn: itemData.nameEn || "",
+    nameFr: itemData.nameFr || "",
+    descriptionEn: itemData.descriptionEn || "",
+    descriptionFr: itemData.descriptionFr || "",
     sku: itemData.sku || "",
     barcode: itemData.barcode || "",
     costPrice: itemData.costPrice || 0,
@@ -93,7 +99,6 @@ export function ModernEditItemForm({
       action={action}
       onSubmit={handleEditSuccess}
       isLoading={isLoading}
-      onCancel={onCancel}
       categories={categories}
       brands={brands}
       units={units}

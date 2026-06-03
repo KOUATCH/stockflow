@@ -1,5 +1,7 @@
 "use server";
 import { adminPermissions } from "@/config/permissions";
+import { getAuthenticatedUser } from "@/config/useAuth";
+import { hasAppPermission, safeUserSelect } from "@/lib/security/server-authz";
 import { db } from "@/prisma/db";
 import { Resend } from "resend";
 
@@ -29,17 +31,23 @@ const ADMIN_USER_ROLE = {
 
 export async function getAllUsers() {
   try {
+    const authUser = await getAuthenticatedUser();
+    if (!hasAppPermission(authUser, "users.read")) {
+      return [];
+    }
+
     const users = await db.user.findMany({
+      where: {
+        organizationId: authUser.organizationId,
+      },
       orderBy: {
         createdAt: "desc",
       },
-      include: {
-        roles: true,
-      },
+      select: safeUserSelect,
     });
     return users;
   } catch (error) {
     console.error("Error fetching the count:", error);
-    return 0;
+    return [];
   }
 }

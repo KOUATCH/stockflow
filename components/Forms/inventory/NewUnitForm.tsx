@@ -1,5 +1,7 @@
 "use client";
-import createUnit from "@/actions/units/createUnit22";
+
+import { notify } from "@/lib/notifications/notify"
+import createUnit from "@/actions/units/createActionUnit";
 import updateUnitById from "@/actions/units/updateUnitById";
 import TextInput from "@/components/FormInputs/TextInput";
 import { Button } from "@/components/ui/button";
@@ -18,8 +20,6 @@ import { CheckCircle2, LayoutGrid, Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
-import { toast } from "sonner";
-
 type UnitsFormProps = {
   editingId?: string | undefined;
   initialData?: Unit | undefined | null;
@@ -42,8 +42,10 @@ const NewUnitForm = ({
     formState: { errors },
   } = useForm<UnitProps>({
     defaultValues: {
-      name: initialData?.name,
+      nameEn: initialData?.nameEn || "",
+      nameFr: initialData?.nameFr || "",
       symbol: initialData?.symbol || "",
+      organizationId,
     },
   });
 
@@ -63,18 +65,18 @@ const NewUnitForm = ({
       console.log({ res })
       if (!res.success) {
         setLoading(false);
-        toast.error(res.error, { description: "Unit not created" });
+        notify.error(res.error, { description: "Unit not created" });
         setErr(res.error ?? "Something went wrong, Please try again")
         return;
       }
       setLoading(false);
-      toast.success("Unit Created successfully", { description: "Unit created" });
+      notify.success("Unit Created successfully", { description: "Unit created" });
       window.location.reload();
       reset()
     } catch (error) {
       setLoading(false);
       console.error("Network Error:", error);
-      toast.error("Its seems something is wrong, try again");
+      notify.error("Its seems something is wrong, try again");
     }
   }
 
@@ -87,14 +89,14 @@ const NewUnitForm = ({
         await updateUnitById(editingId, data);
         setLoading(false);
         // Toast
-        toast.success("Updated Successfully!", { description: " Unit Updated successfully" });
+        notify.success("Updated Successfully!", { description: " Unit Updated successfully" });
         window.location.reload();
         reset()
       } else {
         await createUnit(data);
         setLoading(false);
         // Toast
-        toast.success("Successfully Created!", { description: " Unit Created successfully" });
+        notify.success("Successfully Created!", { description: " Unit Created successfully" });
         window.location.reload();
         reset()
       }
@@ -129,9 +131,16 @@ const NewUnitForm = ({
                 <TextInput
                   register={register}
                   errors={errors}
-                  label="Unit Name"
-                  name="name"
+                  label="English Unit Name"
+                  name="nameEn"
                   placeholder="eg, Kilogram"
+                />
+                <TextInput
+                  register={register}
+                  errors={errors}
+                  label="French Unit Name"
+                  name="nameFr"
+                  placeholder="ex. Kilogramme"
                 />
                 <TextInput
                   register={register}

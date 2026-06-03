@@ -1,5 +1,6 @@
 "use client"
 
+import { notify } from "@/lib/notifications/notify"
 import LocationFormForEditing from "@/components/dashboard/location/locationFormForEditing"
 import { ConfirmationDialog, DataTable, EntityForm, TableActions, type Column } from "@/components/ui/data-table"
 import { FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
@@ -12,7 +13,6 @@ import { format } from "date-fns"
 import { DollarSign } from "lucide-react"
 import { useCallback, useState } from "react"
 import { useForm } from "react-hook-form"
-import { toast } from "sonner"
 import * as XLSX from "xlsx"
 import { z } from "zod"
 
@@ -129,11 +129,11 @@ const LocationListingWithEditing = ({ title, organizationId, editingId, initialL
       const fileName = `Locations_${format(new Date(), "yyyy-MM-dd")}.xlsx`
       XLSX.writeFile(workbook, fileName)
 
-      toast.success("Export successful", {
+      notify.success("Export successful", {
         description: `Locations exported to ${fileName}`,
       })
     } catch (error) {
-      toast.error("Export failed", {
+      notify.error("Export failed", {
         description: error instanceof Error ? error.message : "Unknown error occurred",
       })
     }
@@ -194,19 +194,19 @@ const LocationListingWithEditing = ({ title, organizationId, editingId, initialL
 
       createLocationMutation.mutate(newLocationData, {
         onSuccess: async () => {
-          toast.success("Location added successfully")
+          notify.success("Location added successfully")
           setFormDialogOpen(false)
           resetFormToDefaults()
           await refetch()
         },
         onError: (error: any) => {
-          toast.error("Failed to add location", {
+          notify.error("Failed to add location", {
             description: error?.message || "Unknown error occurred",
           })
         },
       })
     } catch (error) {
-      toast.error("An unexpected error occurred", {
+      notify.error("An unexpected error occurred", {
         description: error instanceof Error ? error.message : "Unknown error",
       })
     }
@@ -255,11 +255,11 @@ const LocationListingWithEditing = ({ title, organizationId, editingId, initialL
     if (locationToDelete) {
       deleteLocationMutation.mutate(locationToDelete.id!, {
         onSuccess: () => {
-          toast.success("Location deleted successfully")
+          notify.success("Location deleted successfully")
           refetch()
         },
         onError: (error: any) => {
-          toast.error("Failed to delete location", {
+          notify.error("Failed to delete location", {
             description: error?.message || "Unknown error occurred",
           })
         },

@@ -1,6 +1,8 @@
 // utils/server-permissions.ts - Server-side RBAC utilities for Auth.js
 import { auth } from "@/auth"
+import { LOCALE_COOKIE, localizePath, pickLocale } from "@/i18n/routing"
 import { hasAllPermissions, hasAnyPermission, hasPermission } from "@/lib/permissions"
+import { cookies } from "next/headers"
 import { redirect } from "next/navigation"
 
 export async function getServerSession() {
@@ -26,16 +28,23 @@ export async function getServerPermissions() {
   }
 }
 
+async function redirectWithRequestLocale(path: string): Promise<never> {
+  const cookieStore = await cookies()
+  const locale = pickLocale(cookieStore.get(LOCALE_COOKIE)?.value)
+
+  redirect(localizePath(path, locale))
+}
+
 // Server-side permission checking with redirect
 export async function requirePermission(permission: string) {
   const session = await auth()
 
   if (!session?.user) {
-    redirect('/login')
+    return redirectWithRequestLocale('/login')
   }
 
-  if (!hasPermission(session.user.permissions, permission)) {
-    redirect('/unauthorized')
+  if (!hasPermission(session.user.permissions ?? [], permission)) {
+    return redirectWithRequestLocale('/unauthorized')
   }
 
   return session
@@ -45,11 +54,11 @@ export async function requireAnyPermission(permissions: string[]) {
   const session = await auth()
 
   if (!session?.user) {
-    redirect('/login')
+    return redirectWithRequestLocale('/login')
   }
 
-  if (!hasAnyPermission(session.user.permissions, permissions)) {
-    redirect('/unauthorized')
+  if (!hasAnyPermission(session.user.permissions ?? [], permissions)) {
+    return redirectWithRequestLocale('/unauthorized')
   }
 
   return session
@@ -59,11 +68,11 @@ export async function requireAllPermissions(permissions: string[]) {
   const session = await auth()
 
   if (!session?.user) {
-    redirect('/login')
+    return redirectWithRequestLocale('/login')
   }
 
-  if (!hasAllPermissions(session.user.permissions, permissions)) {
-    redirect('/unauthorized')
+  if (!hasAllPermissions(session.user.permissions ?? [], permissions)) {
+    return redirectWithRequestLocale('/unauthorized')
   }
 
   return session
@@ -77,7 +86,7 @@ export async function requirePermissionForAPI(permission: string) {
     return { error: "Unauthorized", status: 401 }
   }
 
-  if (!hasPermission(session.user.permissions, permission)) {
+  if (!hasPermission(session.user.permissions ?? [], permission)) {
     return { error: "Insufficient permissions", status: 403 }
   }
 

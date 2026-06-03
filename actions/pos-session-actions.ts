@@ -3,6 +3,16 @@
 import { db } from "@/prisma/db"
 import { revalidatePath } from "next/cache"
 
+type DecimalLike = { toNumber?: () => number; toString: () => string } | number | string | null | undefined
+
+function toNumber(value: DecimalLike): number {
+  if (value == null) return 0
+  if (typeof value === "number") return value
+  if (typeof value === "string") return Number(value) || 0
+  if (typeof value.toNumber === "function") return value.toNumber()
+  return Number(value.toString()) || 0
+}
+
 const POSSessionStatus = {
   ACTIVE: "ACTIVE",
   CLOSED: "CLOSED",
@@ -82,7 +92,7 @@ export async function openPosSession(data: OpenSessionData) {
     // Check for existing active session
     const existingSession = await db.pOSSession.findFirst({
       where: {
-        stationId: data.stationId,
+        terminalId: data.stationId,
         status: POSSessionStatus.ACTIVE,
       },
     })
@@ -113,7 +123,7 @@ export async function openPosSession(data: OpenSessionData) {
     const today = new Date().toISOString().slice(0, 10)
     const sessionCount = await db.pOSSession.count({
       where: {
-        stationId: data.stationId,
+        terminalId: data.stationId,
         startTime: {
           gte: new Date(today + "T00:00:00.000Z"),
           lt: new Date(today + "T23:59:59.999Z"),
@@ -129,9 +139,10 @@ export async function openPosSession(data: OpenSessionData) {
       const session = await tx.pOSSession.create({
         data: {
           sessionNumber,
-          stationId: data.stationId,
+          terminalId: data.stationId,
           userId: data.userId,
           locationId: data.locationId,
+          organizationId: data.organizationId,
           status: POSSessionStatus.ACTIVE,
           startTime: new Date(),
           openingBalance: data.openingBalance,
@@ -143,30 +154,39 @@ export async function openPosSession(data: OpenSessionData) {
           transactionCount: 0,
           cashTotal: 0,
           cardTotal: 0,
-          digitalTotal: 0,
+          mobileMoneyTotal: 0,
+          bankTransferTotal: 0,
         },
       })
 
       // Create or update cash drawer
       const drawerNumber = `DRW-${data.stationId}-${Date.now()}`
-      const cashDrawer = await tx.cashDrawer.upsert({
-        where: { stationId: data.stationId },
-        update: {
-          currentBalance: data.openingBalance,
-          expectedBalance: data.openingBalance,
-          isOpen: true,
-        },
-        create: {
-          name: `Cash Drawer - ${terminal.name}`,
-          drawerNumber,
-          stationId: data.stationId,
-          locationId: data.locationId,
-          organizationId: data.organizationId,
-          currentBalance: data.openingBalance,
-          expectedBalance: data.openingBalance,
-          isOpen: true,
-        },
+      let cashDrawer = await tx.cashDrawer.findFirst({
+        where: { terminalId: data.stationId },
       })
+
+      if (!cashDrawer) {
+        cashDrawer = await tx.cashDrawer.create({
+          data: {
+            name: `Cash Drawer - ${terminal.name}`,
+            drawerNumber,
+            terminalId: data.stationId,
+            locationId: data.locationId,
+            currentBalance: data.openingBalance,
+            expectedBalance: data.openingBalance,
+            isOpen: true,
+          },
+        })
+      } else {
+        cashDrawer = await tx.cashDrawer.update({
+          where: { id: cashDrawer.id },
+          data: {
+            currentBalance: data.openingBalance,
+            expectedBalance: data.openingBalance,
+            isOpen: true,
+          },
+        })
+      }
 
       // Create opening balance event
       await tx.cashDrawerTransaction.create({
@@ -215,7 +235,7 @@ export async function closePosSession(data: CloseSessionData) {
     const session = await db.pOSSession.findUnique({
       where: { id: data.sessionId },
       include: {
-        station: true,
+        terminal: true,
         user: true,
         cashDrawerTransactions: {
           include: { cashDrawer: true },
@@ -240,7 +260,7 @@ export async function closePosSession(data: CloseSessionData) {
     }
 
     // Calculate session totals
-    const expectedBalance = Number(session.expectedBalance) || Number(session.openingBalance)
+    const expectedBalance = toNumber(session.expectedBalance) || toNumber(session.openingBalance)
     const variance = data.closingBalance - expectedBalance
     const endTime = new Date()
 
@@ -279,7 +299,7 @@ export async function closePosSession(data: CloseSessionData) {
             amount: data.closingBalance,
             reason: `Session ${session.sessionNumber} closed`,
             notes: data.notes,
-            balanceBefore: Number(cashDrawer.currentBalance),
+            balanceBefore: toNumber(cashDrawer.currentBalance),
             balanceAfter: data.closingBalance,
           },
         })
@@ -297,15 +317,15 @@ export async function closePosSession(data: CloseSessionData) {
       sessionNumber: session.sessionNumber,
       startTime: session.startTime,
       endTime,
-      openingBalance: Number(session.openingBalance),
+      openingBalance: toNumber(session.openingBalance),
       closingBalance: data.closingBalance,
-      totalSales: Number(session.totalSales),
+      totalSales: toNumber(session.totalSales),
       transactionCount: session.transactionCount,
       variance,
       paymentBreakdown: {
-        cash: Number(session.cashTotal),
-        card: Number(session.cardTotal),
-        digital: Number(session.digitalTotal),
+        cash: toNumber(session.cashTotal),
+        card: toNumber(session.cardTotal),
+        digital: toNumber(session.mobileMoneyTotal) + toNumber(session.bankTransferTotal),
       },
     }
 
@@ -332,11 +352,11 @@ export async function getActiveSession(stationId: string) {
   try {
     const session = await db.pOSSession.findFirst({
       where: {
-        stationId,
+        terminalId: stationId,
         status: POSSessionStatus.ACTIVE,
       },
       include: {
-        station: true,
+        terminal: true,
         user: true,
         cashDrawerTransactions: {
           include: { cashDrawer: true },

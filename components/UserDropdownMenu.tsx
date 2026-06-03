@@ -33,8 +33,11 @@ import {
   UserCircle,
   Zap
 } from "lucide-react";
+import { getLocaleFromPathname, localizePath } from "@/i18n/routing";
 import { signOut } from "@/lib/auth-client";
-import { useRouter } from "next/navigation";
+import { DEFAULT_LOCALE } from "@/types/bilingual";
+import { usePathname, useRouter } from "next/navigation";
+import { useTheme } from "next-themes";
 import { useState } from "react";
 
 interface UserDropdownProps {
@@ -49,8 +52,12 @@ const UserDropdownMenu = ({
   avatarUrl,
 }: UserDropdownProps) => {
   const router = useRouter();
-  const [darkMode, setDarkMode] = useState(false);
+  const pathname = usePathname();
+  const locale = getLocaleFromPathname(pathname) ?? DEFAULT_LOCALE;
+  const localizedHref = (href: string) => localizePath(href, locale);
+  const { resolvedTheme, setTheme } = useTheme();
   const [isOpen, setIsOpen] = useState(false);
+  const isDarkTheme = resolvedTheme === "dark";
 
   const handleLogout = async () => {
     try {
@@ -60,13 +67,13 @@ const UserDropdownMenu = ({
       });
     } catch (error) {
       console.log(error);
-      router.push("/login");
+      router.push(localizedHref("/login"));
     }
   };
 
   const handleNavigate = (path: string) => {
     setIsOpen(false);
-    router.push(path);
+    router.push(localizedHref(path));
   };
 
   // Get user role for display (fallback to default values since session is not available)
@@ -88,69 +95,69 @@ const UserDropdownMenu = ({
       <DropdownMenuTrigger asChild>
         <Button
           variant="ghost"
-          className="relative h-12 w-auto justify-start gap-3 px-3 hover:bg-white/10 transition-all duration-300 group"
+          className="group relative h-10 w-10 justify-center gap-3 rounded-xl border border-white/10 bg-white/[0.045] px-0 text-[#d3ddd8] transition-all duration-300 hover:bg-white/[0.09] hover:text-white 2xl:h-12 2xl:w-auto 2xl:justify-start 2xl:px-3"
         >
           {/* Enhanced Avatar with Status Indicator */}
           <div className="relative">
-            <Avatar className="h-10 w-10 ring-2 ring-white/20 transition-all duration-300 group-hover:ring-emerald-300/50 group-hover:scale-105">
+            <Avatar className="h-8 w-8 ring-2 ring-white/15 transition-all duration-300 group-hover:scale-105 group-hover:ring-[#2dd4bf]/40 2xl:h-10 2xl:w-10">
               <AvatarImage src={avatarUrl} alt={username} className="object-cover" />
-              <AvatarFallback className="bg-gradient-to-br from-emerald-500 to-teal-600 text-white font-bold text-sm">
+              <AvatarFallback className="bg-gradient-to-br from-[#2f7df6] to-[#2dd4bf] text-sm font-bold text-white">
                 {getInitials(username)}
               </AvatarFallback>
             </Avatar>
             {/* Online Status Indicator */}
-            <div className="absolute -bottom-0.5 -right-0.5 w-3.5 h-3.5 bg-green-500 border-2 border-white rounded-full shadow-md animate-pulse" />
+            <div className="absolute -bottom-0.5 -right-0.5 h-3.5 w-3.5 rounded-full border-2 border-[#142129] bg-[#2ec98a] shadow-md animate-pulse" />
           </div>
 
           {/* User Info */}
-          <div className="hidden sm:flex flex-col items-start min-w-0 flex-1">
-            <span className="text-sm font-semibold text-gray-900 truncate max-w-32">
+          <div className="hidden min-w-0 flex-1 flex-col items-start 2xl:flex">
+            <span className="max-w-32 truncate text-sm font-semibold text-white">
               {username}
             </span>
-            <span className="text-xs text-gray-500 truncate max-w-32">
+            <span className="max-w-32 truncate text-xs text-[#8fa4ab]">
               {email}
             </span>
           </div>
 
           {/* Dropdown Arrow */}
-          <ChevronDown className="h-4 w-4 text-gray-400 group-hover:text-emerald-600 transition-all duration-300 group-data-[state=open]:rotate-180" />
+          <ChevronDown className="hidden h-4 w-4 text-[#8fa4ab] transition-all duration-300 group-hover:text-[#2dd4bf] group-data-[state=open]:rotate-180 2xl:block" />
         </Button>
       </DropdownMenuTrigger>
 
       <DropdownMenuContent
-        className="w-80 p-0 bg-white/95 backdrop-blur-xl border border-emerald-200/50 shadow-2xl ring-1 ring-black/5"
+        className="w-[calc(100vw-1rem)] max-w-80 overflow-hidden rounded-xl border border-white/10 bg-[#0f171d]/95 p-0 text-[#d3ddd8] shadow-[0_24px_70px_rgba(5,12,16,0.42)] backdrop-blur-xl"
         align="end"
         forceMount
         sideOffset={8}
       >
         {/* Enhanced User Header */}
-        <div className="relative p-6 bg-gradient-to-br from-emerald-50 via-teal-50 to-cyan-50 border-b border-emerald-200/50">
+        <div className="relative border-b border-white/10 bg-[#142129] p-6">
           {/* Background Pattern */}
-          <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/5 to-teal-500/5" />
-          <div className="absolute top-2 right-2 w-20 h-20 bg-gradient-to-br from-white/10 to-transparent rounded-full" />
-          <div className="absolute bottom-2 left-2 w-16 h-16 bg-gradient-to-tr from-white/5 to-transparent rounded-full" />
+          <div className="absolute inset-0 bg-[radial-gradient(circle_at_15%_0%,rgba(73,198,229,0.16),transparent_34%),radial-gradient(circle_at_88%_10%,rgba(215,168,79,0.14),transparent_28%)]" />
+          <div className="absolute right-2 top-2 h-20 w-20 rounded-full bg-gradient-to-br from-white/10 to-transparent" />
+          <div className="absolute bottom-2 left-2 h-16 w-16 rounded-full bg-gradient-to-tr from-white/5 to-transparent" />
 
           <div className="relative z-10 flex items-center gap-4">
             <div className="relative">
-              <Avatar className="h-14 w-14 ring-4 ring-white/50 shadow-xl">
+              <Avatar className="h-14 w-14 shadow-xl ring-4 ring-white/10">
                 <AvatarImage src={avatarUrl} alt={username} className="object-cover" />
-                <AvatarFallback className="bg-gradient-to-br from-emerald-500 to-teal-600 text-white font-bold text-lg">
+                <AvatarFallback className="bg-gradient-to-br from-[#2f7df6] to-[#2dd4bf] text-lg font-bold text-white">
                   {getInitials(username)}
                 </AvatarFallback>
               </Avatar>
-              <div className="absolute -bottom-1 -right-1 w-5 h-5 bg-green-500 border-3 border-white rounded-full shadow-lg animate-pulse" />
+              <div className="absolute -bottom-1 -right-1 h-5 w-5 rounded-full border-2 border-[#142129] bg-[#2ec98a] shadow-lg animate-pulse" />
             </div>
 
             <div className="flex-1 min-w-0">
-              <h3 className="font-bold text-gray-900 text-lg truncate">{username}</h3>
-              <p className="text-sm text-gray-600 truncate">{email}</p>
+              <h3 className="truncate text-lg font-bold text-white">{username}</h3>
+              <p className="truncate text-sm text-[#9fb4bb]">{email}</p>
 
               <div className="flex items-center gap-2 mt-2">
-                <Badge className="bg-gradient-to-r from-emerald-500 to-teal-600 text-white border-0 shadow-lg">
+                <Badge className="border border-white/10 bg-[rgba(45,212,191,0.14)] text-[#7de8dc] shadow-lg hover:bg-[rgba(45,212,191,0.18)]">
                   <Crown className="w-3 h-3 mr-1" />
                   {userRole}
                 </Badge>
-                <Badge variant="outline" className="text-xs border-emerald-300 text-emerald-700">
+                <Badge variant="outline" className="border-white/10 bg-white/[0.055] text-xs text-[#d3ddd8]">
                   {organizationName}
                 </Badge>
               </div>
@@ -159,27 +166,27 @@ const UserDropdownMenu = ({
         </div>
 
         {/* Quick Actions */}
-        <div className="p-3 border-b border-gray-100/50">
-          <DropdownMenuLabel className="text-xs font-semibold text-gray-500 uppercase tracking-wider px-0 pb-2">
+        <div className="border-b border-white/10 p-3">
+          <DropdownMenuLabel className="px-0 pb-2 text-xs font-semibold uppercase tracking-wider text-[#7f969f]">
             Quick Actions
           </DropdownMenuLabel>
           <div className="grid grid-cols-2 gap-2">
             <Button
               variant="outline"
               size="sm"
-              className="h-auto p-3 flex-col gap-2 border-emerald-200/50 hover:bg-emerald-50 hover:border-emerald-300 transition-all duration-200"
+              className="h-auto flex-col gap-2 rounded-xl border-white/10 bg-white/[0.045] p-3 text-[#d3ddd8] transition-all duration-200 hover:border-[#2dd4bf]/40 hover:bg-white/[0.08] hover:text-white"
               onClick={() => handleNavigate("/dashboard/profile")}
             >
-              <User className="w-4 h-4 text-emerald-600" />
+              <User className="h-4 w-4 text-[#7de8dc]" />
               <span className="text-xs font-medium">Profile</span>
             </Button>
             <Button
               variant="outline"
               size="sm"
-              className="h-auto p-3 flex-col gap-2 border-teal-200/50 hover:bg-teal-50 hover:border-teal-300 transition-all duration-200"
+              className="h-auto flex-col gap-2 rounded-xl border-white/10 bg-white/[0.045] p-3 text-[#d3ddd8] transition-all duration-200 hover:border-[#5796ff]/50 hover:bg-white/[0.08] hover:text-white"
               onClick={() => handleNavigate("/dashboard/settings")}
             >
-              <Settings className="w-4 h-4 text-teal-600" />
+              <Settings className="h-4 w-4 text-[#8fb7ff]" />
               <span className="text-xs font-medium">Settings</span>
             </Button>
           </div>
@@ -187,159 +194,159 @@ const UserDropdownMenu = ({
 
         {/* Account Management */}
         <DropdownMenuGroup className="p-2">
-          <DropdownMenuLabel className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+          <DropdownMenuLabel className="text-xs font-semibold uppercase tracking-wider text-[#7f969f]">
             Account
           </DropdownMenuLabel>
 
           <DropdownMenuItem
-            className="cursor-pointer p-3 rounded-lg hover:bg-emerald-50 hover:text-emerald-700 transition-all duration-200 group"
+            className="group cursor-pointer rounded-lg p-3 transition-all duration-200 focus:bg-white/[0.08] focus:text-white"
             onClick={() => handleNavigate("/dashboard/profile")}
           >
             <div className="flex items-center gap-3 w-full">
-              <div className="p-2 bg-emerald-100 rounded-lg group-hover:bg-emerald-200 transition-colors">
-                <UserCircle className="h-4 w-4 text-emerald-600" />
+              <div className="rounded-lg bg-[rgba(45,212,191,0.14)] p-2 transition-colors">
+                <UserCircle className="h-4 w-4 text-[#7de8dc]" />
               </div>
               <div className="flex-1">
                 <div className="font-medium">My Profile</div>
-                <div className="text-xs text-muted-foreground">Update your information</div>
+                <div className="text-xs text-[#8fa4ab]">Update your information</div>
               </div>
             </div>
           </DropdownMenuItem>
 
           <DropdownMenuItem
-            className="cursor-pointer p-3 rounded-lg hover:bg-teal-50 hover:text-teal-700 transition-all duration-200 group"
+            className="group cursor-pointer rounded-lg p-3 transition-all duration-200 focus:bg-white/[0.08] focus:text-white"
             onClick={() => handleNavigate("/dashboard/settings/security")}
           >
             <div className="flex items-center gap-3 w-full">
-              <div className="p-2 bg-teal-100 rounded-lg group-hover:bg-teal-200 transition-colors">
-                <KeyRound className="h-4 w-4 text-teal-600" />
+              <div className="rounded-lg bg-[rgba(47,125,246,0.16)] p-2 transition-colors">
+                <KeyRound className="h-4 w-4 text-[#8fb7ff]" />
               </div>
               <div className="flex-1">
                 <div className="font-medium">Security</div>
-                <div className="text-xs text-muted-foreground">Password & 2FA settings</div>
+                <div className="text-xs text-[#8fa4ab]">Password & 2FA settings</div>
               </div>
             </div>
           </DropdownMenuItem>
 
           <DropdownMenuItem
-            className="cursor-pointer p-3 rounded-lg hover:bg-cyan-50 hover:text-cyan-700 transition-all duration-200 group"
+            className="group cursor-pointer rounded-lg p-3 transition-all duration-200 focus:bg-white/[0.08] focus:text-white"
             onClick={() => handleNavigate("/dashboard/settings/notifications")}
           >
             <div className="flex items-center gap-3 w-full">
-              <div className="p-2 bg-cyan-100 rounded-lg group-hover:bg-cyan-200 transition-colors">
-                <Bell className="h-4 w-4 text-cyan-600" />
+              <div className="rounded-lg bg-[rgba(73,198,229,0.14)] p-2 transition-colors">
+                <Bell className="h-4 w-4 text-[#49c6e5]" />
               </div>
               <div className="flex-1">
                 <div className="font-medium">Notifications</div>
-                <div className="text-xs text-muted-foreground">Email & push preferences</div>
+                <div className="text-xs text-[#8fa4ab]">Email & push preferences</div>
               </div>
             </div>
           </DropdownMenuItem>
         </DropdownMenuGroup>
 
-        <DropdownMenuSeparator className="mx-2" />
+        <DropdownMenuSeparator className="mx-2 bg-white/10" />
 
         {/* Preferences */}
         <DropdownMenuGroup className="p-2">
-          <DropdownMenuLabel className="text-xs font-semibold text-gray-500 uppercase tracking-wider">
+          <DropdownMenuLabel className="text-xs font-semibold uppercase tracking-wider text-[#7f969f]">
             Preferences
           </DropdownMenuLabel>
 
-          <DropdownMenuItem className="cursor-pointer p-3 rounded-lg hover:bg-slate-50 transition-all duration-200 group">
+          <DropdownMenuItem className="group cursor-pointer rounded-lg p-3 transition-all duration-200 focus:bg-white/[0.08] focus:text-white">
             <div className="flex items-center gap-3 w-full">
-              <div className="p-2 bg-slate-100 rounded-lg group-hover:bg-slate-200 transition-colors">
-                {darkMode ? <Moon className="h-4 w-4 text-slate-600" /> : <Sun className="h-4 w-4 text-slate-600" />}
+              <div className="rounded-lg bg-white/[0.07] p-2 transition-colors">
+                {isDarkTheme ? <Moon className="h-4 w-4 text-[#8fb7ff]" /> : <Sun className="h-4 w-4 text-[#f0c76a]" />}
               </div>
               <div className="flex-1">
                 <div className="font-medium">Dark Mode</div>
-                <div className="text-xs text-muted-foreground">Toggle theme appearance</div>
+                <div className="text-xs text-[#8fa4ab]">Toggle theme appearance</div>
               </div>
               <Switch
-                checked={darkMode}
-                onCheckedChange={setDarkMode}
-                className="data-[state=checked]:bg-emerald-500"
+                checked={isDarkTheme}
+                onCheckedChange={(checked) => setTheme(checked ? "dark" : "light")}
+                className="data-[state=checked]:bg-[#2dd4bf]"
               />
             </div>
           </DropdownMenuItem>
 
           <DropdownMenuItem
-            className="cursor-pointer p-3 rounded-lg hover:bg-purple-50 hover:text-purple-700 transition-all duration-200 group"
+            className="group cursor-pointer rounded-lg p-3 transition-all duration-200 focus:bg-white/[0.08] focus:text-white"
             onClick={() => handleNavigate("/dashboard/settings/appearance")}
           >
             <div className="flex items-center gap-3 w-full">
-              <div className="p-2 bg-purple-100 rounded-lg group-hover:bg-purple-200 transition-colors">
-                <Palette className="h-4 w-4 text-purple-600" />
+              <div className="rounded-lg bg-[rgba(215,168,79,0.16)] p-2 transition-colors">
+                <Palette className="h-4 w-4 text-[#f0c76a]" />
               </div>
               <div className="flex-1">
                 <div className="font-medium">Appearance</div>
-                <div className="text-xs text-muted-foreground">Customize interface</div>
+                <div className="text-xs text-[#8fa4ab]">Customize interface</div>
               </div>
             </div>
           </DropdownMenuItem>
         </DropdownMenuGroup>
 
-        <DropdownMenuSeparator className="mx-2" />
+        <DropdownMenuSeparator className="mx-2 bg-white/10" />
 
         {/* Support & Billing */}
         <DropdownMenuGroup className="p-2">
           <DropdownMenuItem
-            className="cursor-pointer p-3 rounded-lg hover:bg-amber-50 hover:text-amber-700 transition-all duration-200 group"
+            className="group cursor-pointer rounded-lg p-3 transition-all duration-200 focus:bg-white/[0.08] focus:text-white"
             onClick={() => handleNavigate("/dashboard/billing")}
           >
             <div className="flex items-center gap-3 w-full">
-              <div className="p-2 bg-amber-100 rounded-lg group-hover:bg-amber-200 transition-colors">
-                <CreditCard className="h-4 w-4 text-amber-600" />
+              <div className="rounded-lg bg-[rgba(215,168,79,0.16)] p-2 transition-colors">
+                <CreditCard className="h-4 w-4 text-[#f0c76a]" />
               </div>
               <div className="flex-1">
                 <div className="font-medium">Billing & Plans</div>
-                <div className="text-xs text-muted-foreground">Manage subscription</div>
+                <div className="text-xs text-[#8fa4ab]">Manage subscription</div>
               </div>
-              <Badge variant="outline" className="text-xs border-amber-300 text-amber-700">
+              <Badge variant="outline" className="border-[#d7a84f]/30 bg-[rgba(215,168,79,0.12)] text-xs text-[#f0c76a]">
                 Pro
               </Badge>
             </div>
           </DropdownMenuItem>
 
           <DropdownMenuItem
-            className="cursor-pointer p-3 rounded-lg hover:bg-blue-50 hover:text-blue-700 transition-all duration-200 group"
+            className="group cursor-pointer rounded-lg p-3 transition-all duration-200 focus:bg-white/[0.08] focus:text-white"
             onClick={() => handleNavigate("/help")}
           >
             <div className="flex items-center gap-3 w-full">
-              <div className="p-2 bg-blue-100 rounded-lg group-hover:bg-blue-200 transition-colors">
-                <HelpCircle className="h-4 w-4 text-blue-600" />
+              <div className="rounded-lg bg-[rgba(47,125,246,0.16)] p-2 transition-colors">
+                <HelpCircle className="h-4 w-4 text-[#8fb7ff]" />
               </div>
               <div className="flex-1">
                 <div className="font-medium">Help & Support</div>
-                <div className="text-xs text-muted-foreground">Get assistance</div>
+                <div className="text-xs text-[#8fa4ab]">Get assistance</div>
               </div>
             </div>
           </DropdownMenuItem>
         </DropdownMenuGroup>
 
-        <DropdownMenuSeparator className="mx-2" />
+        <DropdownMenuSeparator className="mx-2 bg-white/10" />
 
         {/* Logout */}
         <div className="p-2">
           <DropdownMenuItem
-            className="cursor-pointer p-3 rounded-lg hover:bg-red-50 hover:text-red-700 transition-all duration-200 group border border-transparent hover:border-red-200"
+            className="group cursor-pointer rounded-lg border border-transparent p-3 transition-all duration-200 focus:border-[#ef6a6a]/40 focus:bg-[#ef6a6a]/12 focus:text-white"
             onClick={handleLogout}
           >
             <div className="flex items-center gap-3 w-full">
-              <div className="p-2 bg-red-100 rounded-lg group-hover:bg-red-200 transition-colors">
-                <LogOut className="h-4 w-4 text-red-600" />
+              <div className="rounded-lg bg-[rgba(239,106,106,0.14)] p-2 transition-colors">
+                <LogOut className="h-4 w-4 text-[#efb0b0]" />
               </div>
               <div className="flex-1">
                 <div className="font-medium">Sign Out</div>
-                <div className="text-xs text-muted-foreground">End your session</div>
+                <div className="text-xs text-[#8fa4ab]">End your session</div>
               </div>
             </div>
           </DropdownMenuItem>
         </div>
 
         {/* Footer */}
-        <div className="p-3 bg-gradient-to-r from-gray-50 to-white border-t border-gray-100/50">
-          <div className="text-center text-xs text-gray-500">
-            StockFlow v2.1.0 • Built with ❤️
+        <div className="border-t border-white/10 bg-white/[0.035] p-3">
+          <div className="text-center text-xs text-[#8fa4ab]">
+            StockFlow v2.1.0
           </div>
         </div>
       </DropdownMenuContent>

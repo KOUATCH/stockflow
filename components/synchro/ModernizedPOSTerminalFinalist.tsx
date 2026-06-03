@@ -205,10 +205,10 @@ export function POSTerminalFinal({ organizationId, locationId, terminalId, userI
     avgTransaction: 136.15,
   })
 
-  const { error, success, warning, info, operationStart, operationComplete } = useNotifications()
+  const { error: notifyError, success, warning, info, operationStart, operationComplete } = useNotifications()
   const queryClient = useQueryClient()
 
-  const notification = useNotification()
+  const notification = { error: notifyError, success, warning, info }
 
   const [isItemLoading, setIsItemLoading] = useState<string | null>(null)
   const [showSuccessAnimation, setShowSuccessAnimation] = useState(false)
@@ -220,24 +220,10 @@ export function POSTerminalFinal({ organizationId, locationId, terminalId, userI
   }, [locationId, selectedLocationId])
 
   const { user: sessionData } = useAuth()
-  if (!sessionData?.organizationId) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 p-6 flex items-center justify-center">
-        <div className="text-center">
-
-          <div className="p-4 rounded-full bg-red-100 inline-block mb-4">
-            <AlertTriangle className="h-16 w-16 text-red-600" />
-          </div>
-
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">Organization Required</h2>
-          <p className="text-gray-600">User organization not found. Please contact support.</p>
-        </div>
-      </div>
-    )
-  }
+  const isMissingSessionOrganization = !sessionData?.organizationId
   const {
     data: itemsData,
-    error,
+    error: itemsError,
     isLoading: itemsLoading,
     refetch: refetchItems,
   } = useOrgItemsWithInventoryLevelsLocation(organizationId, selectedLocationId, {
@@ -245,10 +231,10 @@ export function POSTerminalFinal({ organizationId, locationId, terminalId, userI
   })
   console.log({ itemsData })
   useEffect(() => {
-    if (error && organizationId) {
-      error("Loading Error", itemsData?.message || "Failed to load items.")
+    if (itemsError && organizationId) {
+      notifyError("Loading Error", itemsData?.message || "Failed to load items.")
     }
-  }, [error, itemsData?.message, toast, organizationId])
+  }, [itemsError, itemsData?.message, notifyError, organizationId])
 
   const items = itemsData?.data || []
 
@@ -315,6 +301,7 @@ export function POSTerminalFinal({ organizationId, locationId, terminalId, userI
   }
 
   const createSaleMutation = useMutation<any, unknown, any>({
+    meta: { operation: 'create', entity: 'Sale' , suppressSuccessNotification: true, suppressErrorNotification: true },
     mutationFn: (data: any) => createSale(data, userId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["sales-orders"] })
@@ -323,22 +310,24 @@ export function POSTerminalFinal({ organizationId, locationId, terminalId, userI
     },
     onError: (error) => {
       console.error("Sale creation failed:", error)
-      error("Sale Failed", "Failed to create sale. Please try again.")
+      notifyError("Sale Failed", "Failed to create sale. Please try again.")
     },
   })
 
   const createPaymentMutation = useMutation<any, unknown, any>({
+    meta: { operation: 'create', entity: 'Payment' , suppressSuccessNotification: true, suppressErrorNotification: true },
     mutationFn: (paymentData: any) => createPayment(paymentData, userId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["payments"] })
     },
     onError: (error) => {
       console.error("Payment creation failed:", error)
-      error("Payment Failed", "Failed to process payment. Please try again.")
+      notifyError("Payment Failed", "Failed to process payment. Please try again.")
     },
   })
 
   const updateInventoryMutation = useMutation({
+    meta: { operation: 'update', entity: 'Inventory' },
     mutationFn: updateInventoryLevels,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["inventory-levels"] })
@@ -347,6 +336,7 @@ export function POSTerminalFinal({ organizationId, locationId, terminalId, userI
   })
 
   const createTransactionsMutation = useMutation({
+    meta: { operation: 'create', entity: 'Transactions' },
     mutationFn: createInventoryTransactions,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["inventory-transactions"] })
@@ -902,7 +892,7 @@ export function POSTerminalFinal({ organizationId, locationId, terminalId, userI
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     if (cart.length === 0) {
-      error("Empty Cart", "Please add items to cart before processing payment.")
+      notifyError("Empty Cart", "Please add items to cart before processing payment.")
       return
     }
     setIsPaymentDialogOpen(true)
@@ -961,21 +951,22 @@ export function POSTerminalFinal({ organizationId, locationId, terminalId, userI
 
             success("New Session Started", `Session ${session.sessionNumber} created successfully`)
           } else {
-            error("Session Error", newSessionResult.error || "Failed to create POS session")
+            notifyError("Session Error", newSessionResult.error || "Failed to create POS session")
           }
         }
       } catch (error) {
         console.error("Failed to initialize session:", error)
-        error("Session Error", "Failed to initialize POS session")
+        notifyError("Session Error", "Failed to initialize POS session")
       }
     }
 
     if (selectedTerminalId && userId && selectedLocationId && organizationId) {
       initializeSession()
     }
-  }, [selectedTerminalId, userId, selectedLocationId, organizationId, toast])
+  }, [selectedTerminalId, userId, selectedLocationId, organizationId, notifyError])
 
   const createSessionMutation = useMutation({
+    meta: { operation: 'create', entity: 'Session' , suppressSuccessNotification: true, suppressErrorNotification: true },
     mutationFn: createPOSSession,
     onSuccess: (result) => {
       if (result.success && result.data) {
@@ -996,11 +987,11 @@ export function POSTerminalFinal({ organizationId, locationId, terminalId, userI
     },
     onError: (error) => {
       console.error("Session creation failed:", error)
-      error("Session Failed", "Failed to create POS session")
+      notifyError("Session Failed", "Failed to create POS session")
     },
   })
 
-  if (!organizationId) {
+  if (isMissingSessionOrganization || !organizationId) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 p-6 flex items-center justify-center">
         <div className="text-center">

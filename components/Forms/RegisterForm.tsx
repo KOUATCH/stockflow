@@ -1,11 +1,13 @@
 "use client";
 import createUser from "@/actions/users/createUser";
 import countries from "@/contries";
+import { getLocaleFromPathname, localizePath } from "@/i18n/routing";
 import { generateSlug } from "@/lib/generateSlug";
+import { DEFAULT_LOCALE } from "@/types/bilingual";
 import { UserProps, OrgDataProps } from "@/types/types";
 import { Headset, Loader2, Lock, Mail, User, WarehouseIcon } from "lucide-react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { useNotifications } from "../notifications/NotificationProvider";
@@ -29,6 +31,9 @@ export default function RegisterForm() {
     reset,
   } = useForm<UserProps>();
   const router = useRouter();
+  const pathname = usePathname();
+  const locale = getLocaleFromPathname(pathname) ?? DEFAULT_LOCALE;
+  const localizedHref = (href: string) => localizePath(href, locale);
   const { formError, formSuccess } = useNotifications();
 
   async function onSubmit(data: UserProps) {
@@ -46,13 +51,14 @@ export default function RegisterForm() {
       const res = await createUser(data, orgData);
       console.log({ res })
       if (res.status === 409) {
+        const errorMessage = res.error ?? "Email address is already in use";
         setLoading(false);
-        setEmailErr(res.error);
-        formError("Registration", res.error, "Email address is already in use");
+        setEmailErr(errorMessage);
+        formError("Registration", errorMessage, "Email address is already in use");
       } else if (res.status === 200) {
         setLoading(false);
         formSuccess("Registration", "Your account has been created pending verification");
-        router.push(`/verify/${res?.data?.id}?email=${res?.data?.email}`);
+        router.push(localizedHref(`/verify/${res?.data?.id}?email=${res?.data?.email}`));
 
       } else {
         setLoading(false);
@@ -193,7 +199,7 @@ export default function RegisterForm() {
             <p className="mt-6 text-sm text-gray-500">
               Already Registered ?{" "}
               <Link
-                href="/login"
+                href={localizedHref("/login")}
                 className="font-semibold leading-6 text-rose-600 hover:text-rose-500"
               >
                 Login

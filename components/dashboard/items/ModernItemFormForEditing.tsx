@@ -47,8 +47,10 @@ import { z } from "zod"
 
 // -------- Enhanced Schemas for Modern UI --------
 const basicInfoSchema = z.object({
-  name: z.string().min(1, "Name is required").max(100, "Name must be less than 100 characters"),
-  description: z.string().optional(),
+  nameEn: z.string().min(1, "English name is required").max(100, "Name must be less than 100 characters"),
+  nameFr: z.string().optional(),
+  descriptionEn: z.string().optional(),
+  descriptionFr: z.string().optional(),
   imageUrls: z.string().optional(),
   organizationId: z.string(),
   id: z.string(),
@@ -100,7 +102,6 @@ const trackingSchema = z.object({
   trackExpiry: z.boolean().default(false),
   organizationId: z.string(),
   id: z.string(),
-  name: z.string(),
   slug: z.string().optional(),
 })
 
@@ -160,7 +161,7 @@ export default function ModernItemFormForEditing({
   // Welcome notification for editing
   useEffect(() => {
     if (open && itemData) {
-      info("Edit Mode", `Editing ${itemData.name}. Use the tabs to update different sections of your product.`)
+      info("Edit Mode", `Editing ${itemData.nameEn}. Use the tabs to update different sections of your product.`)
     }
   }, [open, itemData, info])
 
@@ -200,8 +201,10 @@ export default function ModernItemFormForEditing({
   const basicInfoForm = useForm<BasicInfoFormValues>({
     resolver: zodResolver(basicInfoSchema),
     defaultValues: {
-      name: "",
-      description: "",
+      nameEn: "",
+      nameFr: "",
+      descriptionEn: "",
+      descriptionFr: "",
       imageUrls: "",
       thumbnail: "",
       organizationId: "",
@@ -271,7 +274,6 @@ export default function ModernItemFormForEditing({
       slug: "",
       organizationId: "",
       id: "",
-      name: "",
     },
     mode: "onChange"
   })
@@ -281,8 +283,10 @@ export default function ModernItemFormForEditing({
     if (!open || !itemData) return
 
     basicInfoForm.reset({
-      name: getItemValue("name", ""),
-      description: getItemValue("description", ""),
+      nameEn: getItemValue("nameEn", ""),
+      nameFr: getItemValue("nameFr", ""),
+      descriptionEn: getItemValue("descriptionEn", ""),
+      descriptionFr: getItemValue("descriptionFr", ""),
       imageUrls: String(getItemValue("imageUrls", "")),
       thumbnail: getItemValue("thumbnail", ""),
       organizationId: itemData.organizationId || "",
@@ -332,7 +336,6 @@ export default function ModernItemFormForEditing({
       slug: getItemValue("slug", ""),
       organizationId: itemData.organizationId || "",
       id: itemData.id,
-      name: getItemValue("name", ""),
     })
 
     setCurrentImageUrl(String(getItemValue("imageUrls", "")))
@@ -364,7 +367,7 @@ export default function ModernItemFormForEditing({
 
     try {
       await updateItemMutation.mutateAsync({ id: itemData!.id, data })
-      operationComplete("Basic Information Updated", `"${data.name}" details have been successfully updated`)
+      operationComplete("Basic Information Updated", `"${data.nameEn}" details have been successfully updated`)
       onSuccess?.()
     } catch (err: any) {
       error("Update Failed", "Failed to update basic information", err?.message || "An unexpected error occurred")
@@ -468,7 +471,6 @@ export default function ModernItemFormForEditing({
         trackExpiry: data.trackExpiry,
         organizationId: data.organizationId,
         id: data.id,
-        name: data.name,
         slug: data.slug ?? "",
       }
       await updateItemMutation.mutateAsync({ id: itemData!.id, data: updateData })
@@ -510,15 +512,15 @@ export default function ModernItemFormForEditing({
             <div className="text-center space-y-4 mb-8">
               <div className="relative mx-auto w-32 h-32 rounded-2xl overflow-hidden border-4 border-slate-200 dark:border-slate-700 shadow-xl">
                 <img
-                  src={currentImageUrl || "https://via.placeholder.com/200"}
-                  alt={getItemValue("name", "Item")}
+                  src={currentImageUrl || "/placeholder.png"}
+                  alt={getItemValue("nameEn", "Item")}
                   className="w-full h-full object-cover"
                 />
                 <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent" />
               </div>
               <div>
                 <h2 className="text-3xl font-bold text-slate-900 dark:text-white">
-                  {getItemValue("name", "Unknown Item")}
+                  {getItemValue("nameEn", "Unknown Item")}
                 </h2>
                 <p className="text-slate-600 dark:text-slate-400 mt-1">
                   SKU: {getItemValue("sku", "N/A")}
@@ -658,12 +660,12 @@ export default function ModernItemFormForEditing({
 
                     <FormField
                       control={basicInfoForm.control}
-                      name="name"
+                      name="nameEn"
                       render={({ field }) => (
                         <FormItem>
                           <FormLabel className="text-base font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-2">
                             <Sparkles className="h-4 w-4 text-blue-500" />
-                            Item Name *
+                            English Item Name *
                           </FormLabel>
                           <FormControl>
                             <Input
@@ -679,13 +681,49 @@ export default function ModernItemFormForEditing({
 
                     <FormField
                       control={basicInfoForm.control}
-                      name="description"
+                      name="nameFr"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel className="text-base font-semibold text-slate-700 dark:text-slate-300">Description</FormLabel>
+                          <FormLabel className="text-base font-semibold text-slate-700 dark:text-slate-300">French Item Name</FormLabel>
+                          <FormControl>
+                            <Input
+                              placeholder="Enter French item name"
+                              className="h-12 bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm border-2 border-slate-200 dark:border-slate-700 focus:border-blue-500 dark:focus:border-blue-400 rounded-xl"
+                              {...field}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={basicInfoForm.control}
+                      name="descriptionEn"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-base font-semibold text-slate-700 dark:text-slate-300">English Description</FormLabel>
                           <FormControl>
                             <Textarea
                               placeholder="Enter item description"
+                              className="min-h-[120px] bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm border-2 border-slate-200 dark:border-slate-700 focus:border-blue-500 dark:focus:border-blue-400 rounded-xl resize-none"
+                              {...field}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={basicInfoForm.control}
+                      name="descriptionFr"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel className="text-base font-semibold text-slate-700 dark:text-slate-300">French Description</FormLabel>
+                          <FormControl>
+                            <Textarea
+                              placeholder="Enter French item description"
                               className="min-h-[120px] bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm border-2 border-slate-200 dark:border-slate-700 focus:border-blue-500 dark:focus:border-blue-400 rounded-xl resize-none"
                               {...field}
                             />
@@ -747,7 +785,7 @@ export default function ModernItemFormForEditing({
       <DialogContent className="max-w-7xl max-h-[95vh] overflow-y-auto">
         <DialogHeader className="border-b border-slate-200 dark:border-slate-700 pb-4">
           <DialogTitle className="text-2xl font-bold bg-gradient-to-r from-slate-900 to-slate-700 dark:from-white dark:to-slate-300 bg-clip-text text-transparent">
-            Edit Item: {String(getItemValue("name", "Unknown Item"))}
+            Edit Item: {String(getItemValue("nameEn", "Unknown Item"))}
           </DialogTitle>
         </DialogHeader>
 

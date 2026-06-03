@@ -1,7 +1,19 @@
 "use server";
 import { getAuthenticatedUser } from "@/lib/auth-server";
+import { generateSlug } from "@/lib/generateSlug";
 import { db } from "@/prisma/db";
 import { OrganizationProps } from "@/types/types";
+import { Locale as PrismaLocale } from "@prisma/client";
+import { randomUUID } from "crypto";
+
+function cleanText(value?: string | null) {
+  const trimmed = value?.trim()
+  return trimmed ? trimmed : null
+}
+
+function toPrismaLocale(value?: string | null) {
+  return value === "fr" ? PrismaLocale.FR : PrismaLocale.EN
+}
 
 
 const createOrganization = async (data: OrganizationProps) => {
@@ -19,12 +31,15 @@ const createOrganization = async (data: OrganizationProps) => {
       }
 
 
-      //check if the organization already exists
-      const existingOrganization = await tx.organization.findUnique({
-
+      const requestedSlug = data.slug || generateSlug(data.name).replace(/^-+|-+$/g, "")
+      const slug = requestedSlug || `organization-${randomUUID().slice(0, 8)}`
+      const existingOrganization = await tx.organization.findFirst({
         where: {
-        id: data?.id,
-        }
+          OR: [
+            ...(data.id ? [{ id: data.id }] : []),
+            { slug },
+          ],
+        },
       });
 
       console.log({ existingOrganization })
@@ -38,10 +53,20 @@ const createOrganization = async (data: OrganizationProps) => {
 
       const newOrganization = await tx.organization.create({
         data: {
-          ...data,
-          // name: data?.name ,
-          // slug: data?.slug,
-        
+          id: data.id || randomUUID(),
+          name: data.name,
+          slug,
+          industry: cleanText(data.industry),
+          country: cleanText(data.country),
+          state: cleanText(data.state),
+          address: cleanText(data.address),
+          currency: data.currency || "XAF",
+          timezone: data.timezone || "Africa/Douala",
+          defaultLocale: toPrismaLocale(data.defaultLocale),
+          inventoryStartDate: data.inventoryStartDate,
+          fiscalYearStart: data.fiscalYearStart,
+          isActive: data.isActive ?? true,
+          updatedAt: new Date(),
         },
       });
       // Revalidate the path to refresh the data
@@ -65,4 +90,3 @@ const createOrganization = async (data: OrganizationProps) => {
 }
 
 export default createOrganization
-

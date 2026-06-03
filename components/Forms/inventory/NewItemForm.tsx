@@ -1,6 +1,8 @@
 "use client";
-import createItem from "@/actions/itemsShow/createActionItem";
-import updateItemById from "@/actions/itemsShow/updateItemById";
+
+import { notify } from "@/lib/notifications/notify"
+import { createActionItem as createItem } from "@/actions/itemsShow/createActionItem";
+import { updateItemById } from "@/actions/itemsShow/updateItemById";
 import TextInput from "@/components/FormInputs/TextInput";
 import { Button } from "@/components/ui/button";
 import { Card, CardHeader, CardTitle } from "@/components/ui/card";
@@ -12,13 +14,11 @@ import {
   DialogTrigger
 } from "@/components/ui/dialog";
 import { generateSlug } from "@/lib/generateSlug";
-import { ItemCreateDTO, UpdateItemPayload } from "@/types/item";
+import { ItemCreateDTO } from "@/types/item";
 import { CheckCircle2, LayoutGrid, Loader2 } from "lucide-react";
 import router from "next/router";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
-import { toast } from "sonner";
-
 type ItemFormProps = {
   editingId?: string | undefined;
   initialData?: ItemCreateDTO | undefined | null;
@@ -38,7 +38,8 @@ const NewItemForm = ({
     formState: { errors },
   } = useForm<ItemCreateDTO>({
     defaultValues: {
-      name: initialData?.name || "",
+      nameEn: initialData?.nameEn || "",
+      nameFr: initialData?.nameFr || "",
       sku: initialData?.sku || "",
       organizationId: organizationId,
       costPrice: initialData?.costPrice || 0,
@@ -55,9 +56,9 @@ const NewItemForm = ({
 
     try {
       // Convert ItemCreateDTO to UpdateItemPayload
-      const payload: UpdateItemPayload = {
+      const payload = {
         ...data,
-        slug: generateSlug(data?.name).toLowerCase(),
+        slug: generateSlug(data?.nameEn).toLowerCase(),
         organizationId: organizationId,
         createdAt: data.createdAt ? new Date(data.createdAt) : new Date(),
       };
@@ -67,9 +68,9 @@ const NewItemForm = ({
         if (payload.createdAt && !(payload.createdAt instanceof Date)) {
           payload.createdAt = new Date(payload.createdAt);
         }
-        await updateItemById(editingId, payload);
+        await updateItemById({ id: editingId, data: payload });
         setLoading(false);
-        toast.success("Updated Successfully!");
+        notify.success("Updated Successfully!");
         reset();
         router.push("/dashboard/items");
       } else {
@@ -80,7 +81,7 @@ const NewItemForm = ({
           return;
         }
         setLoading(false);
-        toast.success("Item Created successfully", { description: "Item created" });
+        notify.success("Item Created successfully", { description: "Item created" });
         window.location.reload();
         reset();
       }
@@ -114,10 +115,18 @@ const NewItemForm = ({
               <TextInput
                 register={register}
                 errors={errors}
-                label="Item Name"
-                name="name"
+                label="English Item Name"
+                name="nameEn"
                 placeholder="Product Name"
                 isRequired
+              />
+
+              <TextInput
+                register={register}
+                errors={errors}
+                label="French Item Name"
+                name="nameFr"
+                placeholder="Nom du produit"
               />
 
               <TextInput

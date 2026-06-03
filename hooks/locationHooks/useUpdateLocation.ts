@@ -5,9 +5,25 @@ import { LocationDTO } from "@/types/location";
 import { LocationKeys2 } from "@/types/queryKeys";
 import { useEntityMutation } from "./useEntityMutation";
 
+const updateLocation = async ({
+  id,
+  data,
+}: {
+  id: string
+  data: Partial<LocationDTO>
+}): Promise<LocationDTO | null> => {
+  const result = await updateLocationById(id, data as LocationDTO)
+
+  if (!result.success) {
+    throw new Error(result.error ?? "Failed to update location")
+  }
+
+  return result.data as LocationDTO | null
+}
+
 const useUpdateLocation = () =>
   useEntityMutation<LocationDTO>(
-    updateLocationById,
+    updateLocation,
     {
       detail: LocationKeys2.detail,
       list: LocationKeys2.lists,

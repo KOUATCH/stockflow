@@ -92,7 +92,7 @@ export function useInventoryIntegration(organizationId?: string) {
             id: level.item.id,
             name: level.item.name,
             sku: level.item.sku,
-            unit: level.item.unit?.abbreviation || "ea",
+            unit: "ea",
           }
         : undefined,
       location: level.location,

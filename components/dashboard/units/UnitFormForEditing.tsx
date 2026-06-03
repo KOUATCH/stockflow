@@ -1,5 +1,6 @@
 "use client"
 
+import { notify } from "@/lib/notifications/notify"
 import { type Column, ConfirmationDialog, DataTable, EntityForm, TableActions } from "@/components/ui/data-table"
 import { FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
@@ -10,7 +11,6 @@ import { zodResolver } from "@hookform/resolvers/zod"
 import { format } from "date-fns"
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { useForm } from "react-hook-form"
-import { toast } from "sonner"
 import * as XLSX from "xlsx"
 import { z } from "zod"
 
@@ -174,11 +174,11 @@ const UnitFormForEditing = ({ title, organizationId, editingId, initialData }: U
         // Export to file
         XLSX.writeFile(workbook, fileName)
 
-        toast.success("Export successful", {
+        notify.success("Export successful", {
           description: `Units exported to ${fileName}`,
         })
       } catch (error) {
-        toast.error("Export failed", {
+        notify.error("Export failed", {
           description: error instanceof Error ? error.message : "Unknown error occurred",
         })
       }
@@ -222,31 +222,23 @@ const UnitFormForEditing = ({ title, organizationId, editingId, initialData }: U
         const { id } = data
         const newUnitData = {
           id: crypto.randomUUID(),
-          name: data.name,
+          nameEn: data.name,
           symbol: data.symbol || "",
           organizationId: organizationId || "",
           createdAt: new Date(),
         }
 
-        createUnitMutation.mutate(newUnitData, {
-          onSuccess: async () => {
-            toast.success("Unit added successfully")
-            setFormDialogOpen(false)
-            resetFormToDefaults()
-            await refetch()
-          },
-          onError: (error: any) => {
-            toast.error("Failed to add unit", {
-              description: error?.message || "Unknown error occurred",
-            })
-          },
-        })
+        await createUnitMutation.mutateAsync(newUnitData)
+        notify.success("Unit added successfully")
+        setFormDialogOpen(false)
+        resetFormToDefaults()
+        await refetch()
       } else {
         // Edit existing unit
         const updateData = {
           ...data,
           id: unitToEdit.id,
-          name: data.name,
+          nameEn: data.name,
           symbol: data.symbol || unitToEdit.symbol,
           createdAt: unitToEdit.createdAt, // Ensure createdAt is included
         }
@@ -258,13 +250,13 @@ const UnitFormForEditing = ({ title, organizationId, editingId, initialData }: U
           },
           {
             onSuccess: async () => {
-              toast.success("Unit updated successfully")
+              notify.success("Unit updated successfully")
               setFormDialogOpen(false)
               resetFormToDefaults()
               await refetch()
             },
             onError: (error: any) => {
-              toast.error("Failed to update unit", {
+              notify.error("Failed to update unit", {
                 description: error?.message || "Unknown error occurred",
               })
             },
@@ -272,7 +264,7 @@ const UnitFormForEditing = ({ title, organizationId, editingId, initialData }: U
         )
       }
     } catch (error) {
-      toast.error("An unexpected error occurred", {
+      notify.error("An unexpected error occurred", {
         description: error instanceof Error ? error.message : "Unknown error",
       })
     }
@@ -316,21 +308,19 @@ const UnitFormForEditing = ({ title, organizationId, editingId, initialData }: U
   }, [initialData])
 
   // Handle delete confirmation
-  const handleDeleteUnitConfirmation = () => {
+  const handleDeleteUnitConfirmation = async () => {
     if (unitToDelete) {
-      deleteUnitMutation.mutate(unitToDelete.id, {
-        onSuccess: () => {
-          toast.success("Unit deleted successfully")
-          refetch()
-        },
-        onError: (error: any) => {
-          toast.error("Failed to delete unit", {
-            description: error?.message || "Unknown error occurred",
-          })
-        },
-      })
-      setDeleteDialogOpen(false)
-      setUnitToDelete(null)
+      try {
+        await deleteUnitMutation.mutateAsync(unitToDelete.id)
+        notify.success("Unit deleted successfully")
+        refetch()
+        setDeleteDialogOpen(false)
+        setUnitToDelete(null)
+      } catch (error: any) {
+        notify.error("Failed to delete unit", {
+          description: error?.message || "Unknown error occurred",
+        })
+      }
     }
   }
 

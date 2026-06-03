@@ -4,6 +4,16 @@ import { db } from "@/prisma/db"
 import { CashDrawerTransactionType, Prisma } from "@prisma/client"
 import { revalidatePath } from "next/cache"
 
+type DecimalLike = { toNumber?: () => number; toString: () => string } | number | string | null | undefined
+
+function toNumber(value: DecimalLike): number {
+  if (value == null) return 0
+  if (typeof value === "number") return value
+  if (typeof value === "string") return Number(value) || 0
+  if (typeof value.toNumber === "function") return value.toNumber()
+  return Number(value.toString()) || 0
+}
+
 // Types for cash drawer operations
 export interface CashDrawerOperation {
   drawerId: string
@@ -127,28 +137,31 @@ export async function getCashDrawers(organizationId: string) {
 
         const todayTotal = todayTransactions.reduce((sum, tx) => {
           return tx.type === 'CASH_IN' || tx.type === 'SALE' 
-            ? sum + tx.amount 
-            : sum - tx.amount
+            ? sum + toNumber(tx.amount)
+            : sum - toNumber(tx.amount)
         }, 0)
 
         return {
           id: drawer.id,
           name: drawer.name,
           drawerNumber: drawer.drawerNumber,
-          currentBalance: drawer.currentBalance,
-          expectedBalance: drawer.expectedBalance,
+          currentBalance: toNumber(drawer.currentBalance),
+          expectedBalance: toNumber(drawer.expectedBalance),
           isOpen: drawer.isOpen,
           locationId: drawer.locationId,
           terminalId: drawer.terminalId,
           lastTransaction: drawer.transactions[0]
             ? {
-                ...drawer.transactions[0],
+                id: drawer.transactions[0].id,
+                type: drawer.transactions[0].type,
+                amount: toNumber(drawer.transactions[0].amount),
+                createdAt: drawer.transactions[0].createdAt,
                 reason: drawer.transactions[0].reason ?? ""
               }
             : undefined,
           todayTransactions: todayTransactions.length,
           todayTotal,
-          variance: drawer.currentBalance - drawer.expectedBalance
+          variance: toNumber(drawer.currentBalance) - toNumber(drawer.expectedBalance)
         }
       })
     )
@@ -192,7 +205,6 @@ export async function getCashDrawerReport(
       include: {
         user: {
           select: {
-            name: true,
             firstName: true,
             lastName: true
           }
@@ -204,9 +216,9 @@ export async function getCashDrawerReport(
     })
 
     // Calculate report metrics
-    const openingBalance = transactions.find(tx => tx.type === 'OPENING_BALANCE')?.balanceAfter || 0
+    const openingBalance = toNumber(transactions.find(tx => tx.type === 'OPENING_BALANCE')?.balanceAfter)
     const closingBalance = transactions.length > 0 
-      ? transactions[transactions.length - 1].balanceAfter 
+      ? toNumber(transactions[transactions.length - 1].balanceAfter)
       : openingBalance
 
     const salesTransactions = transactions.filter(tx => tx.type === 'SALE')
@@ -214,10 +226,10 @@ export async function getCashDrawerReport(
     const cashOutTransactions = transactions.filter(tx => tx.type === 'CASH_OUT' || tx.type === 'PAYOUT')
     const returnTransactions = transactions.filter(tx => tx.type === 'RETURN' || tx.type === 'REFUND')
 
-    const totalSales = salesTransactions.reduce((sum, tx) => sum + tx.amount, 0)
-    const totalCashIn = cashInTransactions.reduce((sum, tx) => sum + tx.amount, 0)
-    const totalCashOut = cashOutTransactions.reduce((sum, tx) => sum + tx.amount, 0)
-    const totalReturns = returnTransactions.reduce((sum, tx) => sum + tx.amount, 0)
+    const totalSales = salesTransactions.reduce((sum, tx) => sum + toNumber(tx.amount), 0)
+    const totalCashIn = cashInTransactions.reduce((sum, tx) => sum + toNumber(tx.amount), 0)
+    const totalCashOut = cashOutTransactions.reduce((sum, tx) => sum + toNumber(tx.amount), 0)
+    const totalReturns = returnTransactions.reduce((sum, tx) => sum + toNumber(tx.amount), 0)
 
     const netCashFlow = totalCashIn + totalSales - totalCashOut - totalReturns
     const expectedClosing = openingBalance + netCashFlow
@@ -239,13 +251,17 @@ export async function getCashDrawerReport(
       transactions: transactions.map(tx => ({
         id: tx.id,
         type: tx.type,
-        amount: tx.amount,
+        amount: toNumber(tx.amount),
         reason: tx.reason || '',
         notes: tx.notes || undefined,
         createdAt: tx.createdAt,
-        balanceBefore: tx.balanceBefore,
-        balanceAfter: tx.balanceAfter,
-        user: tx.user
+        balanceBefore: toNumber(tx.balanceBefore),
+        balanceAfter: toNumber(tx.balanceAfter),
+        user: {
+          name: `${tx.user.firstName ?? ""} ${tx.user.lastName ?? ""}`.trim() || null,
+          firstName: tx.user.firstName,
+          lastName: tx.user.lastName,
+        }
       }))
     }
 
@@ -269,7 +285,8 @@ export async function addCashToDrawer(operation: CashDrawerOperation) {
         throw new Error("Cash drawer not found")
       }
 
-      const newBalance = drawer.currentBalance + operation.amount
+      const currentBalance = toNumber(drawer.currentBalance)
+      const newBalance = currentBalance + operation.amount
 
       // Update drawer balance
       await tx.cashDrawer.update({
@@ -296,7 +313,7 @@ export async function addCashToDrawer(operation: CashDrawerOperation) {
           amount: operation.amount,
           reason: operation.reason,
           notes: operation.notes,
-          balanceBefore: drawer.currentBalance,
+          balanceBefore: currentBalance,
           balanceAfter: newBalance
         }
       })
@@ -325,11 +342,12 @@ export async function removeCashFromDrawer(operation: CashDrawerOperation) {
         throw new Error("Cash drawer not found")
       }
 
-      if (drawer.currentBalance < operation.amount) {
+      const currentBalance = toNumber(drawer.currentBalance)
+      if (currentBalance < operation.amount) {
         throw new Error("Insufficient cash in drawer")
       }
 
-      const newBalance = drawer.currentBalance - operation.amount
+      const newBalance = currentBalance - operation.amount
 
       // Update drawer balance
       await tx.cashDrawer.update({
@@ -356,7 +374,7 @@ export async function removeCashFromDrawer(operation: CashDrawerOperation) {
           amount: operation.amount,
           reason: operation.reason,
           notes: operation.notes,
-          balanceBefore: drawer.currentBalance,
+          balanceBefore: currentBalance,
           balanceAfter: newBalance
         }
       })
@@ -390,7 +408,8 @@ export async function reconcileCashDrawer(
         throw new Error("Cash drawer not found")
       }
 
-      const variance = countedAmount - drawer.currentBalance
+      const currentBalance = toNumber(drawer.currentBalance)
+      const variance = countedAmount - currentBalance
       const reconciliationType: CashDrawerTransactionType = variance === 0 
         ? 'RECONCILIATION' 
         : variance > 0 
@@ -420,8 +439,8 @@ export async function reconcileCashDrawer(
           reason: variance === 0 
             ? 'Cash drawer reconciled - no variance'
             : `Cash drawer reconciled - ${variance > 0 ? 'overage' : 'shortage'} of $${Math.abs(variance).toFixed(2)}`,
-          notes: notes || `Physical count: $${countedAmount.toFixed(2)}, System: $${drawer.currentBalance.toFixed(2)}`,
-          balanceBefore: drawer.currentBalance,
+          notes: notes || `Physical count: $${countedAmount.toFixed(2)}, System: $${currentBalance.toFixed(2)}`,
+          balanceBefore: currentBalance,
           balanceAfter: countedAmount
         }
       })
@@ -468,7 +487,6 @@ export async function getCashDrawerTransactions(
         include: {
           user: {
             select: {
-              name: true,
               firstName: true,
               lastName: true
             }
@@ -494,7 +512,12 @@ export async function getCashDrawerTransactions(
     return {
       success: true,
       data: {
-        transactions,
+        transactions: transactions.map((tx) => ({
+          ...tx,
+          amount: toNumber(tx.amount),
+          balanceBefore: toNumber(tx.balanceBefore),
+          balanceAfter: toNumber(tx.balanceAfter),
+        })),
         pagination: {
           page,
           limit,

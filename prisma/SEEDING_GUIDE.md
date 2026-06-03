@@ -117,7 +117,7 @@ SELECT email, "firstName", "lastName" FROM users LIMIT 10;
 
 ### 👥 Users
 - Realistic names, emails, and phone numbers
-- Proper password hashing (bcrypt)
+- Proper password hashing (Argon2id)
 - Role assignments (1-3 roles per user)
 - Permission context and risk profiles
 - Session configuration settings
@@ -221,7 +221,7 @@ To see detailed logging during seeding, check the console output. The seed scrip
 
 ## Security Considerations
 
-- All seeded passwords use bcrypt hashing
+- All seeded passwords use Argon2id hashing
 - Permission assignments follow least-privilege principles
 - Risk assessments are properly configured
 - Audit trails are comprehensive

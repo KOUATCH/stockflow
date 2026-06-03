@@ -23,6 +23,7 @@ type ErrorType = Error
 export function useDeleteSupplierHook() {
   const qc = useQueryClient()
   return useMutation({
+    meta: { operation: 'delete', entity: 'Supplier' },
     mutationFn: async (args: { id: string; organizationId: string }) => {
       const res = await deleteSupplier(args.id, args.organizationId)
       return res as SupplierResponse<null>

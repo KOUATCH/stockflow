@@ -6,12 +6,20 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { AlertTriangle, Package, RefreshCw, Store, TrendingUp, Warehouse } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { getInventoryLevelsClientSafe, getLocationsClientSafe, getLowStockItemsClientSafe } from '@/actions/inventory/clientSafeInventoryData';
-import { InventoryLevel, Location, LocationType } from '@/types/inventory';
+import { InventoryLevel, LocationType } from '@/types/inventory';
+
+type DashboardLocation = {
+  id: string;
+  name: string;
+  code: string;
+  type?: LocationType;
+  isDefault?: boolean;
+};
 
 export function EnhancedInventoryDashboard() {
   const [levels, setLevels] = useState<InventoryLevel[]>([]);
   const [lowStockItems, setLowStockItems] = useState<InventoryLevel[]>([]);
-  const [locations, setLocations] = useState<Location[]>([]);
+  const [locations, setLocations] = useState<DashboardLocation[]>([]);
   const [selectedLocationId, setSelectedLocationId] = useState<string>('');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -139,7 +147,7 @@ export function EnhancedInventoryDashboard() {
                 size="sm"
                 className="flex items-center gap-2"
               >
-                {getLocationIcon(location.type)}
+                {getLocationIcon(location.type ?? LocationType.WAREHOUSE)}
                 {location.name}
                 {location.isDefault && <Badge variant="secondary" className="ml-1 text-xs">Default</Badge>}
               </Button>
@@ -277,9 +285,9 @@ export function EnhancedInventoryDashboard() {
                   <div key={`${level.itemId}-${level.locationId}`} className="flex items-center justify-between p-4 border rounded-lg">
                     <div className="flex items-center space-x-4">
                       <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center">
-                        {level.item?.imageUrls ? (
+                        {level.item?.imageUrls?.[0] ? (
                           <img
-                            src={level.item.imageUrls || "/placeholder.svg"}
+                            src={level.item.imageUrls[0]}
                             alt={level.item.name}
                             className="w-10 h-10 object-cover rounded"
                           />

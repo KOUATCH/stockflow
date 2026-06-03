@@ -111,6 +111,7 @@ export function usePurchaseOrderModalWorkflowAction(id: string, organizationId?:
 
   // Submit purchase order
   const submitMutation = useMutation({
+    meta: { operation: 'submit', entity: 'Purchase Order' },
     mutationFn: async () => {
       const res = await submitPurchaseOrder(id, organizationId!)
       if (!res.success) throw new Error(res.error || "Failed to submit purchase order")
@@ -127,6 +128,7 @@ export function usePurchaseOrderModalWorkflowAction(id: string, organizationId?:
 
   // Approve purchase order
   const approveMutation = useMutation({
+    meta: { operation: 'approve', entity: 'Purchase Order' },
     mutationFn: async (approvedById: string) => {
       const res = await approvePurchaseOrder(id, organizationId!, approvedById)
       if (!res.success) throw new Error(res.error || "Failed to approve purchase order")
@@ -143,6 +145,7 @@ export function usePurchaseOrderModalWorkflowAction(id: string, organizationId?:
 
   // Cancel purchase order
   const cancelMutation = useMutation({
+    meta: { operation: 'cancel', entity: 'Purchase Order' },
     mutationFn: async (reason?: string) => {
       const res = await cancelPurchaseOrder(id, organizationId!, reason)
       if (!res.success) throw new Error(res.error || "Failed to cancel purchase order")
@@ -159,6 +162,7 @@ export function usePurchaseOrderModalWorkflowAction(id: string, organizationId?:
 
   // Close purchase order
   const closeMutation = useMutation({
+    meta: { operation: 'close', entity: 'Purchase Order' },
     mutationFn: async () => {
       const res = await closePurchaseOrder(id)
       if (!res.success) throw new Error(res.error || "Failed to close purchase order")
@@ -175,6 +179,7 @@ export function usePurchaseOrderModalWorkflowAction(id: string, organizationId?:
 
   // Receive items (with inventory integration)
   const receiveMutation = useMutation({
+    meta: { operation: 'receive', entity: 'Purchase Order Items' },
     mutationFn: async (lines: { lineId: string; quantity: number }[]) => {
       const payload = {
         id,
@@ -202,6 +207,7 @@ export function usePurchaseOrderModalWorkflowAction(id: string, organizationId?:
 
   // Bulk status update
   const bulkStatusMutation = useMutation({
+    meta: { operation: 'update', entity: 'Purchase Orders' },
     mutationFn: async ({ ids, status }: { ids: string[]; status: PurchaseOrderStatus }) => {
       const res = await bulkUpdatePurchaseOrderStatus({
         organizationId: organizationId!,

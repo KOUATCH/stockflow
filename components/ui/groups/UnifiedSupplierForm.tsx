@@ -1,5 +1,6 @@
 'use client'
 
+import { notify } from "@/lib/notifications/notify"
 import { Button } from '@/components/ui/button'
 import { type Column, ConfirmationDialog, DataTable, TableActions } from '@/components/ui/data-table'
 import { FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form'
@@ -17,10 +18,9 @@ import { format } from 'date-fns'
 import { Building2, ContactRound, DollarSign, Mail, MapPin, Phone, Save, User, UserCheck } from 'lucide-react'
 import { useCallback, useMemo, useState } from 'react'
 import { useForm } from 'react-hook-form'
-import { toast } from 'sonner'
 import * as XLSX from 'xlsx'
 import { z } from 'zod'
-import EntityForm2 from '../data-table/EntityForm2'
+import EntityForm from '../data-table/entity-form'
 
 interface SupplierDetailProps {
   title: string
@@ -164,11 +164,11 @@ export default function UnifiedSupplierForm({
       XLSX.utils.book_append_sheet(workbook, worksheet, 'Suppliers')
       const fileName = `Suppliers_${format(new Date(), 'yyyy-MM-dd')}.xlsx`
       XLSX.writeFile(workbook, fileName)
-      toast.success('Export successful', {
+      notify.success('Export successful', {
         description: `Suppliers exported to ${fileName}`,
       })
     } catch (error) {
-      toast.error('Export failed', {
+      notify.error('Export failed', {
         description: error instanceof Error ? error.message : 'Unknown error occurred',
       })
     }
@@ -222,7 +222,7 @@ export default function UnifiedSupplierForm({
         contactPerson: validatedData.contactPerson,
       }
       await updateSupplierMutation.mutateAsync(payload)
-      toast.success('Basic information updated successfully')
+      notify.success('Basic information updated successfully')
       await refetch()
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -231,11 +231,11 @@ export default function UnifiedSupplierForm({
             message: err.message,
           })
         })
-        toast.error('Validation failed', {
+        notify.error('Validation failed', {
           description: 'Please check the form fields and try again',
         })
       } else {
-        toast.error('Failed to update basic information', {
+        notify.error('Failed to update basic information', {
           description: error instanceof Error ? error.message : 'Unknown error occurred',
         })
       }
@@ -257,7 +257,7 @@ export default function UnifiedSupplierForm({
         address: validatedData.address || null,
       }
       await updateSupplierMutation.mutateAsync(payload)
-      toast.success('Contact information updated successfully')
+      notify.success('Contact information updated successfully')
       await refetch()
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -266,11 +266,11 @@ export default function UnifiedSupplierForm({
             message: err.message,
           })
         })
-        toast.error('Validation failed', {
+        notify.error('Validation failed', {
           description: 'Please check the form fields and try again',
         })
       } else {
-        toast.error('Failed to update contact information', {
+        notify.error('Failed to update contact information', {
           description: error instanceof Error ? error.message : 'Unknown error occurred',
         })
       }
@@ -292,7 +292,7 @@ export default function UnifiedSupplierForm({
         notes: validatedData.notes ?? undefined,
       }
       await updateSupplierMutation.mutateAsync(payload)
-      toast.success('Business information updated successfully')
+      notify.success('Business information updated successfully')
       await refetch()
     } catch (error) {
       if (error instanceof z.ZodError) {
@@ -301,11 +301,11 @@ export default function UnifiedSupplierForm({
             message: err.message,
           })
         })
-        toast.error('Validation failed', {
+        notify.error('Validation failed', {
           description: 'Please check the form fields and try again',
         })
       } else {
-        toast.error('Failed to update business information', {
+        notify.error('Failed to update business information', {
           description: error instanceof Error ? error.message : 'Unknown error occurred',
         })
       }
@@ -329,12 +329,12 @@ export default function UnifiedSupplierForm({
         isActive: typeof data.isActive === 'boolean' ? data.isActive : true,
       }
       await createSupplierMutation.mutateAsync(payload)
-      toast.success('Supplier created successfully')
+      notify.success('Supplier created successfully')
       setFormDialogOpen(false)
       resetFormToDefaults()
       await refetch()
     } catch (error) {
-      toast.error('Failed to create supplier', {
+      notify.error('Failed to create supplier', {
         description: error instanceof Error ? error.message : 'Unknown error occurred',
       })
     }
@@ -345,10 +345,10 @@ export default function UnifiedSupplierForm({
     if (!supplierToDelete) return
     try {
       await deleteSupplierMutation.mutateAsync({ id: supplierToDelete.id, organizationId })
-      toast.success('Supplier deleted successfully')
+      notify.success('Supplier deleted successfully')
       await refetch()
     } catch (error) {
-      toast.error('Failed to delete supplier', {
+      notify.error('Failed to delete supplier', {
         description: error instanceof Error ? error.message : 'Unknown error occurred',
       })
     } finally {
@@ -468,7 +468,7 @@ export default function UnifiedSupplierForm({
       />
 
       {/* Tabbed Create/Update Supplier Form Dialog */}
-      <EntityForm2
+      <EntityForm
         open={formDialogOpen}
         onOpenChange={handleFormDialogClose}
         title={isEditMode ? 'Edit Supplier' : 'Add New Supplier'}
@@ -731,7 +731,7 @@ export default function UnifiedSupplierForm({
             </TabsContent>
           </Tabs>
         </div>
-      </EntityForm2 >
+      </EntityForm >
 
       {/* Delete Confirmation Dialog */}
       < ConfirmationDialog

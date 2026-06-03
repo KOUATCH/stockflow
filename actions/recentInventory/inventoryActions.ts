@@ -1,6 +1,11 @@
 "use server"
 
 import { db } from "@/prisma/db"
+import {
+  Prisma,
+  TransactionReferenceType as PrismaTransactionReferenceType,
+  TransactionType as PrismaTransactionType,
+} from "@prisma/client"
 import { revalidatePath, revalidateTag } from "next/cache"
 
 export interface InventoryFilters {
@@ -69,8 +74,117 @@ export interface InventoryTransaction {
   }
 }
 
+const toNumber = (value: Prisma.Decimal | number | null | undefined) => {
+  if (value instanceof Prisma.Decimal) return value.toNumber()
+  return Number(value ?? 0)
+}
+
+const itemName = (item: { nameEn: string; nameFr: string | null }) => item.nameEn || item.nameFr || ""
+
+const mapInventoryLevel = (
+  level: Prisma.InventoryLevelGetPayload<{
+    include: {
+      item: {
+        select: {
+          id: true
+          organizationId: true
+          nameEn: true
+          nameFr: true
+          sku: true
+          descriptionEn: true
+          descriptionFr: true
+          costPrice: true
+          sellingPrice: true
+          maxStockLevel: true
+          category: {
+            select: {
+              id: true
+              titleEn: true
+              titleFr: true
+            }
+          }
+        }
+      }
+      location: {
+        select: {
+          id: true
+          name: true
+          address: true
+        }
+      }
+    }
+  }>
+): InventoryWithRelations => ({
+  id: level.id,
+  itemId: level.itemId,
+  locationId: level.locationId,
+  organizationId: level.item.organizationId,
+  quantity: toNumber(level.quantityOnHand),
+  totalValue: toNumber(level.totalValue),
+  averageCost: toNumber(level.averageCost),
+  reorderLevel: toNumber(level.reorderPoint),
+  maxLevel: toNumber(level.item.maxStockLevel),
+  lastUpdated: level.updatedAt,
+  item: {
+    id: level.item.id,
+    name: itemName(level.item),
+    sku: level.item.sku,
+    description: level.item.descriptionEn ?? level.item.descriptionFr,
+    category: level.item.category
+      ? {
+          id: level.item.category.id,
+          name: level.item.category.titleEn ?? level.item.category.titleFr ?? "",
+        }
+      : null,
+    costPrice: toNumber(level.item.costPrice),
+    sellingPrice: toNumber(level.item.sellingPrice),
+  },
+  location: {
+    id: level.location.id,
+    name: level.location.name,
+    address: level.location.address,
+  },
+})
+
+const sortInventory = (
+  inventory: InventoryWithRelations[],
+  sortBy = "lastUpdated",
+  sortOrder: "asc" | "desc" = "desc"
+) => {
+  const direction = sortOrder === "asc" ? 1 : -1
+  const valueFor = (row: InventoryWithRelations) => {
+    switch (sortBy) {
+      case "quantity":
+        return row.quantity
+      case "totalValue":
+        return row.totalValue
+      case "averageCost":
+        return row.averageCost
+      case "reorderLevel":
+        return row.reorderLevel
+      case "name":
+        return row.item.name
+      case "sku":
+        return row.item.sku
+      case "location":
+        return row.location.name
+      default:
+        return row.lastUpdated.getTime()
+    }
+  }
+
+  return [...inventory].sort((a, b) => {
+    const aValue = valueFor(a)
+    const bValue = valueFor(b)
+    if (typeof aValue === "string" || typeof bValue === "string") {
+      return String(aValue).localeCompare(String(bValue)) * direction
+    }
+    return (Number(aValue) - Number(bValue)) * direction
+  })
+}
+
 /**
- * Fetches inventory data with filters
+ * Fetches inventory data with filters.
  */
 export async function getInventory(filters: InventoryFilters) {
   try {
@@ -81,98 +195,102 @@ export async function getInventory(filters: InventoryFilters) {
     const page = Math.max(1, filters.page || 1)
     const limit = Math.min(100, Math.max(1, filters.limit || 20))
     const skip = (page - 1) * limit
+    const search = filters.search?.trim()
 
-    const where: any = {
-      organizationId: filters.organizationId,
-    }
-
-    if (filters.search?.trim()) {
-      where.OR = [
-        {
-          item: {
-            OR: [
-              { name: { contains: filters.search.trim(), mode: "insensitive" } },
-              { sku: { contains: filters.search.trim(), mode: "insensitive" } },
-              { description: { contains: filters.search.trim(), mode: "insensitive" } },
-            ],
+    const where: Prisma.InventoryLevelWhereInput = {
+      item: {
+        organizationId: filters.organizationId,
+        deletedAt: null,
+        ...(filters.categoryId && { categoryId: filters.categoryId }),
+        ...(search && {
+          OR: [
+            { nameEn: { contains: search, mode: "insensitive" } },
+            { nameFr: { contains: search, mode: "insensitive" } },
+            { sku: { contains: search, mode: "insensitive" } },
+            { descriptionEn: { contains: search, mode: "insensitive" } },
+            { descriptionFr: { contains: search, mode: "insensitive" } },
+          ],
+        }),
+      },
+      ...(filters.locationId && { locationId: filters.locationId }),
+      ...(search && {
+        OR: [
+          {
+            location: {
+              name: { contains: search, mode: "insensitive" },
+            },
           },
-        },
-        {
-          location: {
-            name: { contains: filters.search.trim(), mode: "insensitive" },
+          {
+            item: {
+              organizationId: filters.organizationId,
+              deletedAt: null,
+              OR: [
+                { nameEn: { contains: search, mode: "insensitive" } },
+                { nameFr: { contains: search, mode: "insensitive" } },
+                { sku: { contains: search, mode: "insensitive" } },
+                { descriptionEn: { contains: search, mode: "insensitive" } },
+                { descriptionFr: { contains: search, mode: "insensitive" } },
+              ],
+            },
           },
-        },
-      ]
+        ],
+      }),
     }
 
-    if (filters.locationId) {
-      where.locationId = filters.locationId
-    }
-
-    if (filters.categoryId) {
-      where.item = {
-        ...where.item,
-        categoryId: filters.categoryId,
-      }
-    }
-
-    if (filters.lowStock) {
-      where.quantity = {
-        lte: db.raw("reorder_level"),
-        gt: 0,
-      }
-    }
-
-    if (filters.outOfStock) {
-      where.quantity = 0
-    }
-
-    const sortBy = filters.sortBy || "lastUpdated"
-    const sortOrder = filters.sortOrder || "desc"
-
-    const [inventory, totalCount] = await Promise.all([
-      db.inventory.findMany({
-        where,
-        include: {
-          item: {
-            select: {
-              id: true,
-              name: true,
-              sku: true,
-              description: true,
-              costPrice: true,
-              sellingPrice: true,
-              category: {
-                select: {
-                  id: true,
-                  name: true,
-                },
+    const levels = await db.inventoryLevel.findMany({
+      where,
+      include: {
+        item: {
+          select: {
+            id: true,
+            organizationId: true,
+            nameEn: true,
+            nameFr: true,
+            sku: true,
+            descriptionEn: true,
+            descriptionFr: true,
+            costPrice: true,
+            sellingPrice: true,
+            maxStockLevel: true,
+            category: {
+              select: {
+                id: true,
+                titleEn: true,
+                titleFr: true,
               },
             },
           },
-          location: {
-            select: {
-              id: true,
-              name: true,
-              address: true,
-            },
+        },
+        location: {
+          select: {
+            id: true,
+            name: true,
+            address: true,
           },
         },
-        orderBy: { [sortBy]: sortOrder },
-        skip,
-        take: limit,
-      }),
-      db.inventory.count({ where }),
-    ])
+      },
+    })
 
-    const totalPages = Math.ceil(totalCount / limit)
+    let inventory = levels.map(mapInventoryLevel)
+
+    if (filters.lowStock) {
+      inventory = inventory.filter((level) => level.quantity <= level.reorderLevel && level.quantity > 0)
+    }
+
+    if (filters.outOfStock) {
+      inventory = inventory.filter((level) => level.quantity <= 0)
+    }
+
+    const sortedInventory = sortInventory(inventory, filters.sortBy, filters.sortOrder)
+    const data = sortedInventory.slice(skip, skip + limit)
+    const totalPages = Math.ceil(sortedInventory.length / limit)
 
     return {
-      data: inventory,
+      data,
       pagination: {
         page,
         limit,
-        total: totalCount,
+        total: sortedInventory.length,
         totalPages,
         hasNext: page < totalPages,
         hasPrev: page > 1,
@@ -186,56 +304,60 @@ export async function getInventory(filters: InventoryFilters) {
 }
 
 /**
- * Fetches inventory summary statistics
+ * Fetches inventory summary statistics.
  */
 export async function getInventorySummary(organizationId: string) {
   try {
     if (!organizationId) throw new Error("Organization ID is required")
 
-    const [totalItems, totalValue, lowStockItems, outOfStockItems, totalLocations, recentTransactions] =
-      await Promise.all([
-        db.inventory.count({
-          where: { organizationId },
-        }),
-        db.inventory.aggregate({
-          where: { organizationId },
-          _sum: { totalValue: true },
-        }),
-        db.inventory.count({
-          where: {
+    const [levels, totalValue, recentTransactions] = await Promise.all([
+      db.inventoryLevel.findMany({
+        where: {
+          item: {
             organizationId,
-            quantity: {
-              lte: db.raw("reorder_level"),
-              gt: 0,
-            },
+            deletedAt: null,
           },
-        }),
-        db.inventory.count({
-          where: {
+        },
+        select: {
+          locationId: true,
+          quantityOnHand: true,
+          quantityAvailable: true,
+          reorderPoint: true,
+        },
+      }),
+      db.inventoryLevel.aggregate({
+        where: {
+          item: {
             organizationId,
-            quantity: 0,
+            deletedAt: null,
           },
-        }),
-        db.inventory.groupBy({
-          by: ["locationId"],
-          where: { organizationId },
-        }),
-        db.inventoryTransaction.count({
-          where: {
-            organizationId,
-            createdAt: {
-              gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000), // Last 7 days
-            },
+        },
+        _sum: { totalValue: true },
+      }),
+      db.inventoryTransaction.count({
+        where: {
+          organizationId,
+          createdAt: {
+            gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
           },
-        }),
-      ])
+        },
+      }),
+    ])
+
+    const lowStockItems = levels.filter((level) => {
+      const quantity = toNumber(level.quantityAvailable)
+      return quantity <= toNumber(level.reorderPoint) && quantity > 0
+    }).length
+
+    const outOfStockItems = levels.filter((level) => toNumber(level.quantityAvailable) <= 0).length
+    const totalLocations = new Set(levels.map((level) => level.locationId)).size
 
     return {
-      totalItems,
-      totalValue: totalValue._sum.totalValue || 0,
+      totalItems: levels.length,
+      totalValue: toNumber(totalValue._sum.totalValue),
       lowStockItems,
       outOfStockItems,
-      totalLocations: totalLocations.length,
+      totalLocations,
       recentTransactions,
     }
   } catch (error) {
@@ -245,31 +367,29 @@ export async function getInventorySummary(organizationId: string) {
 }
 
 /**
- * Fetches inventory transactions
+ * Fetches inventory transactions.
  */
 export async function getInventoryTransactions(
   organizationId: string,
   itemId?: string,
   locationId?: string,
-  limit = 50,
-) {
+  limit = 50
+): Promise<InventoryTransaction[]> {
   try {
     if (!organizationId) throw new Error("Organization ID is required")
 
-    const where: any = {
-      organizationId,
-    }
-
-    if (itemId) where.itemId = itemId
-    if (locationId) where.locationId = locationId
-
     const transactions = await db.inventoryTransaction.findMany({
-      where,
+      where: {
+        organizationId,
+        ...(itemId && { itemId }),
+        ...(locationId && { locationId }),
+      },
       include: {
         item: {
           select: {
             id: true,
-            name: true,
+            nameEn: true,
+            nameFr: true,
             sku: true,
           },
         },
@@ -284,7 +404,28 @@ export async function getInventoryTransactions(
       take: limit,
     })
 
-    return transactions
+    return transactions.map((transaction) => ({
+      id: transaction.id,
+      itemId: transaction.itemId,
+      locationId: transaction.locationId,
+      organizationId: transaction.organizationId,
+      type: transaction.type,
+      quantity: toNumber(transaction.quantity),
+      unitPrice: toNumber(transaction.unitCost),
+      totalValue: toNumber(transaction.totalCost),
+      reference: transaction.referenceNumber ?? transaction.referenceId,
+      notes: transaction.notes,
+      createdAt: transaction.createdAt,
+      item: {
+        id: transaction.item.id,
+        name: itemName(transaction.item),
+        sku: transaction.item.sku,
+      },
+      location: {
+        id: transaction.location.id,
+        name: transaction.location.name,
+      },
+    }))
   } catch (error) {
     console.error("Error fetching inventory transactions:", error)
     throw new Error("Failed to fetch inventory transactions")
@@ -292,22 +433,25 @@ export async function getInventoryTransactions(
 }
 
 /**
- * Updates inventory reorder levels
+ * Updates inventory reorder levels.
  */
 export async function updateReorderLevels(
   inventoryId: string,
   reorderLevel: number,
   maxLevel: number,
-  organizationId: string,
+  organizationId: string
 ) {
   try {
     if (!inventoryId) throw new Error("Inventory ID is required")
     if (!organizationId) throw new Error("Organization ID is required")
 
-    const inventory = await db.inventory.findFirst({
+    const inventory = await db.inventoryLevel.findFirst({
       where: {
         id: inventoryId,
-        organizationId,
+        item: {
+          organizationId,
+          deletedAt: null,
+        },
       },
     })
 
@@ -315,14 +459,20 @@ export async function updateReorderLevels(
       throw new Error("Inventory record not found")
     }
 
-    await db.inventory.update({
-      where: { id: inventoryId },
-      data: {
-        reorderLevel,
-        maxLevel,
-        lastUpdated: new Date(),
-      },
-    })
+    await db.$transaction([
+      db.inventoryLevel.update({
+        where: { id: inventoryId },
+        data: {
+          reorderPoint: new Prisma.Decimal(reorderLevel),
+        },
+      }),
+      db.item.update({
+        where: { id: inventory.itemId },
+        data: {
+          maxStockLevel: new Prisma.Decimal(maxLevel),
+        },
+      }),
+    ])
 
     revalidateTag("inventory")
     revalidateTag(`inventory-${organizationId}`)
@@ -339,7 +489,7 @@ export async function updateReorderLevels(
 }
 
 /**
- * Creates manual inventory adjustment
+ * Creates manual inventory adjustment.
  */
 export async function createInventoryAdjustment(
   itemId: string,
@@ -347,7 +497,7 @@ export async function createInventoryAdjustment(
   adjustmentQuantity: number,
   reason: string,
   organizationId: string,
-  userId: string,
+  userId: string
 ) {
   try {
     if (!itemId) throw new Error("Item ID is required")
@@ -356,16 +506,15 @@ export async function createInventoryAdjustment(
     if (!userId) throw new Error("User ID is required")
     if (adjustmentQuantity === 0) throw new Error("Adjustment quantity cannot be zero")
 
-    const result = await db.$transaction(async (tx) => {
-      // Get current inventory
-      const inventory = await tx.inventory.findFirst({
+    await db.$transaction(async (tx) => {
+      const inventory = await tx.inventoryLevel.findFirst({
         where: {
           itemId,
           locationId,
-          organizationId,
-        },
-        include: {
-          item: true,
+          item: {
+            organizationId,
+            deletedAt: null,
+          },
         },
       })
 
@@ -373,55 +522,38 @@ export async function createInventoryAdjustment(
         throw new Error("Inventory record not found")
       }
 
-      const newQuantity = Math.max(0, inventory.quantity + adjustmentQuantity)
-      const adjustmentValue = adjustmentQuantity * inventory.averageCost
+      const adjustment = new Prisma.Decimal(adjustmentQuantity)
+      const newQuantity = Prisma.Decimal.max(new Prisma.Decimal(0), inventory.quantityOnHand.plus(adjustment))
+      const quantityAvailable = newQuantity.minus(inventory.quantityReserved)
+      const totalValue = newQuantity.mul(inventory.averageCost)
+      const totalCost = adjustment.mul(inventory.averageCost)
 
-      // Update inventory
-      await tx.inventory.update({
+      await tx.inventoryLevel.update({
         where: { id: inventory.id },
         data: {
-          quantity: newQuantity,
-          totalValue: inventory.totalValue + adjustmentValue,
-          lastUpdated: new Date(),
+          quantityOnHand: newQuantity,
+          quantityAvailable,
+          totalValue,
+          lastTransactionAt: new Date(),
         },
       })
 
-      // Create transaction record
       await tx.inventoryTransaction.create({
         data: {
           itemId,
           locationId,
           organizationId,
-          type: adjustmentQuantity > 0 ? "ADJUSTMENT_IN" : "ADJUSTMENT_OUT",
-          quantity: Math.abs(adjustmentQuantity),
-          unitPrice: inventory.averageCost,
-          totalValue: Math.abs(adjustmentValue),
-          reference: "MANUAL_ADJUSTMENT",
+          createdById: userId,
+          type: adjustmentQuantity > 0 ? PrismaTransactionType.ADJUSTMENT_IN : PrismaTransactionType.ADJUSTMENT_OUT,
+          quantity: adjustment,
+          unitCost: inventory.averageCost,
+          totalCost,
+          referenceType: PrismaTransactionReferenceType.MANUAL,
+          referenceNumber: "MANUAL_ADJUSTMENT",
           notes: reason,
-          createdAt: new Date(),
+          balanceAfter: newQuantity,
         },
       })
-
-      // Update item total quantity
-      const totalInventory = await tx.inventory.aggregate({
-        where: {
-          itemId,
-          organizationId,
-        },
-        _sum: {
-          quantity: true,
-        },
-      })
-
-      await tx.item.update({
-        where: { id: itemId },
-        data: {
-          quantity: totalInventory._sum.quantity || 0,
-          lastUpdated: new Date(),
-        },
-      })
-
-      return inventory
     })
 
     revalidateTag("inventory")

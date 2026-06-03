@@ -1,12 +1,22 @@
 "use server"
 
-import type { CreatePosStationInput, UpdatePosStationInput } from "@/lib/validations/pos-station";
-import { posStationSchema, updatePosStationSchema } from "@/lib/validations/pos-station";
-import { db } from "@/prisma/db";
-import { PaymentMethod, TransactionReferenceType, TransactionType } from "@prisma/client";
-import { revalidatePath } from "next/cache";
+import { randomUUID } from "crypto"
 
-// Types for the POS actions
+import type { CreatePosStationInput, UpdatePosStationInput } from "@/lib/validations/pos-station"
+import { posStationSchema, updatePosStationSchema } from "@/lib/validations/pos-station"
+import { db } from "@/prisma/db"
+import {
+  CashDrawerTransactionType,
+  PaymentMethod,
+  PaymentStatus,
+  POSSessionStatus,
+  Prisma,
+  SalesOrderStatus,
+  TransactionReferenceType,
+  TransactionType,
+} from "@prisma/client"
+import { revalidatePath } from "next/cache"
+
 interface SalesOrderLine {
   itemId: string
   quantity: number
@@ -62,13 +72,12 @@ interface InventoryTransaction {
   serialNumbers: string[]
 }
 
-// FIXED: Updated interface to match frontend data structure
 export interface CreateSaleData {
   organizationId: string
   locationId: string
   stationId: string
   createdById: string
-  customerId?: string // Made optional since it can be undefined
+  customerId?: string
   sessionId: string
   lines: SalesOrderLine[]
   subtotal: number
@@ -145,10 +154,220 @@ export interface SalesType {
   }
 }
 
+const POS_REVALIDATION_PATHS = [
+  "/[locale]/dashboard/session-pos-sync",
+  "/[locale]/dashboard/posStation",
+  "/[locale]/dashboard/pos-system",
+  "/[locale]/dashboard/app/sales/pos",
+] as const
+
+function revalidatePOSPaths() {
+  for (const path of POS_REVALIDATION_PATHS) {
+    revalidatePath(path, "page")
+  }
+}
+
+function createId() {
+  return randomUUID()
+}
+
+function toNumber(value: Prisma.Decimal | number | string | null | undefined): number {
+  if (value === null || value === undefined) {
+    return 0
+  }
+
+  if (typeof value === "number") {
+    return value
+  }
+
+  if (typeof value === "string") {
+    return Number(value) || 0
+  }
+
+  return value.toNumber()
+}
+
+function generateNumber(prefix: string) {
+  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8).toUpperCase()}`
+}
+
+function toPaymentMethod(method: "CASH" | "CARD" | "DIGITAL" | PaymentMethod): PaymentMethod {
+  if (method === "DIGITAL") {
+    return PaymentMethod.MOBILE_MONEY
+  }
+
+  return method as PaymentMethod
+}
+
+function mapPOSSessionForClient(session: any) {
+  if (!session) {
+    return null
+  }
+
+  return {
+    ...session,
+    stationId: session.terminalId,
+    digitalTotal: toNumber(session.mobileMoneyTotal),
+    openingBalance: toNumber(session.openingBalance),
+    closingBalance: toNumber(session.closingBalance),
+    expectedBalance: toNumber(session.expectedBalance),
+    variance: toNumber(session.variance),
+    totalSales: toNumber(session.totalSales),
+    totalTax: toNumber(session.totalTax),
+    totalDiscount: toNumber(session.totalDiscount),
+    cashTotal: toNumber(session.cashTotal),
+    cardTotal: toNumber(session.cardTotal),
+    mobileMoneyTotal: toNumber(session.mobileMoneyTotal),
+    bankTransferTotal: toNumber(session.bankTransferTotal),
+    creditTotal: toNumber(session.creditTotal),
+    station: session.terminal
+      ? {
+          ...session.terminal,
+          stationNumber: session.terminal.terminalNumber,
+        }
+      : undefined,
+    cashDrawerTransactions: session.cashDrawerTransactions?.map((transaction: any) => ({
+      ...transaction,
+      amount: toNumber(transaction.amount),
+      balanceBefore: toNumber(transaction.balanceBefore),
+      balanceAfter: toNumber(transaction.balanceAfter),
+      cashDrawer: transaction.cashDrawer
+        ? {
+            ...transaction.cashDrawer,
+            currentBalance: toNumber(transaction.cashDrawer.currentBalance),
+            expectedBalance: toNumber(transaction.cashDrawer.expectedBalance),
+          }
+        : transaction.cashDrawer,
+    })),
+  }
+}
+
+function mapPOSStationForClient(station: any) {
+  if (!station) {
+    return null
+  }
+
+  return {
+    ...station,
+    stationNumber: station.terminalNumber,
+  }
+}
+
+function mapCashDrawerForClient(cashDrawer: any) {
+  if (!cashDrawer) {
+    return null
+  }
+
+  return {
+    ...cashDrawer,
+    stationId: cashDrawer.terminalId,
+    currentBalance: toNumber(cashDrawer.currentBalance),
+    expectedBalance: toNumber(cashDrawer.expectedBalance),
+    station: cashDrawer.terminal
+      ? {
+          ...cashDrawer.terminal,
+          stationNumber: cashDrawer.terminal.terminalNumber,
+        }
+      : undefined,
+    transactions: cashDrawer.transactions?.map((transaction: any) => ({
+      ...transaction,
+      amount: toNumber(transaction.amount),
+      balanceBefore: toNumber(transaction.balanceBefore),
+      balanceAfter: toNumber(transaction.balanceAfter),
+    })),
+  }
+}
+
+async function resolveCustomerId(
+  tx: Prisma.TransactionClient,
+  organizationId: string,
+  customerId?: string
+) {
+  if (customerId?.trim()) {
+    return customerId
+  }
+
+  const existingCustomer = await tx.customer.findFirst({
+    where: {
+      organizationId,
+      code: "WALK-IN",
+      deletedAt: null,
+    },
+    select: { id: true },
+  })
+
+  if (existingCustomer) {
+    return existingCustomer.id
+  }
+
+  const customer = await tx.customer.create({
+    data: {
+      id: createId(),
+      name: "Walk-in Customer",
+      code: "WALK-IN",
+      organizationId,
+      updatedAt: new Date(),
+    },
+    select: { id: true },
+  })
+
+  return customer.id
+}
+
+async function generateTerminalNumber(organizationId: string): Promise<string> {
+  const terminalNumber = generateNumber("POS")
+  const existing = await db.pOSStation.findFirst({
+    where: {
+      organizationId,
+      terminalNumber,
+    },
+    select: { id: true },
+  })
+
+  return existing ? generateTerminalNumber(organizationId) : terminalNumber
+}
+
+async function findTerminalOrThrow(
+  tx: Prisma.TransactionClient,
+  terminalId: string
+) {
+  const terminal = await tx.pOSStation.findUnique({
+    where: { id: terminalId },
+    select: {
+      id: true,
+      name: true,
+      terminalNumber: true,
+      locationId: true,
+      organizationId: true,
+    },
+  })
+
+  if (!terminal) {
+    throw new Error("POS terminal not found")
+  }
+
+  return terminal
+}
+
+async function findOpenCashDrawer(tx: Prisma.TransactionClient, terminalId: string) {
+  return tx.cashDrawer.findFirst({
+    where: {
+      terminalId,
+      isOpen: true,
+    },
+  })
+}
+
 export async function createSalesOrder(data: CreateSalesOrderData) {
   try {
+    if (!data.lines.length) {
+      return { success: false, error: "At least one sales order line is required" }
+    }
+
+    const now = new Date()
     const salesOrder = await db.salesOrder.create({
       data: {
+        id: createId(),
         customerId: data.customerId,
         locationId: data.locationId,
         organizationId: data.organizationId,
@@ -158,9 +377,12 @@ export async function createSalesOrder(data: CreateSalesOrderData) {
         taxAmount: data.taxAmount,
         discount: data.discount,
         total: data.total,
-        status: "CONFIRMED",
+        status: SalesOrderStatus.CONFIRMED,
+        paymentStatus: PaymentStatus.PENDING,
+        updatedAt: now,
         lines: {
           create: data.lines.map((line) => ({
+            id: createId(),
             itemId: line.itemId,
             quantity: line.quantity,
             unitPrice: line.unitPrice,
@@ -168,6 +390,7 @@ export async function createSalesOrder(data: CreateSalesOrderData) {
             taxRate: line.taxRate,
             taxAmount: line.taxAmount,
             lineTotal: line.lineTotal,
+            updatedAt: now,
           })),
         },
       },
@@ -176,7 +399,7 @@ export async function createSalesOrder(data: CreateSalesOrderData) {
       },
     })
 
-    revalidatePath("/dashboard/session-pos-sync")
+    revalidatePOSPaths()
     return { success: true, data: salesOrder }
   } catch (error) {
     console.error("Failed to create sales order:", error)
@@ -184,361 +407,282 @@ export async function createSalesOrder(data: CreateSalesOrderData) {
   }
 }
 
-// FIXED: Main createSale function with proper error handling and data structure
 export async function createSale(
   saleData: CreateSaleData,
   userId: string
 ): Promise<{ success: boolean; data?: { id: string }; saleId?: string; error?: string }> {
   try {
-    console.log("[CREATE_SALES] Starting sale creation with data:", {
-      ...saleData,
-      userId,
-      hasLines: saleData.lines?.length > 0,
-      hasPayments: saleData.payments?.length > 0
-    });
-
-    // FIXED: Enhanced validation with detailed error messages
-    if (!saleData.payments || !Array.isArray(saleData.payments) || saleData.payments.length === 0) {
-      console.error("[CREATE_SALES] Validation failed: No payments provided");
+    if (!saleData.payments?.length) {
       return { success: false, error: "At least one payment method is required" }
     }
 
-    if (!saleData.lines || !Array.isArray(saleData.lines) || saleData.lines.length === 0) {
-      console.error("[CREATE_SALES] Validation failed: No sale lines provided");
+    if (!saleData.lines?.length) {
       return { success: false, error: "At least one sale item is required" }
     }
 
     if (!userId) {
-      console.error("[CREATE_SALES] Validation failed: No user ID provided");
       return { success: false, error: "User ID is required" }
     }
 
-    if (!saleData.organizationId || !saleData.locationId || !saleData.stationId) {
-      console.error("[CREATE_SALES] Validation failed: Missing required IDs", {
-        hasOrgId: !!saleData.organizationId,
-        hasLocationId: !!saleData.locationId,
-        hasstationId: !!saleData.stationId
-      });
-      return { success: false, error: "Organization, location, and terminal IDs are required" }
+    if (!saleData.organizationId || !saleData.locationId || !saleData.stationId || !saleData.sessionId) {
+      return { success: false, error: "Organization, location, terminal, and session IDs are required" }
     }
 
-    // Generate sale number
-    const saleNumber = `SALES-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
-    console.log("[CREATE_SALES] Generated sales number:", saleNumber);
-
-    // Calculate change amount with null safety
+    const saleNumber = generateNumber("SALE")
     const totalPaid = saleData.payments.reduce((sum, payment) => sum + (payment.amount || 0), 0)
     const changeAmount = Math.max(0, totalPaid - saleData.totalAmount)
 
-    console.log("[CREATE_SALES] Payment calculations:", {
-      totalPaid,
-      totalAmount: saleData.totalAmount,
-      changeAmount
-    });
-
-    // Use database transaction to ensure data consistency
     const result = await db.$transaction(async (tx) => {
-      console.log("[CREATE_SALES] Starting database transaction");
+      const now = new Date()
+      const customerId = await resolveCustomerId(tx, saleData.organizationId, saleData.customerId)
 
-      // FIXED: Proper customer handling (can be null/undefined)
-      const customerData: any = {
-        orderNumber: saleNumber,
-        sessionId: saleData.sessionId,
-        stationId: saleData.stationId,
-        createdById: userId, // Use the passed userId parameter
-        locationId: saleData.locationId,
-        organizationId: saleData.organizationId,
-        subtotal: saleData.subtotal,
-        taxAmount: saleData.taxAmount,
-        discount: saleData.discount,
-        total: saleData.totalAmount,
-        notes: saleData.notes,
-        status: "CONFIRMED",
-        paymentStatus: "PAID",
-      };
-
-      // Only add customerId if it exists and is not empty
-      if (saleData.customerId && saleData.customerId.trim() !== '') {
-        customerData.customerId = saleData.customerId;
-      }
-
-      // Create the sales order
       const sale = await tx.salesOrder.create({
-        data: customerData,
+        data: {
+          id: createId(),
+          orderNumber: saleNumber,
+          sessionId: saleData.sessionId,
+          terminalId: saleData.stationId,
+          createdById: userId,
+          customerId,
+          locationId: saleData.locationId,
+          organizationId: saleData.organizationId,
+          subtotal: saleData.subtotal,
+          taxAmount: saleData.taxAmount,
+          discount: saleData.discount,
+          total: saleData.totalAmount,
+          notes: saleData.notes,
+          status: SalesOrderStatus.CONFIRMED,
+          paymentStatus: PaymentStatus.PAID,
+          updatedAt: now,
+          lines: {
+            create: saleData.lines.map((line) => ({
+              id: createId(),
+              itemId: line.itemId,
+              quantity: line.quantity,
+              unitPrice: line.unitPrice,
+              discount: line.discount || 0,
+              taxRate: line.taxRate || 0,
+              taxAmount: line.taxAmount || 0,
+              lineTotal: line.lineTotal || line.unitPrice * line.quantity - (line.discount || 0) + (line.taxAmount || 0),
+              updatedAt: now,
+            })),
+          },
+        },
       })
 
-      console.log("[CREATE_SALES] Sales order created with ID:", sale.id);
-
-      // Create sale items and update inventory
-      for (const [index, item] of Array.from(saleData.lines.entries())) {
-        console.log(`[CREATE_SALES] Processing line item ${index + 1}:`, {
-          itemId: item.itemId,
-          quantity: item.quantity,
-          unitPrice: item.unitPrice
-        });
-
-        // Validate required item properties
-        if (!item.itemId || item.quantity === undefined || item.unitPrice === undefined) {
-          throw new Error(`Invalid item data at line ${index + 1}: missing required properties`)
-        }
-
-        const lineTotal = item.unitPrice * item.quantity - (item.discount || 0) + (item.taxAmount || 0)
-
-        await tx.salesOrderLine.create({
-          data: {
-            salesOrderId: sale.id,
-            itemId: item.itemId,
-            quantity: item.quantity,
-            unitPrice: item.unitPrice,
-            discount: item.discount || 0,
-            taxRate: item.taxRate || 0,
-            taxAmount: item.taxAmount || 0,
-            lineTotal,
-          },
-        })
-
-        // Get current inventory level
-        const inventoryLevel = await tx.inventoryLevel.findFirst({
+      for (const line of saleData.lines) {
+        const inventoryLevel = await tx.inventoryLevel.findUnique({
           where: {
-            itemId: item.itemId,
-            locationId: saleData.locationId,
+            itemId_locationId: {
+              itemId: line.itemId,
+              locationId: saleData.locationId,
+            },
           },
         })
 
-        // Update or create inventory level
-        if (inventoryLevel) {
-          const newQuantityOnHand = inventoryLevel.quantityOnHand - item.quantity
-          const newQuantityAvailable = Math.max(0, inventoryLevel.quantityAvailable - item.quantity)
+        const currentOnHand = toNumber(inventoryLevel?.quantityOnHand)
+        const currentAvailable = toNumber(inventoryLevel?.quantityAvailable)
+        const newQuantityOnHand = currentOnHand - line.quantity
+        const newQuantityAvailable = Math.max(0, currentAvailable - line.quantity)
 
+        if (inventoryLevel) {
           await tx.inventoryLevel.update({
             where: { id: inventoryLevel.id },
             data: {
               quantityOnHand: newQuantityOnHand,
               quantityAvailable: newQuantityAvailable,
-              lastTransactionAt: new Date(),
-            },
-          })
-
-          // Create inventory transaction
-          await tx.inventoryTransaction.create({
-            data: {
-              itemId: item.itemId,
-              locationId: saleData.locationId,
-              organizationId: saleData.organizationId,
-              type: TransactionType.SALE,
-              quantity: -item.quantity, // Negative for outbound
-              unitCost: item.unitPrice,
-              totalCost: item.unitPrice * item.quantity,
-              balanceAfter: newQuantityOnHand,
-              referenceType: TransactionReferenceType.SALES_ORDER,
-              referenceId: sale.id,
-              referenceNumber: saleNumber,
-              createdById: userId,
-              notes: `Sale transaction - ${item.quantity} units sold`,
+              totalValue: Math.max(0, newQuantityOnHand) * toNumber(inventoryLevel.averageCost),
+              lastTransactionAt: now,
+              updatedAt: now,
             },
           })
         } else {
-          // Create new inventory level if it doesn't exist
           await tx.inventoryLevel.create({
             data: {
-              itemId: item.itemId,
+              id: createId(),
+              itemId: line.itemId,
               locationId: saleData.locationId,
-              quantityOnHand: -item.quantity,
-              quantityAvailable: 0,
+              quantityOnHand: newQuantityOnHand,
+              quantityAvailable: newQuantityAvailable,
               quantityReserved: 0,
               quantityInTransit: 0,
               quantityOnOrder: 0,
               reorderPoint: 0,
-              averageCost: item.unitPrice,
-              totalValue: 0,
-              lastTransactionAt: new Date(),
-            },
-          })
-
-          // Create inventory transaction
-          await tx.inventoryTransaction.create({
-            data: {
-              itemId: item.itemId,
-              locationId: saleData.locationId,
-              organizationId: saleData.organizationId,
-              type: TransactionType.SALE,
-              quantity: -item.quantity,
-              unitCost: item.unitPrice,
-              totalCost: item.unitPrice * item.quantity,
-              balanceAfter: -item.quantity,
-              referenceType: TransactionReferenceType.SALES_ORDER,
-              referenceId: sale.id,
-              referenceNumber: saleNumber,
-              createdById: userId,
-              notes: `Sale transaction - ${item.quantity} units sold`,
+              averageCost: line.unitPrice,
+              totalValue: Math.max(0, newQuantityOnHand) * line.unitPrice,
+              lastTransactionAt: now,
+              updatedAt: now,
             },
           })
         }
-      }
 
-      console.log("[CREATE_SALES] All line items processed, creating payments");
-
-      // Create payments
-      for (const [index, payment] of Array.from(saleData.payments.entries())) {
-        // Validate payment data
-        if (!payment.method || payment.amount === undefined || payment.amount <= 0) {
-          throw new Error(`Invalid payment data at payment ${index + 1}: missing or invalid method/amount`)
-        }
-
-        const paymentNumber = `PAY-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
-
-        await tx.payment.create({
+        await tx.inventoryTransaction.create({
           data: {
-            paymentNumber,
-            salesOrderId: sale.id,
-            method: payment.method as PaymentMethod,
-            amount: payment.amount,
-            cardLast4: payment.cardLastFour,
-            cardType: payment.cardType,
-            authorizationCode: payment.authorizationCode,
-            status: "PAID",
-            processedById: userId,
-            processedAt: new Date(),
+            id: createId(),
+            itemId: line.itemId,
+            locationId: saleData.locationId,
+            organizationId: saleData.organizationId,
+            type: TransactionType.SALE,
+            quantity: -line.quantity,
+            unitCost: line.unitPrice,
+            totalCost: line.unitPrice * line.quantity,
+            balanceAfter: newQuantityOnHand,
+            referenceType: TransactionReferenceType.SALES_ORDER,
+            referenceId: sale.id,
+            referenceNumber: saleNumber,
+            createdById: userId,
+            serialNumbers: [],
+            notes: `Sale transaction - ${line.quantity} units sold`,
           },
         })
       }
 
-      // Handle cash drawer updates for cash payments
-      const cashPayments = saleData.payments.filter(p => p.method === "CASH")
-      if (cashPayments.length > 0) {
-        console.log("[CREATE_SALES] Processing cash payments, count:", cashPayments.length);
+      for (const payment of saleData.payments) {
+        if (!payment.method || payment.amount <= 0) {
+          throw new Error("Each payment must include a valid method and amount")
+        }
 
-        // Find the cash drawer for this session/terminal
+        await tx.payment.create({
+          data: {
+            id: createId(),
+            paymentNumber: generateNumber("PAY"),
+            salesOrderId: sale.id,
+            organizationId: saleData.organizationId,
+            method: toPaymentMethod(payment.method),
+            amount: payment.amount,
+            cardLast4: payment.cardLastFour,
+            cardType: payment.cardType,
+            transactionId: payment.referenceNumber,
+            authorizationCode: payment.authorizationCode,
+            status: PaymentStatus.PAID,
+            processedById: userId,
+            processedAt: now,
+            updatedAt: now,
+          },
+        })
+      }
+
+      const cashPaymentsTotal = saleData.payments
+        .filter((payment) => payment.method === "CASH")
+        .reduce((sum, payment) => sum + payment.amount, 0)
+
+      if (cashPaymentsTotal > 0) {
         const cashDrawer = await tx.cashDrawer.findFirst({
           where: {
-            stationId: saleData.stationId,
+            terminalId: saleData.stationId,
             locationId: saleData.locationId,
             isOpen: true,
           },
         })
 
         if (cashDrawer) {
-          const totalCashPayment = cashPayments.reduce((sum, payment) => sum + payment.amount, 0)
-          const netCashAmount = totalCashPayment - changeAmount
-          const newBalance = cashDrawer.currentBalance + netCashAmount
+          const balanceBefore = toNumber(cashDrawer.currentBalance)
+          const netCashAmount = cashPaymentsTotal - changeAmount
+          const balanceAfter = balanceBefore + netCashAmount
 
-          console.log("[CREATE_SALES] Updating cash drawer:", {
-            currentBalance: cashDrawer.currentBalance,
-            totalCashPayment,
-            changeAmount,
-            netCashAmount,
-            newBalance
-          });
-
-          // Update cash drawer balance
           await tx.cashDrawer.update({
             where: { id: cashDrawer.id },
             data: {
-              currentBalance: newBalance,
-              expectedBalance: newBalance,
+              currentBalance: balanceAfter,
+              expectedBalance: balanceAfter,
+              updatedAt: now,
             },
           })
 
-          // FIXED: Proper cash drawer transaction creation with relation handling
-          const transactionData: any = {
-            cashDrawer: {
-              connect: { id: cashDrawer.id }
-            },
-            session: {
-              connect: { id: saleData.sessionId }
-            },
-            type: "SALE",
-            amount: netCashAmount,
-            reason: `Sale ${saleNumber}`,
-            balanceBefore: cashDrawer.currentBalance,
-            balanceAfter: newBalance,
-          }
-
-          // Add notes if change was given
-          if (changeAmount > 0) {
-            transactionData.notes = `Change given: $${changeAmount.toFixed(2)}`
-          }
-
-          // Only connect user if userId is provided and valid
-          if (userId) {
-            transactionData.user = {
-              connect: { id: userId }
-            }
-          }
-
-          // Record cash drawer transaction
           await tx.cashDrawerTransaction.create({
-            data: transactionData
+            data: {
+              id: createId(),
+              cashDrawerId: cashDrawer.id,
+              sessionId: saleData.sessionId,
+              userId,
+              type: CashDrawerTransactionType.SALE,
+              amount: netCashAmount,
+              reason: `Sale ${saleNumber}`,
+              notes: changeAmount > 0 ? `Change given: ${changeAmount.toFixed(2)}` : undefined,
+              balanceBefore,
+              balanceAfter,
+            },
           })
-        } else {
-          console.warn(`[CREATE_SALES] No active cash drawer found for terminal ${saleData.stationId}`)
         }
       }
 
-      // Update POS session totals
       const session = await tx.pOSSession.findUnique({
         where: { id: saleData.sessionId },
+        select: { id: true },
       })
 
       if (session) {
-        console.log("[CREATE_SALES] Updating POS session totals");
+        const cardTotal = saleData.payments
+          .filter((payment) => payment.method === "CARD")
+          .reduce((sum, payment) => sum + payment.amount, 0)
+        const mobileMoneyTotal = saleData.payments
+          .filter((payment) => payment.method === "DIGITAL")
+          .reduce((sum, payment) => sum + payment.amount, 0)
 
         await tx.pOSSession.update({
           where: { id: saleData.sessionId },
           data: {
-            totalSales: session.totalSales + saleData.totalAmount,
-            totalTax: session.totalTax + saleData.taxAmount,
-            totalDiscount: session.totalDiscount + saleData.discount,
-            transactionCount: session.transactionCount + 1,
-            cashTotal: session.cashTotal + cashPayments.reduce((sum, p) => sum + p.amount, 0),
-            cardTotal: session.cardTotal + saleData.payments.filter(p => p.method === "CARD").reduce((sum, p) => sum + p.amount, 0),
-            digitalTotal: session.digitalTotal + saleData.payments.filter(p => p.method === "DIGITAL").reduce((sum, p) => sum + p.amount, 0),
+            totalSales: { increment: saleData.totalAmount },
+            totalTax: { increment: saleData.taxAmount },
+            totalDiscount: { increment: saleData.discount },
+            transactionCount: { increment: 1 },
+            cashTotal: { increment: cashPaymentsTotal },
+            cardTotal: { increment: cardTotal },
+            mobileMoneyTotal: { increment: mobileMoneyTotal },
+            updatedAt: now,
           },
         })
-      } else {
-        console.warn("[CREATE_SALES] No session found with ID:", saleData.sessionId);
       }
 
-      console.log("[CREATE_SALES] Transaction completed successfully, sale ID:", sale.id);
       return sale
     })
 
-    revalidatePath("/dashboard/app/sales/pos")
-
-    // FIXED: Return consistent data structure that matches frontend expectations
+    revalidatePOSPaths()
     return {
       success: true,
       data: { id: result.id },
-      saleId: result.id
+      saleId: result.id,
     }
   } catch (error) {
-    console.error("[CREATE_SALES] Error creating sale:", error)
+    console.error("[CREATE_SALE] Error creating sale:", error)
     return {
       success: false,
-      error: error instanceof Error ? error.message : "Failed to create sale"
+      error: error instanceof Error ? error.message : "Failed to create sale",
     }
   }
 }
 
 export async function createPayment(data: CreatePaymentData, userId: string) {
   try {
+    const salesOrder = await db.salesOrder.findUnique({
+      where: { id: data.salesOrderId },
+      select: { organizationId: true },
+    })
+
+    if (!salesOrder) {
+      return { success: false, error: "Sales order not found" }
+    }
+
     const payment = await db.payment.create({
       data: {
+        id: createId(),
         amount: data.amount,
         method: data.method,
         salesOrderId: data.salesOrderId,
+        organizationId: salesOrder.organizationId,
         processedById: userId,
-        status: "PAID",
-        paymentNumber: `${data.method.toString().toUpperCase().slice(0, 3)}-${Date.now().toString().slice(-6)}`,
+        status: PaymentStatus.PAID,
+        paymentNumber: generateNumber(data.method.toString().toUpperCase().slice(0, 3)),
         cardType: data.cardType,
         cardLast4: data.cardLast4,
         transactionId: data.transactionId,
         authorizationCode: data.authorizationCode,
         processedAt: new Date(),
+        updatedAt: new Date(),
       },
     })
 
-    revalidatePath("/dashboard/app/sales/pos")
+    revalidatePOSPaths()
     return { success: true, data: payment }
   } catch (error) {
     console.error("Failed to create payment:", error)
@@ -548,8 +692,19 @@ export async function createPayment(data: CreatePaymentData, userId: string) {
 
 export async function updateInventoryLevels(updates: InventoryUpdate[]) {
   try {
-    // Process each inventory update
     for (const update of updates) {
+      const existingLevel = await db.inventoryLevel.findUnique({
+        where: {
+          itemId_locationId: {
+            itemId: update.itemId,
+            locationId: update.locationId,
+          },
+        },
+      })
+
+      const quantityOnHand = toNumber(existingLevel?.quantityOnHand) + update.quantityChange
+      const quantityAvailable = Math.max(0, toNumber(existingLevel?.quantityAvailable) + update.quantityChange)
+
       await db.inventoryLevel.upsert({
         where: {
           itemId_locationId: {
@@ -558,30 +713,30 @@ export async function updateInventoryLevels(updates: InventoryUpdate[]) {
           },
         },
         update: {
-          quantityOnHand: {
-            decrement: Math.abs(update.quantityChange),
-          },
-          quantityAvailable: {
-            decrement: Math.abs(update.quantityChange),
-          },
+          quantityOnHand,
+          quantityAvailable,
           lastTransactionAt: new Date(),
+          updatedAt: new Date(),
         },
         create: {
+          id: createId(),
           itemId: update.itemId,
           locationId: update.locationId,
-          quantityOnHand: Math.max(0, -Math.abs(update.quantityChange)),
-          quantityAvailable: Math.max(0, -Math.abs(update.quantityChange)),
+          quantityOnHand,
+          quantityAvailable,
           quantityReserved: 0,
           quantityInTransit: 0,
           quantityOnOrder: 0,
           reorderPoint: 0,
           averageCost: 0,
           totalValue: 0,
+          lastTransactionAt: new Date(),
+          updatedAt: new Date(),
         },
       })
     }
 
-    revalidatePath("/pos")
+    revalidatePOSPaths()
     return { success: true }
   } catch (error) {
     console.error("Failed to update inventory levels:", error)
@@ -597,40 +752,51 @@ export async function createPOSSession(data: {
   openingBalance?: number
 }) {
   try {
-    const sessionNumber = `SES-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${String(Date.now()).slice(-6)}`
-    const openingBalance = data.openingBalance || 200.0
+    const sessionNumber = generateNumber("SES")
+    const openingBalance = data.openingBalance ?? 200
 
     const result = await db.$transaction(async (tx) => {
-      // Verify user exists
-      const user = await tx.user.findUnique({ where: { id: data.userId } })
+      const now = new Date()
+      const user = await tx.user.findUnique({ where: { id: data.userId }, select: { id: true } })
       if (!user) {
-        throw new Error(`User with ID ${data.userId} not found`)
+        throw new Error("User not found")
       }
 
-      // Create the POS session
+      await findTerminalOrThrow(tx, data.stationId)
+
       const session = await tx.pOSSession.create({
         data: {
+          id: createId(),
           sessionNumber,
-          stationId: data.stationId,
+          terminalId: data.stationId,
           userId: data.userId,
           locationId: data.locationId,
-          status: "ACTIVE",
-          startTime: new Date(),
-          openingBalance: openingBalance,
+          organizationId: data.organizationId,
+          status: POSSessionStatus.ACTIVE,
+          startTime: now,
+          openingBalance,
           totalSales: 0,
           totalTax: 0,
           totalDiscount: 0,
           transactionCount: 0,
           cashTotal: 0,
           cardTotal: 0,
-          digitalTotal: 0,
+          mobileMoneyTotal: 0,
+          bankTransferTotal: 0,
+          creditTotal: 0,
+          updatedAt: now,
+        },
+        include: {
+          terminal: true,
+          cashDrawerTransactions: {
+            include: { cashDrawer: true },
+          },
         },
       })
 
-      // Create or find existing cash drawer for this terminal
       let cashDrawer = await tx.cashDrawer.findFirst({
         where: {
-          stationId: data.stationId,
+          terminalId: data.stationId,
           locationId: data.locationId,
         },
       })
@@ -638,40 +804,36 @@ export async function createPOSSession(data: {
       if (!cashDrawer) {
         cashDrawer = await tx.cashDrawer.create({
           data: {
+            id: createId(),
             name: `Drawer-${data.stationId}`,
-            drawerNumber: `DRW-${data.stationId}-${Date.now()}`,
-            stationId: data.stationId,
+            drawerNumber: generateNumber("DRW"),
+            terminalId: data.stationId,
             locationId: data.locationId,
             currentBalance: openingBalance,
             expectedBalance: openingBalance,
             isOpen: true,
+            updatedAt: now,
           },
         })
       } else {
-        // Update existing cash drawer
-        await tx.cashDrawer.update({
+        cashDrawer = await tx.cashDrawer.update({
           where: { id: cashDrawer.id },
           data: {
             currentBalance: openingBalance,
             expectedBalance: openingBalance,
             isOpen: true,
+            updatedAt: now,
           },
         })
       }
 
-      // Create opening balance transaction with proper relations
       await tx.cashDrawerTransaction.create({
         data: {
-          cashDrawer: {
-            connect: { id: cashDrawer.id }
-          },
-          session: {
-            connect: { id: session.id }
-          },
-          user: {
-            connect: { id: user.id }
-          },
-          type: "OPENING_BALANCE",
+          id: createId(),
+          cashDrawerId: cashDrawer.id,
+          sessionId: session.id,
+          userId: user.id,
+          type: CashDrawerTransactionType.OPENING_BALANCE,
           amount: openingBalance,
           reason: "Session opened",
           balanceBefore: 0,
@@ -679,20 +841,25 @@ export async function createPOSSession(data: {
         },
       })
 
-      // Update terminal's current session
       await tx.pOSStation.update({
         where: { id: data.stationId },
-        data: { currentSessionId: session.id },
+        data: {
+          currentSessionId: session.id,
+          updatedAt: now,
+        },
       })
 
       return session
     })
 
-    revalidatePath("/dashboard/app/sales/pos")
-    return { success: true, data: result }
+    revalidatePOSPaths()
+    return { success: true, data: mapPOSSessionForClient(result) }
   } catch (error) {
     console.error("Failed to create POS session:", error)
-    return { success: false, error: "Failed to create POS session" }
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : "Failed to create POS session",
+    }
   }
 }
 
@@ -700,23 +867,23 @@ export async function getActivePOSSession(stationId: string) {
   try {
     const session = await db.pOSSession.findFirst({
       where: {
-        stationId: stationId,
-        status: "ACTIVE",
+        terminalId: stationId,
+        status: POSSessionStatus.ACTIVE,
       },
       include: {
         user: {
           select: {
             id: true,
-            name: true,
             firstName: true,
             lastName: true,
+            email: true,
           },
         },
-        station: {
+        terminal: {
           select: {
             id: true,
             name: true,
-            stationNumber: true,
+            terminalNumber: true,
           },
         },
         cashDrawerTransactions: {
@@ -732,14 +899,14 @@ export async function getActivePOSSession(stationId: string) {
             },
           },
           orderBy: {
-            createdAt: 'desc',
+            createdAt: "desc",
           },
           take: 1,
         },
       },
     })
 
-    return { success: true, data: session }
+    return { success: true, data: mapPOSSessionForClient(session) }
   } catch (error) {
     console.error("Failed to get active POS session:", error)
     return { success: false, error: "Failed to get active POS session" }
@@ -750,6 +917,7 @@ export async function createInventoryTransactions(transactions: InventoryTransac
   try {
     const createdTransactions = await db.inventoryTransaction.createMany({
       data: transactions.map((transaction) => ({
+        id: createId(),
         itemId: transaction.itemId,
         locationId: transaction.locationId,
         organizationId: transaction.organizationId,
@@ -757,16 +925,16 @@ export async function createInventoryTransactions(transactions: InventoryTransac
         quantity: transaction.quantity,
         unitCost: transaction.unitCost,
         totalCost: transaction.totalCost,
-        balanceAfter: 0, // This should be calculated based on current inventory levels
+        balanceAfter: transaction.quantity,
         referenceType: transaction.referenceType as TransactionReferenceType,
         referenceId: transaction.referenceId,
         createdById: transaction.createdById,
-        serialNumbers: transaction.serialNumbers,
-        notes: `Sale transaction for ${Math.abs(transaction.quantity)} units`,
+        serialNumbers: transaction.serialNumbers ?? [],
+        notes: `Inventory transaction for ${Math.abs(transaction.quantity)} units`,
       })),
     })
 
-    revalidatePath("/dashboard/session-pos-sync")
+    revalidatePOSPaths()
     return { success: true, data: createdTransactions }
   } catch (error) {
     console.error("Failed to create inventory transactions:", error)
@@ -781,13 +949,14 @@ export async function closePOSSession(
 ) {
   try {
     const result = await db.$transaction(async (tx) => {
-      // Get the current session
+      const now = new Date()
       const currentSession = await tx.pOSSession.findUnique({
         where: { id: sessionId },
         include: {
+          terminal: true,
           cashDrawerTransactions: {
             include: { cashDrawer: true },
-            orderBy: { createdAt: 'desc' },
+            orderBy: { createdAt: "desc" },
             take: 1,
           },
         },
@@ -797,138 +966,126 @@ export async function closePOSSession(
         throw new Error("Session not found")
       }
 
-      // Update session status
+      const expectedBalance = toNumber(currentSession.openingBalance) + toNumber(currentSession.cashTotal)
+      const variance = closingBalance - expectedBalance
+
       const session = await tx.pOSSession.update({
         where: { id: sessionId },
         data: {
-          status: "CLOSED",
-          endTime: new Date(),
-          closingBalance: closingBalance,
-          expectedBalance: currentSession.openingBalance + currentSession.totalSales,
-          variance: closingBalance - (currentSession.openingBalance + currentSession.totalSales),
+          status: POSSessionStatus.CLOSED,
+          endTime: now,
+          closingBalance,
+          expectedBalance,
+          variance,
+          updatedAt: now,
+        },
+        include: {
+          terminal: true,
+          cashDrawerTransactions: {
+            include: { cashDrawer: true },
+          },
         },
       })
 
-      // Close associated cash drawer
-      const cashDrawerTransaction = currentSession.cashDrawerTransactions[0]
-      if (cashDrawerTransaction?.cashDrawer) {
+      const cashDrawer = await tx.cashDrawer.findFirst({
+        where: {
+          terminalId: currentSession.terminalId,
+          isOpen: true,
+        },
+      })
+
+      if (cashDrawer) {
+        const balanceBefore = toNumber(cashDrawer.currentBalance)
+
         await tx.cashDrawer.update({
-          where: { id: cashDrawerTransaction.cashDrawer.id },
+          where: { id: cashDrawer.id },
           data: {
             isOpen: false,
             currentBalance: closingBalance,
+            expectedBalance,
+            updatedAt: now,
           },
         })
 
-        // Record closing event with proper relations
         await tx.cashDrawerTransaction.create({
           data: {
-            cashDrawer: {
-              connect: { id: cashDrawerTransaction.cashDrawer.id }
-            },
-            session: {
-              connect: { id: sessionId }
-            },
-            user: {
-              connect: { id: userId }
-            },
-            type: "CLOSING_BALANCE",
+            id: createId(),
+            cashDrawerId: cashDrawer.id,
+            sessionId,
+            userId,
+            type: CashDrawerTransactionType.CLOSING_BALANCE,
             amount: closingBalance,
             reason: "Session closed",
-            balanceBefore: cashDrawerTransaction.cashDrawer.currentBalance,
+            balanceBefore,
             balanceAfter: closingBalance,
           },
         })
       }
 
-      // Clear terminal's current session
       await tx.pOSStation.update({
-        where: { id: currentSession.stationId },
-        data: { currentSessionId: null },
+        where: { id: currentSession.terminalId },
+        data: {
+          currentSessionId: null,
+          updatedAt: now,
+        },
       })
 
       return session
     })
 
-    revalidatePath("/dashboard/session-pos-sync")
+    const mappedResult = mapPOSSessionForClient(result)
+    revalidatePOSPaths()
     return {
       success: true,
-      data: result,
-      message: `POS Session ${result.sessionNumber} closed successfully. Final sales: $${result.totalSales.toFixed(2)}, Variance: $${(result.variance || 0).toFixed(2)}`
+      data: mappedResult,
+      message: `POS Session ${mappedResult.sessionNumber} closed successfully. Final sales: $${mappedResult.totalSales.toFixed(2)}, Variance: $${mappedResult.variance.toFixed(2)}`,
     }
   } catch (error) {
     console.error("Failed to close POS session:", error)
     return {
       success: false,
       error: error instanceof Error ? error.message : "Failed to close POS session",
-      message: "Could not close the session. Please try again or contact support."
+      message: "Could not close the session. Please try again or contact support.",
     }
   }
-}
-
-// ============================================================================
-// POS STATION MANAGEMENT FUNCTIONS
-// ============================================================================
-
-// Generate unique terminal number
-async function generatestationNumber(): Promise<string> {
-  const timestamp = Date.now().toString().slice(-6)
-  const random = Math.random().toString(36).substring(2, 6).toUpperCase()
-  const stationNumber = `POS-${timestamp}-${random}`
-
-  // Check if terminal number already exists
-  const existing = await db.pOSStation.findUnique({
-    where: { stationNumber },
-  })
-
-  if (existing) {
-    // Recursively generate a new number if collision occurs
-    return generatestationNumber()
-  }
-
-  return stationNumber
 }
 
 export async function createPosStation(input: CreatePosStationInput) {
   try {
-    // Validate input
     const validatedInput = posStationSchema.parse(input)
 
-    // Check if organization exists
     const organization = await db.organization.findUnique({
       where: { id: validatedInput.organizationId },
+      select: { id: true },
     })
 
     if (!organization) {
-      return {
-        success: false,
-        error: "Organization not found",
-      }
+      return { success: false, error: "Organization not found" }
     }
 
-    // Check if location exists and belongs to the organization
     const location = await db.location.findFirst({
       where: {
         id: validatedInput.locationId,
         organizationId: validatedInput.organizationId,
       },
+      select: { id: true },
     })
 
     if (!location) {
-      return {
-        success: false,
-        error: "Location not found or does not belong to the specified organization",
-      }
+      return { success: false, error: "Location not found or does not belong to the specified organization" }
     }
 
-    // Generate unique terminal number
-    const stationNumber = await generatestationNumber()
-
-    // Create POS station
+    const terminalNumber = validatedInput.terminalNumber || await generateTerminalNumber(validatedInput.organizationId)
     const posStation = await db.pOSStation.create({
       data: {
-        ...validatedInput,
-        stationNumber,
+        id: createId(),
+        name: validatedInput.name,
+        terminalNumber,
+        isActive: validatedInput.isActive,
+        hasCashDrawer: validatedInput.hasCashDrawer,
+        locationId: validatedInput.locationId,
+        organizationId: validatedInput.organizationId,
+        updatedAt: new Date(),
       },
       include: {
         location: {
@@ -943,12 +1100,10 @@ export async function createPosStation(input: CreatePosStationInput) {
       },
     })
 
-    revalidatePath("/dashboard/posStation")
-    revalidatePath("/dashboard/session-pos-sync")
-
+    revalidatePOSPaths()
     return {
       success: true,
-      data: posStation,
+      data: mapPOSStationForClient(posStation),
     }
   } catch (error) {
     console.error("Error creating POS station:", error)
@@ -979,7 +1134,7 @@ export async function getPosStations(organizationId?: string) {
 
     return {
       success: true,
-      data: posStations,
+      data: posStations.map(mapPOSStationForClient),
     }
   } catch (error) {
     console.error("Error fetching POS stations:", error)
@@ -1016,7 +1171,7 @@ export async function getPosStationById(id: string) {
 
     return {
       success: true,
-      data: posStation,
+      data: mapPOSStationForClient(posStation),
     }
   } catch (error) {
     console.error("Error fetching POS station:", error)
@@ -1029,13 +1184,12 @@ export async function getPosStationById(id: string) {
 
 export async function updatePosStation(input: UpdatePosStationInput) {
   try {
-    // Validate input
     const validatedInput = updatePosStationSchema.parse(input)
     const { id, ...updateData } = validatedInput
 
-    // Check if POS station exists
     const existingStation = await db.pOSStation.findUnique({
       where: { id },
+      select: { organizationId: true },
     })
 
     if (!existingStation) {
@@ -1045,13 +1199,14 @@ export async function updatePosStation(input: UpdatePosStationInput) {
       }
     }
 
-    // If updating location, verify it belongs to the organization
-    if (updateData.locationId && updateData.organizationId) {
+    if (updateData.locationId) {
+      const organizationId = updateData.organizationId ?? existingStation.organizationId
       const location = await db.location.findFirst({
         where: {
           id: updateData.locationId,
-          organizationId: updateData.organizationId,
+          organizationId,
         },
+        select: { id: true },
       })
 
       if (!location) {
@@ -1062,10 +1217,17 @@ export async function updatePosStation(input: UpdatePosStationInput) {
       }
     }
 
-    // Update POS station
     const updatedStation = await db.pOSStation.update({
       where: { id },
-      data: updateData,
+      data: {
+        name: updateData.name,
+        terminalNumber: updateData.terminalNumber,
+        isActive: updateData.isActive,
+        hasCashDrawer: updateData.hasCashDrawer,
+        locationId: updateData.locationId,
+        organizationId: updateData.organizationId,
+        updatedAt: new Date(),
+      },
       include: {
         location: {
           select: { id: true, name: true },
@@ -1079,12 +1241,10 @@ export async function updatePosStation(input: UpdatePosStationInput) {
       },
     })
 
-    revalidatePath("/dashboard/posStation")
-    revalidatePath("/dashboard/session-pos-sync")
-
+    revalidatePOSPaths()
     return {
       success: true,
-      data: updatedStation,
+      data: mapPOSStationForClient(updatedStation),
     }
   } catch (error) {
     console.error("Error updating POS station:", error)
@@ -1097,13 +1257,9 @@ export async function updatePosStation(input: UpdatePosStationInput) {
 
 export async function deletePosStation(id: string) {
   try {
-    // Check if POS station exists
     const existingStation = await db.pOSStation.findUnique({
       where: { id },
-      include: {
-        sessions: { take: 1 },
-        salesOrders: { take: 1 },
-      },
+      select: { id: true },
     })
 
     if (!existingStation) {
@@ -1113,31 +1269,25 @@ export async function deletePosStation(id: string) {
       }
     }
 
-    // Check if station has active sessions or sales orders
-    if (existingStation.sessions.length > 0 || existingStation.salesOrders.length > 0) {
-      return {
-        success: false,
-        error: "Cannot delete POS station with existing sessions or sales orders. Deactivate it instead.",
-      }
-    }
-
-    // Delete POS station
-    await db.pOSStation.delete({
+    await db.pOSStation.update({
       where: { id },
+      data: {
+        isActive: false,
+        currentSessionId: null,
+        updatedAt: new Date(),
+      },
     })
 
-    revalidatePath("/dashboard/posStation")
-    revalidatePath("/dashboard/session-pos-sync")
-
+    revalidatePOSPaths()
     return {
       success: true,
-      message: "POS station deleted successfully",
+      message: "POS station deactivated successfully",
     }
   } catch (error) {
-    console.error("Error deleting POS station:", error)
+    console.error("Error deactivating POS station:", error)
     return {
       success: false,
-      error: "Failed to delete POS station",
+      error: "Failed to deactivate POS station",
     }
   }
 }
@@ -1183,33 +1333,29 @@ export async function getLocationsByOrganization(organizationId: string) {
   }
 }
 
-// ============================================================================
-// CASH DRAWER MANAGEMENT FUNCTIONS
-// ============================================================================
-
 export async function getCashDrawerByStationId(stationId: string) {
   try {
     const cashDrawer = await db.cashDrawer.findFirst({
-      where: { stationId },
+      where: { terminalId: stationId },
       include: {
         transactions: {
-          orderBy: { createdAt: 'desc' },
+          orderBy: { createdAt: "desc" },
           take: 10,
           include: {
             user: {
-              select: { id: true, name: true, firstName: true, lastName: true }
-            }
-          }
+              select: { id: true, firstName: true, lastName: true, email: true },
+            },
+          },
         },
-        station: {
-          select: { id: true, name: true, stationNumber: true }
-        }
-      }
+        terminal: {
+          select: { id: true, name: true, terminalNumber: true },
+        },
+      },
     })
 
     return {
       success: true,
-      data: cashDrawer,
+      data: mapCashDrawerForClient(cashDrawer),
     }
   } catch (error) {
     console.error("Error fetching cash drawer:", error)
@@ -1223,63 +1369,65 @@ export async function getCashDrawerByStationId(stationId: string) {
 export async function openCashDrawer(stationId: string, userId: string, openingBalance: number) {
   try {
     const result = await db.$transaction(async (tx) => {
-      // Find or create cash drawer for the station
+      const now = new Date()
+      const terminal = await findTerminalOrThrow(tx, stationId)
       let cashDrawer = await tx.cashDrawer.findFirst({
-        where: { stationId }
+        where: { terminalId: stationId },
       })
 
       if (!cashDrawer) {
-        // Create new cash drawer
         cashDrawer = await tx.cashDrawer.create({
           data: {
-            name: `Drawer-${stationId}`,
-            drawerNumber: `DRW-${stationId}-${Date.now()}`,
-            stationId,
-            locationId: "", // Will be updated when we have location context
+            id: createId(),
+            name: `Drawer-${terminal.terminalNumber}`,
+            drawerNumber: generateNumber("DRW"),
+            terminalId: stationId,
+            locationId: terminal.locationId,
             currentBalance: openingBalance,
             expectedBalance: openingBalance,
             isOpen: true,
-          }
+            updatedAt: now,
+          },
         })
       } else {
-        // Update existing cash drawer
-        await tx.cashDrawer.update({
+        cashDrawer = await tx.cashDrawer.update({
           where: { id: cashDrawer.id },
           data: {
             currentBalance: openingBalance,
             expectedBalance: openingBalance,
             isOpen: true,
-          }
+            updatedAt: now,
+          },
         })
       }
 
-      // Create opening transaction
       await tx.cashDrawerTransaction.create({
         data: {
-          cashDrawer: { connect: { id: cashDrawer.id } },
-          user: { connect: { id: userId } },
-          type: "OPENING_BALANCE",
+          id: createId(),
+          cashDrawerId: cashDrawer.id,
+          userId,
+          type: CashDrawerTransactionType.OPENING_BALANCE,
           amount: openingBalance,
           reason: "Cash drawer opened",
           balanceBefore: 0,
           balanceAfter: openingBalance,
-        }
+        },
       })
 
       return cashDrawer
     })
 
-    revalidatePath("/dashboard/session-pos-sync")
+    revalidatePOSPaths()
     return {
       success: true,
-      data: result,
-      message: `Cash drawer opened with balance: $${openingBalance.toFixed(2)}`
+      data: mapCashDrawerForClient(result),
+      message: `Cash drawer opened with balance: $${openingBalance.toFixed(2)}`,
     }
   } catch (error) {
     console.error("Error opening cash drawer:", error)
     return {
       success: false,
-      error: "Failed to open cash drawer",
+      error: error instanceof Error ? error.message : "Failed to open cash drawer",
     }
   }
 }
@@ -1287,44 +1435,44 @@ export async function openCashDrawer(stationId: string, userId: string, openingB
 export async function closeCashDrawer(stationId: string, userId: string, closingBalance: number) {
   try {
     const result = await db.$transaction(async (tx) => {
-      const cashDrawer = await tx.cashDrawer.findFirst({
-        where: { stationId, isOpen: true }
-      })
+      const now = new Date()
+      const cashDrawer = await findOpenCashDrawer(tx, stationId)
 
       if (!cashDrawer) {
-        throw new Error("No open cash drawer found for this station")
+        throw new Error("No open cash drawer found for this terminal")
       }
 
-      // Update cash drawer status
+      const balanceBefore = toNumber(cashDrawer.currentBalance)
       const updatedDrawer = await tx.cashDrawer.update({
         where: { id: cashDrawer.id },
         data: {
           isOpen: false,
           currentBalance: closingBalance,
-        }
+          updatedAt: now,
+        },
       })
 
-      // Create closing transaction
       await tx.cashDrawerTransaction.create({
         data: {
-          cashDrawer: { connect: { id: cashDrawer.id } },
-          user: { connect: { id: userId } },
-          type: "CLOSING_BALANCE",
+          id: createId(),
+          cashDrawerId: cashDrawer.id,
+          userId,
+          type: CashDrawerTransactionType.CLOSING_BALANCE,
           amount: closingBalance,
           reason: "Cash drawer closed",
-          balanceBefore: cashDrawer.currentBalance,
+          balanceBefore,
           balanceAfter: closingBalance,
-        }
+        },
       })
 
       return updatedDrawer
     })
 
-    revalidatePath("/dashboard/session-pos-sync")
+    revalidatePOSPaths()
     return {
       success: true,
-      data: result,
-      message: `Cash drawer closed with balance: $${closingBalance.toFixed(2)}`
+      data: mapCashDrawerForClient(result),
+      message: `Cash drawer closed with balance: $${closingBalance.toFixed(2)}`,
     }
   } catch (error) {
     console.error("Error closing cash drawer:", error)
@@ -1344,50 +1492,47 @@ export async function addCashToDrawer(
 ) {
   try {
     const result = await db.$transaction(async (tx) => {
-      const cashDrawer = await tx.cashDrawer.findFirst({
-        where: { stationId, isOpen: true }
-      })
+      const now = new Date()
+      const cashDrawer = await findOpenCashDrawer(tx, stationId)
 
       if (!cashDrawer) {
-        throw new Error("No open cash drawer found for this station")
+        throw new Error("No open cash drawer found for this terminal")
       }
 
-      const newBalance = cashDrawer.currentBalance + amount
+      const balanceBefore = toNumber(cashDrawer.currentBalance)
+      const balanceAfter = balanceBefore + amount
 
-      // Update cash drawer balance
       const updatedDrawer = await tx.cashDrawer.update({
         where: { id: cashDrawer.id },
         data: {
-          currentBalance: newBalance,
-          expectedBalance: newBalance,
-        }
+          currentBalance: balanceAfter,
+          expectedBalance: balanceAfter,
+          updatedAt: now,
+        },
       })
 
-      // Create transaction record
-      const transactionData: any = {
-        cashDrawer: { connect: { id: cashDrawer.id } },
-        user: { connect: { id: userId } },
-        type: "CASH_ADDED",
-        amount,
-        reason,
-        balanceBefore: cashDrawer.currentBalance,
-        balanceAfter: newBalance,
-      }
-
-      if (sessionId) {
-        transactionData.session = { connect: { id: sessionId } }
-      }
-
-      await tx.cashDrawerTransaction.create({ data: transactionData })
+      await tx.cashDrawerTransaction.create({
+        data: {
+          id: createId(),
+          cashDrawerId: cashDrawer.id,
+          sessionId,
+          userId,
+          type: CashDrawerTransactionType.CASH_IN,
+          amount,
+          reason,
+          balanceBefore,
+          balanceAfter,
+        },
+      })
 
       return updatedDrawer
     })
 
-    revalidatePath("/dashboard/session-pos-sync")
+    revalidatePOSPaths()
     return {
       success: true,
-      data: result,
-      message: `$${amount.toFixed(2)} added to cash drawer`
+      data: mapCashDrawerForClient(result),
+      message: `$${amount.toFixed(2)} added to cash drawer`,
     }
   } catch (error) {
     console.error("Error adding cash to drawer:", error)
@@ -1407,54 +1552,50 @@ export async function removeCashFromDrawer(
 ) {
   try {
     const result = await db.$transaction(async (tx) => {
-      const cashDrawer = await tx.cashDrawer.findFirst({
-        where: { stationId, isOpen: true }
-      })
+      const now = new Date()
+      const cashDrawer = await findOpenCashDrawer(tx, stationId)
 
       if (!cashDrawer) {
-        throw new Error("No open cash drawer found for this station")
+        throw new Error("No open cash drawer found for this terminal")
       }
 
-      if (cashDrawer.currentBalance < amount) {
+      const balanceBefore = toNumber(cashDrawer.currentBalance)
+      if (balanceBefore < amount) {
         throw new Error("Insufficient cash in drawer")
       }
 
-      const newBalance = cashDrawer.currentBalance - amount
-
-      // Update cash drawer balance
+      const balanceAfter = balanceBefore - amount
       const updatedDrawer = await tx.cashDrawer.update({
         where: { id: cashDrawer.id },
         data: {
-          currentBalance: newBalance,
-          expectedBalance: newBalance,
-        }
+          currentBalance: balanceAfter,
+          expectedBalance: balanceAfter,
+          updatedAt: now,
+        },
       })
 
-      // Create transaction record
-      const transactionData: any = {
-        cashDrawer: { connect: { id: cashDrawer.id } },
-        user: { connect: { id: userId } },
-        type: "CASH_REMOVED",
-        amount: -amount, // Negative for removal
-        reason,
-        balanceBefore: cashDrawer.currentBalance,
-        balanceAfter: newBalance,
-      }
-
-      if (sessionId) {
-        transactionData.session = { connect: { id: sessionId } }
-      }
-
-      await tx.cashDrawerTransaction.create({ data: transactionData })
+      await tx.cashDrawerTransaction.create({
+        data: {
+          id: createId(),
+          cashDrawerId: cashDrawer.id,
+          sessionId,
+          userId,
+          type: CashDrawerTransactionType.CASH_OUT,
+          amount: -amount,
+          reason,
+          balanceBefore,
+          balanceAfter,
+        },
+      })
 
       return updatedDrawer
     })
 
-    revalidatePath("/dashboard/session-pos-sync")
+    revalidatePOSPaths()
     return {
       success: true,
-      data: result,
-      message: `$${amount.toFixed(2)} removed from cash drawer`
+      data: mapCashDrawerForClient(result),
+      message: `$${amount.toFixed(2)} removed from cash drawer`,
     }
   } catch (error) {
     console.error("Error removing cash from drawer:", error)
@@ -1468,21 +1609,21 @@ export async function removeCashFromDrawer(
 export async function getCashDrawerTransactions(stationId: string, limit: number = 50) {
   try {
     const cashDrawer = await db.cashDrawer.findFirst({
-      where: { stationId },
+      where: { terminalId: stationId },
       include: {
         transactions: {
-          orderBy: { createdAt: 'desc' },
+          orderBy: { createdAt: "desc" },
           take: limit,
           include: {
             user: {
-              select: { id: true, name: true, firstName: true, lastName: true }
+              select: { id: true, firstName: true, lastName: true, email: true },
             },
             session: {
-              select: { id: true, sessionNumber: true }
-            }
-          }
-        }
-      }
+              select: { id: true, sessionNumber: true },
+            },
+          },
+        },
+      },
     })
 
     if (!cashDrawer) {
@@ -1494,7 +1635,7 @@ export async function getCashDrawerTransactions(stationId: string, limit: number
 
     return {
       success: true,
-      data: cashDrawer.transactions,
+      data: mapCashDrawerForClient(cashDrawer)?.transactions ?? [],
     }
   } catch (error) {
     console.error("Error fetching cash drawer transactions:", error)
@@ -1513,50 +1654,48 @@ export async function performCashCount(
 ) {
   try {
     const result = await db.$transaction(async (tx) => {
-      const cashDrawer = await tx.cashDrawer.findFirst({
-        where: { stationId, isOpen: true }
-      })
+      const now = new Date()
+      const cashDrawer = await findOpenCashDrawer(tx, stationId)
 
       if (!cashDrawer) {
-        throw new Error("No open cash drawer found for this station")
+        throw new Error("No open cash drawer found for this terminal")
       }
 
-      const variance = countedAmount - cashDrawer.expectedBalance
+      const balanceBefore = toNumber(cashDrawer.currentBalance)
+      const expectedBalance = toNumber(cashDrawer.expectedBalance)
+      const variance = countedAmount - expectedBalance
 
-      // Update cash drawer with counted amount
       const updatedDrawer = await tx.cashDrawer.update({
         where: { id: cashDrawer.id },
         data: {
           currentBalance: countedAmount,
-        }
+          updatedAt: now,
+        },
       })
 
-      // Create cash count transaction
-      const transactionData: any = {
-        cashDrawer: { connect: { id: cashDrawer.id } },
-        user: { connect: { id: userId } },
-        type: "CASH_COUNT",
-        amount: variance,
-        reason: `Cash count - Variance: $${variance.toFixed(2)}`,
-        balanceBefore: cashDrawer.currentBalance,
-        balanceAfter: countedAmount,
-        notes: `Expected: $${cashDrawer.expectedBalance.toFixed(2)}, Counted: $${countedAmount.toFixed(2)}, Variance: $${variance.toFixed(2)}`
-      }
+      await tx.cashDrawerTransaction.create({
+        data: {
+          id: createId(),
+          cashDrawerId: cashDrawer.id,
+          sessionId,
+          userId,
+          type: CashDrawerTransactionType.RECONCILIATION,
+          amount: variance,
+          reason: `Cash count - Variance: $${variance.toFixed(2)}`,
+          balanceBefore,
+          balanceAfter: countedAmount,
+          notes: `Expected: $${expectedBalance.toFixed(2)}, Counted: $${countedAmount.toFixed(2)}, Variance: $${variance.toFixed(2)}`,
+        },
+      })
 
-      if (sessionId) {
-        transactionData.session = { connect: { id: sessionId } }
-      }
-
-      await tx.cashDrawerTransaction.create({ data: transactionData })
-
-      return { drawer: updatedDrawer, variance }
+      return { drawer: mapCashDrawerForClient(updatedDrawer), variance }
     })
 
-    revalidatePath("/dashboard/session-pos-sync")
+    revalidatePOSPaths()
     return {
       success: true,
       data: result,
-      message: `Cash count completed. Variance: $${result.variance.toFixed(2)}`
+      message: `Cash count completed. Variance: $${result.variance.toFixed(2)}`,
     }
   } catch (error) {
     console.error("Error performing cash count:", error)
@@ -1567,29 +1706,33 @@ export async function performCashCount(
   }
 }
 
-// Helper function to get cash drawer status
 export async function getCashDrawerStatus(stationId: string) {
   try {
     const cashDrawer = await db.cashDrawer.findFirst({
-      where: { stationId },
+      where: { terminalId: stationId },
       select: {
         id: true,
         isOpen: true,
         currentBalance: true,
         expectedBalance: true,
-        // lastActivity: true,
-      }
+      },
     })
 
     return {
       success: true,
-      data: cashDrawer || {
-        id: null,
-        isOpen: false,
-        currentBalance: 0,
-        expectedBalance: 0,
-        lastActivity: null,
-      },
+      data: cashDrawer
+        ? {
+            ...cashDrawer,
+            currentBalance: toNumber(cashDrawer.currentBalance),
+            expectedBalance: toNumber(cashDrawer.expectedBalance),
+          }
+        : {
+            id: null,
+            isOpen: false,
+            currentBalance: 0,
+            expectedBalance: 0,
+            lastActivity: null,
+          },
     }
   } catch (error) {
     console.error("Error fetching cash drawer status:", error)

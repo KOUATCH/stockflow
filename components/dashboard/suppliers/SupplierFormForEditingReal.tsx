@@ -1,5 +1,6 @@
 "use client";
 
+import { notify } from "@/lib/notifications/notify"
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
@@ -33,7 +34,6 @@ import {
 } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Form, useForm } from "react-hook-form";
-import { toast } from "sonner";
 import { z } from "zod";
 
 // Import your custom hooks here
@@ -179,7 +179,7 @@ export default function SupplierFormForEditing({
       console.log("Updating basic info:", { ...data, supplierId: supplierData?.id });
 
       if (!supplierData) {
-        toast.error("Supplier data is missing. Cannot update supplier.");
+        notify.error("Supplier data is missing. Cannot update supplier.");
         return;
       }
 
@@ -196,11 +196,11 @@ export default function SupplierFormForEditing({
         },
         {
           onSuccess: async () => {
-            toast.success("Supplier updated successfully");
+            notify.success("Supplier updated successfully");
             onSuccess?.();
           },
           onError: (error: any) => {
-            toast.error("Failed to update supplier", {
+            notify.error("Failed to update supplier", {
               description: error?.message || "Unknown error occurred",
             });
           },
@@ -208,10 +208,10 @@ export default function SupplierFormForEditing({
       );
 
       // Temporary success message
-      toast.success("Supplier basic info updated successfully");
+      notify.success("Supplier basic info updated successfully");
       onSuccess?.();
     } catch (error) {
-      toast.error("Failed to update basic information");
+      notify.error("Failed to update basic information");
     } finally {
       setIsSubmitting(false);
     }
@@ -223,7 +223,7 @@ export default function SupplierFormForEditing({
       console.log("Updating supplier details:", { ...data, supplierId: supplierData?.id });
 
       if (!supplierData) {
-        toast.error("Supplier data is missing. Cannot update supplier details.");
+        notify.error("Supplier data is missing. Cannot update supplier details.");
         return;
       }
 
@@ -240,11 +240,11 @@ export default function SupplierFormForEditing({
         },
         {
           onSuccess: async () => {
-            toast.success("Supplier details updated successfully");
+            notify.success("Supplier details updated successfully");
             onSuccess?.();
           },
           onError: (error: any) => {
-            toast.error("Failed to update supplier details", {
+            notify.error("Failed to update supplier details", {
               description: error?.message || "Unknown error occurred",
             });
           },
@@ -252,10 +252,10 @@ export default function SupplierFormForEditing({
       );
 
       // Temporary success message
-      toast.success("Supplier details updated successfully");
+      notify.success("Supplier details updated successfully");
       onSuccess?.();
     } catch (error) {
-      toast.error("Failed to update supplier details information");
+      notify.error("Failed to update supplier details information");
     } finally {
       setIsSubmitting(false);
     }
@@ -267,7 +267,7 @@ export default function SupplierFormForEditing({
       console.log("Updating supplier relations info:", { ...data, supplierId: supplierData?.id });
 
       if (!supplierData) {
-        toast.error("Supplier relations data is missing. Cannot update supplier.");
+        notify.error("Supplier relations data is missing. Cannot update supplier.");
         return;
       }
 
@@ -284,11 +284,11 @@ export default function SupplierFormForEditing({
         },
         {
           onSuccess: async () => {
-            toast.success("Supplier relations updated successfully");
+            notify.success("Supplier relations updated successfully");
             onSuccess?.();
           },
           onError: (error: any) => {
-            toast.error("Failed to update supplier relations", {
+            notify.error("Failed to update supplier relations", {
               description: error?.message || "Unknown error occurred",
             });
           },
@@ -296,10 +296,10 @@ export default function SupplierFormForEditing({
       );
 
       // Temporary success message
-      toast.success("Supplier relations updated successfully");
+      notify.success("Supplier relations updated successfully");
       onSuccess?.();
     } catch (error) {
-      toast.error("Failed to update supplier relations information");
+      notify.error("Failed to update supplier relations information");
     } finally {
       setIsSubmitting(false);
     }

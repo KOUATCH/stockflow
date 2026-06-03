@@ -1,59 +1,110 @@
 "use server";
-import { getAuthenticatedUser } from "@/lib/auth-server";
-import { db } from "@/prisma/db";
-import { ProductProps } from "@/types/types";
+
 import { revalidatePath } from "next/cache";
 
+import { getAuthenticatedUser } from "@/lib/auth-server";
+import { db } from "@/prisma/db";
 
-const createProduct=async(data: ProductProps)=> {
-  const user = await  getAuthenticatedUser();
+type ProductProps = {
+  name?: string;
+  nameEn?: string;
+  nameFr?: string | null;
+  description?: string | null;
+  descriptionEn?: string | null;
+  descriptionFr?: string | null;
+  sku?: string;
+  barcode?: string | null;
+  imageUrls?: string[];
+  thumbnail?: string | null;
+  costPrice?: number;
+  sellingPrice?: number;
+  categoryId?: string | null;
+  brandId?: string | null;
+  unitId?: string | null;
+};
+
+function slugify(value: string) {
+  return (
+    value
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "")
+      .slice(0, 80) || "product"
+  );
+}
+
+const createProduct = async (data: ProductProps) => {
+  const user = await getAuthenticatedUser();
+
   try {
-    // Use a transaction for atomic operations
     return await db.$transaction(async (tx) => {
-   const orgId= user.organizationId;
-      //check if the product already exists for the Organization
-     
-      const existingOrgProduct = await tx.product.findUnique({
+      const organizationId = user.organizationId;
+      const nameEn = data.nameEn ?? data.name;
+
+      if (!nameEn) {
+        return {
+          error: "Product name is required",
+          status: 400,
+          data: null,
+        };
+      }
+
+      const sku = data.sku ?? `SKU-${Date.now().toString(36).toUpperCase()}`;
+      const existingItem = await tx.item.findUnique({
         where: {
-          name_organizationId: {
-            name: data?.name,
-            organizationId: orgId,
+          organizationId_sku: {
+            organizationId,
+            sku,
           },
         },
-      })
-console.log({existingOrgProduct})
-      if (existingOrgProduct) {
+      });
+
+      if (existingItem) {
         return {
-          error: `This Product ${data?.name} is already in use for this orgnisation`,
+          error: `This product SKU ${sku} is already in use for this organisation`,
           status: 409,
           data: null,
         };
       }
-      // Create product
-      const newProduct = await tx.product.create({
-        data:{
-        ...data,
-        organizationId:orgId,
-       }}); 
 
-console.log({data})
-revalidatePath("/dashboard/inventory/products")
-      // Check if the product was created successfully   
+      const newProduct = await tx.item.create({
+        data: {
+          organizationId,
+          slug: `${slugify(nameEn)}-${Date.now().toString(36)}`,
+          sku,
+          barcode: data.barcode ?? null,
+          nameEn,
+          nameFr: data.nameFr ?? null,
+          descriptionEn: data.descriptionEn ?? data.description ?? null,
+          descriptionFr: data.descriptionFr ?? data.description ?? null,
+          imageUrls: data.imageUrls ?? [],
+          thumbnail: data.thumbnail ?? null,
+          costPrice: data.costPrice ?? 0,
+          sellingPrice: data.sellingPrice ?? 0,
+          categoryId: data.categoryId ?? null,
+          brandId: data.brandId ?? null,
+          unitId: data.unitId ?? null,
+        },
+      });
+
+      revalidatePath("/dashboard/inventory/products");
+      revalidatePath("/dashboard/inventory/items");
+
       return {
-          status: 200,
-          error: null,
-          data: newProduct,
-        };
+        status: 200,
+        error: null,
+        data: newProduct,
+      };
     });
   } catch (error) {
     console.error("Error creating product:", error);
     return {
-      error: `Something went wrong, Please try again`,
+      error: "Something went wrong, please try again",
       status: 500,
       data: null,
     };
   }
-}
+};
 
-export default createProduct
-
+export default createProduct;

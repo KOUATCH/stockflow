@@ -1,7 +1,6 @@
 "use server"
-
-// Simplified types for the basic functionality
-export type ActionResult<T> = { success: true; data: T; message?: string } | { success: false; error: string }
+import { inventoryAction } from "@/lib/error-handling";
+import type { ServerActionResult } from "@/lib/error-handling/types";
 
 export type ItemWithRelations = {
   id: string
@@ -64,13 +63,13 @@ const mockItems: ItemWithRelations[] = [
  * Lists Items with search, filters, sorting, and pagination.
  * Simplified version for basic functionality.
  */
-export const listAllItems = async (
-  organizationId: string,
-  q?: string,
-  page = 1,
-  pageSize = 25,
-): Promise<ActionResult<PaginatedItems>> => {
-  try {
+export const listAllItems = inventoryAction(
+  async (
+    organizationId: string,
+    q?: string,
+    page = 1,
+    pageSize = 25,
+  ): Promise<ServerActionResult<PaginatedItems>> => {
     // Filter items by organization and search query
     let filteredItems = mockItems.filter((item) => item.organizationId === organizationId)
 
@@ -95,12 +94,15 @@ export const listAllItems = async (
         pageSize,
         totalPages,
       },
+    };
+  },
+  {
+    actionName: 'listAllItems',
+    component: 'InventoryManagement',
+    businessContext: {
+      domain: 'inventory',
+      operation: 'read',
+      resourceType: 'item'
     }
-  } catch (error) {
-    console.error("listAllItems error:", error)
-    const message = error instanceof Error ? error.message : "Failed to list items"
-    return { success: false, error: message }
   }
-}
-
-export default listAllItems
+)

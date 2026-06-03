@@ -1,12 +1,16 @@
 "use client";
+
+import { notify } from "@/lib/notifications/notify"
 import { CheckCircle2, Loader2, Mail } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 
 import { sendResetLink } from "@/actions/users/sendResetLink";
+import { getLocaleFromPathname, localizePath } from "@/i18n/routing";
+import { DEFAULT_LOCALE } from "@/types/bilingual";
 import { ForgotPasswordProps } from "@/types/types";
-import { toast } from "sonner";
+import { usePathname } from "next/navigation";
 import SubmitButton from "../FormInputs/SubmitButton";
 import TextInput from "../FormInputs/TextInput";
 import CustomCarousel from "../frontend/custom-carousel";
@@ -21,6 +25,9 @@ import {
 } from "../ui/card";
 ;
 export default function ForgotPasswordForm() {
+  const pathname = usePathname();
+  const locale = getLocaleFromPathname(pathname) ?? DEFAULT_LOCALE;
+  const localizedHref = (href: string) => localizePath(href, locale);
   const [loading, setLoading] = useState(false);
   const {
     handleSubmit,
@@ -62,14 +69,14 @@ export default function ForgotPasswordForm() {
         setPassErr(res?.error ?? "");
         return;
       }
-      toast.success("Reset Instructions sent, Check your email");
+      notify.success("Reset Instructions sent, Check your email");
       setLoading(false);
       setEmail(data.email);
       setSuccess(true);
     } catch (error) {
       setLoading(false);
       console.error("Network Error:", error);
-      // toast.error("Its seems something is wrong with your Network");
+      // notify.error("Its seems something is wrong with your Network");
     }
   }
   return (
@@ -159,7 +166,7 @@ export default function ForgotPasswordForm() {
                 <p className="mt-6 text-sm text-gray-500">
                   Remember password ?{" "}
                   <Link
-                    href="/login"
+                    href={localizedHref("/login")}
                     className="font-semibold leading-6 text-rose-600 hover:text-rose-500"
                   >
                     Login

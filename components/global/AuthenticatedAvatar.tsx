@@ -10,7 +10,10 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { getInitials } from "@/lib/generateInitials";
 // Removed NextAuth Session import - using Better-Auth session type
+import { getLocaleFromPathname, localizePath } from "@/i18n/routing";
+import { DEFAULT_LOCALE } from "@/types/bilingual";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import LogoutBtn from "@/components/global/LogoutBtn";
 
 export default function AuthenticatedAvatar({
@@ -18,6 +21,10 @@ export default function AuthenticatedAvatar({
 }: {
   session: any | null;
 }) {
+  const pathname = usePathname();
+  const locale = getLocaleFromPathname(pathname) ?? DEFAULT_LOCALE;
+  const localizedHref = (href: string) => localizePath(href, locale);
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger className="cursor-pointer" asChild>
@@ -39,7 +46,7 @@ export default function AuthenticatedAvatar({
 
         <DropdownMenuSeparator />
         <DropdownMenuItem>
-          <Link href="/dashboard">Dashboard</Link>
+          <Link href={localizedHref("/dashboard")}>Dashboard</Link>
         </DropdownMenuItem>
         <DropdownMenuItem>Services</DropdownMenuItem>
         {/* <DropdownMenuItem>Team</DropdownMenuItem> */}

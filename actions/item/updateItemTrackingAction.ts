@@ -1,5 +1,6 @@
 import { itemStandardInclude } from "@/lib/item/includes"
-import { ActionResult, ItemWithRelations, revalidateItems, slugify, updateTrackingSchema } from "@/lib/item/schemas"
+import { ActionResult, ItemWithRelations, slugify, updateTrackingSchema } from "@/lib/item/schemas"
+import { revalidateItem } from "@/lib/item/revalidation"
 import { db } from "@/prisma/db"
 import { Prisma } from "@prisma/client"
 
@@ -13,7 +14,7 @@ export async function updateItemTrackingAction(
 
     const patch: Prisma.ItemUpdateInput = {
       isActive: data.isActive ?? undefined,
-      // isSerialTracked: data.isSerialTracked ?? undefined,
+      trackSerialNumbers: data.isSerialTracked ?? undefined,
     }
 
     if (typeof data.slug === 'string') {
@@ -26,7 +27,7 @@ export async function updateItemTrackingAction(
       include: itemStandardInclude,
     })
 
-    revalidateItems(updated.id, data.organizationId)
+    revalidateItem(updated.id, data.organizationId)
     return { success: true, data: updated, message: 'Item tracking updated' }
   } catch (error) {
     console.error('updateItemTrackingAction error:', error)

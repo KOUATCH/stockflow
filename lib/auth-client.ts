@@ -1,5 +1,7 @@
 "use client"
 
+import { getLocaleFromPathname, localizePath } from "@/i18n/routing"
+import { DEFAULT_LOCALE } from "@/types/bilingual"
 import { useSession as useNextAuthSession } from "next-auth/react"
 
 export function useSession() {
@@ -95,15 +97,20 @@ export async function signOut(options?: { redirectTo?: string; redirect?: boolea
 
   // Use absolute URL to ensure correct port
   const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000";
-  const redirectPath = options?.redirectTo || "/login";
+  const currentLocale =
+    typeof window === "undefined"
+      ? DEFAULT_LOCALE
+      : getLocaleFromPathname(window.location.pathname) ?? DEFAULT_LOCALE;
+  const redirectPath = localizePath(options?.redirectTo || "/login", currentLocale);
   const callbackUrl = redirectPath.startsWith('http') ? redirectPath : `${baseUrl}${redirectPath}`;
 
   console.log("SignOut debug:", { baseUrl, redirectPath, callbackUrl, options });
 
-  return nextSignOut({
-    callbackUrl,
-    redirect: options?.redirect === undefined ? true : options.redirect === true ? true : false
-  });
+  if (options?.redirect === false) {
+    return nextSignOut({ callbackUrl, redirect: false });
+  }
+
+  return nextSignOut({ callbackUrl, redirect: true });
 }
 
 export default useAuth

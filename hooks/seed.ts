@@ -309,9 +309,9 @@ async function main() {
   for (const catData of categoryData) {
     const category = await prisma.category.create({
       data: {
-        title: catData.name,
+        titleEn: catData.name,
         slug: catData.name.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
-        description: catData.desc,
+        descriptionEn: catData.desc,
         imageUrl: faker.image.url({ width: 400, height: 300 }),
         isActive: faker.datatype.boolean({ probability: 0.9 }),
         organizationId: organization.id,
@@ -398,7 +398,7 @@ async function main() {
   for (const unitInfo of unitData) {
     const unit = await prisma.unit.create({
       data: {
-        name: unitInfo.name,
+        nameEn: unitInfo.name,
         symbol: unitInfo.symbol,
         type: unitInfo.type as any,
         isActive: true,
@@ -457,12 +457,12 @@ async function main() {
 
     const item = await prisma.item.create({
       data: {
-        name: productName,
+        nameEn: productName,
         slug: `${productName.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-${i + 1}`,
         sku: `SKU${String(i + 1).padStart(6, '0')}`,
         barcode: faker.string.numeric(12),
-        description: faker.commerce.productDescription(),
-        imageUrls: faker.image.url({ width: 400, height: 400 }),
+        descriptionEn: faker.commerce.productDescription(),
+        imageUrls: [faker.image.url({ width: 400, height: 400 })],
         thumbnail: faker.image.url({ width: 200, height: 200 }),
         upc: faker.string.numeric(12),
         ean: faker.string.numeric(13),

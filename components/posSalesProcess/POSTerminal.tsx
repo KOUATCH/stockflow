@@ -53,6 +53,8 @@ import { useCustomers } from "@/hooks/posSalesProcess/usePOSHooks"
 import { useOrgCategories } from "@/hooks/useAllCategoriesqueries"
 import { useOrgItemsWithInventoryLevelsLocation } from "@/hooks/useAllItemQueries"
 import { useAuth } from "@/hooks/useAuth"
+import ReceiptPreviewDialog from "@/components/receipts/ReceiptPreviewDialog"
+import SalesReceiptModal from "@/components/receipts/SalesReceiptModal"
 import {
   BookOpen,
   Briefcase,
@@ -194,6 +196,9 @@ export function POSTerminalFinal({ organizationId, locationId, stationId, userId
   const [showCustomerDisplay, setShowCustomerDisplay] = useState(false)
   const [isDarkMode, setIsDarkMode] = useState(false)
   const [isReceiptPreviewOpen, setIsReceiptPreviewOpen] = useState(false)
+  const [isReceiptModalOpen, setIsReceiptModalOpen] = useState(false)
+  const [completedSaleData, setCompletedSaleData] = useState<any>(null)
+  const [lastSaleData, setLastSaleData] = useState<any>(null)
 
   const [selectedLocationId, setSelectedLocationId] = useState<string>(locationId)
   const [selectedstationId, setSelectedstationId] = useState<string>(stationId)
@@ -230,21 +235,7 @@ export function POSTerminalFinal({ organizationId, locationId, stationId, userId
   }, [locationId, selectedLocationId])
 
   const { user: sessionData } = useAuth()
-
-  if (!sessionData?.organizationId) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 p-6 flex items-center justify-center">
-        <div className="text-center">
-          <div className="p-4 rounded-full bg-red-100 inline-block mb-4">
-            <AlertTriangle className="h-16 w-16 text-red-600" />
-          </div>
-
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">Organization Required</h2>
-          <p className="text-gray-600">User organization not found. Please contact support.</p>
-        </div>
-      </div>
-    )
-  }
+  const isMissingSessionOrganization = !sessionData?.organizationId
   const {
     data: itemsDBData,
     error: itemsDBError,
@@ -343,6 +334,7 @@ export function POSTerminalFinal({ organizationId, locationId, stationId, userId
   }, [])
 
   const createSaleMutation = useMutation<any, unknown, any>({
+    meta: { operation: 'create', entity: 'Sale' , suppressSuccessNotification: true, suppressErrorNotification: true },
     mutationFn: (data: any) => createSale(data, userId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["sales-orders"] })
@@ -669,6 +661,7 @@ export function POSTerminalFinal({ organizationId, locationId, stationId, userId
   }, [selectedstationId, userId, selectedLocationId, organizationId, success, error])
 
   const createSessionMutation = useMutation({
+    meta: { operation: 'create', entity: 'Session' , suppressSuccessNotification: true, suppressErrorNotification: true },
     mutationFn: createPOSSession,
     onSuccess: (result: any) => {
       if (result?.success && result?.data) {
@@ -692,19 +685,7 @@ export function POSTerminalFinal({ organizationId, locationId, stationId, userId
     },
   })
 
-  if (!organizationId) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 p-6 flex items-center justify-center">
-        <div className="text-center">
-          <div className="p-4 rounded-full bg-red-100 inline-block mb-4">
-            <AlertTriangle className="h-16 w-16 text-red-600" />
-          </div>
-          <h2 className="text-2xl font-bold text-gray-900 mb-2">Organization Required</h2>
-          <p className="text-gray-600">User organization not found. Please contact support.</p>
-        </div>
-      </div>
-    )
-  }
+  const isMissingOrganization = !organizationId
 
   const toggleFavorite = useCallback((itemId: string) => {
     setFavorites((prevFavorites) => {
@@ -826,12 +807,73 @@ export function POSTerminalFinal({ organizationId, locationId, stationId, userId
       clearInterval(progressInterval)
       setPaymentProgress(100)
 
+      // Prepare receipt data
+      const receiptData = {
+        id: salesId,
+        receiptNumber: `RCP-${Date.now()}`,
+        transactionDate: new Date(),
+        customer: selectedCustomer,
+        lines: cart.map((item) => ({
+          itemId: item.itemId,
+          name: item.name,
+          sku: item.sku,
+          quantity: item.quantity,
+          unitPrice: item.price,
+          discount: item.discount || 0,
+          taxRate: item.taxRate,
+          taxAmount: (item.price * item.quantity * item.taxRate) / 100,
+          lineTotal: item.lineTotal,
+        })),
+        subtotal: calculateSubtotal(),
+        discountAmount: calculateDiscount(),
+        taxAmount: calculateTax(),
+        totalAmount: calculateTotal(),
+        payments: [
+          {
+            method: paymentMethod,
+            amount: calculateTotal(),
+          },
+        ],
+        cashTendered: paymentMethod === PaymentMethod.CASH ? Number.parseFloat(cashTendered) : undefined,
+        changeGiven: paymentMethod === PaymentMethod.CASH ? calculateChange() : undefined,
+        notes: selectedCustomer ? `Customer: ${selectedCustomer.name}` : undefined,
+      }
+
+      // Store last sale data for receipt
+      setLastSaleData(receiptData)
+
+      // Prepare sale data for digital receipt modal
+      const digitalReceiptData = {
+        saleId: salesId,
+        customerName: selectedCustomer?.name,
+        customerEmail: selectedCustomer?.email,
+        customerPhone: selectedCustomer?.phone,
+        items: cart.map(item => ({
+          name: item.name,
+          sku: item.sku || `SKU-${item.itemId}`,
+          quantity: item.quantity,
+          unitPrice: item.price,
+          totalPrice: item.lineTotal
+        })),
+        subtotal: calculateSubtotal(),
+        tax: calculateTax(),
+        total: calculateTotal(),
+        paymentMethod: paymentMethod.toString(),
+        cashier: "Current User", // Replace with actual user name
+        terminal: selectedstationId,
+        createdAt: new Date()
+      };
+
+      // Set data and show digital receipt modal
+      setCompletedSaleData(digitalReceiptData);
+      setIsReceiptModalOpen(true);
+
       // Success notification with action
       success("Sales Completed!", `Transaction total: ${formatCurrency(calculateTotal())}`, {
         duration: 8000,
         action: {
-          label: "Print Receipt",
-          onClick: () => setIsReceiptPreviewOpen(true),
+          label: "View Receipt",
+          onClick: () => setIsReceiptModalOpen(true),
         },
       })
 
@@ -886,6 +928,21 @@ export function POSTerminalFinal({ organizationId, locationId, stationId, userId
     success,
     refetchDBItems,
   ])
+
+  if (isMissingSessionOrganization || isMissingOrganization) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 p-6 flex items-center justify-center">
+        <div className="text-center">
+          <div className="p-4 rounded-full bg-red-100 inline-block mb-4">
+            <AlertTriangle className="h-16 w-16 text-red-600" />
+          </div>
+          <h2 className="text-2xl font-bold text-gray-900 mb-2">Organization Required</h2>
+          <p className="text-gray-600">User organization not found. Please contact support.</p>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div
       className={`min-h-screen bg-gradient-to-br from-slate-50 via-emerald-50 to-teal-50 p-4 space-y-4 transition-colors duration-300 ${isDarkMode ? "dark bg-gradient-to-br from-slate-950 via-slate-900 to-slate-800" : ""
@@ -1549,7 +1606,41 @@ export function POSTerminalFinal({ organizationId, locationId, stationId, userId
                             type="button"
                             variant="outline"
                             size="sm"
-                            onClick={() => setIsReceiptPreviewOpen(true)}
+                            onClick={() => {
+                              // Create preview data with current cart
+                              const previewData = {
+                                id: `PREVIEW-${Date.now()}`,
+                                receiptNumber: `PREVIEW-${Date.now()}`,
+                                transactionDate: new Date(),
+                                customer: selectedCustomer,
+                                lines: cart.map((item) => ({
+                                  itemId: item.itemId,
+                                  name: item.name,
+                                  sku: item.sku,
+                                  quantity: item.quantity,
+                                  unitPrice: item.price,
+                                  discount: item.discount || 0,
+                                  taxRate: item.taxRate,
+                                  taxAmount: (item.price * item.quantity * item.taxRate) / 100,
+                                  lineTotal: item.lineTotal,
+                                })),
+                                subtotal: calculateSubtotal(),
+                                discountAmount: calculateDiscount(),
+                                taxAmount: calculateTax(),
+                                totalAmount: calculateTotal(),
+                                payments: [
+                                  {
+                                    method: paymentMethod,
+                                    amount: calculateTotal(),
+                                  },
+                                ],
+                                cashTendered: paymentMethod === PaymentMethod.CASH && cashTendered ? Number.parseFloat(cashTendered) : undefined,
+                                changeGiven: paymentMethod === PaymentMethod.CASH && cashTendered ? calculateChange() : undefined,
+                                notes: selectedCustomer ? `Customer: ${selectedCustomer.name}` : "Receipt Preview",
+                              }
+                              setLastSaleData(previewData)
+                              setIsReceiptPreviewOpen(true)
+                            }}
                             className="flex items-center gap-2 bg-white/80 backdrop-blur-sm hover:shadow-md transition-all"
                           >
                             <Receipt className="h-4 w-4" />
@@ -1756,6 +1847,51 @@ export function POSTerminalFinal({ organizationId, locationId, stationId, userId
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Receipt Preview Dialog */}
+      {lastSaleData && (
+        <ReceiptPreviewDialog
+          open={isReceiptPreviewOpen}
+          onOpenChange={setIsReceiptPreviewOpen}
+          receiptData={lastSaleData}
+          organizationData={{
+            name: sessionData?.organization?.name || "StockFlow Business",
+            address: "123 Business Street, Suite 100, Business City, BC 12345",
+            phone: "(555) 123-4567",
+            taxId: "TAX-123456789"
+          }}
+          locationData={{
+            name: "Main Store"
+          }}
+          terminalId={selectedstationId}
+          cashierName={sessionData?.firstName ? `${sessionData.firstName} ${sessionData.lastName || ''}`.trim() : "Cashier"}
+          sessionNumber={currentSession?.sessionNumber}
+        />
+      )}
+
+      {/* Digital Receipt Modal */}
+      {isReceiptModalOpen && completedSaleData && (
+        <SalesReceiptModal
+          isOpen={isReceiptModalOpen}
+          onClose={() => setIsReceiptModalOpen(false)}
+          saleData={completedSaleData}
+          businessInfo={{
+            name: "StockFlow Retail",
+            address: "123 Business Avenue, Suite 100",
+            city: "Business City, BC 12345",
+            phone: "+1 (555) 123-BUSI",
+            email: "contact@stockflow.com",
+            website: "www.stockflow.com",
+            taxId: "TAX123456789"
+          }}
+          locationInfo={{
+            name: sessionData?.organization?.name || "Main Store Location",
+            address: "456 Store Street",
+            city: "Store City, SC 67890",
+            phone: "+1 (555) 456-STORE"
+          }}
+        />
+      )}
 
       <style jsx>{`
         .scrollbar-hide {

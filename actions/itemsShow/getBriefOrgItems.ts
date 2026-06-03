@@ -1,43 +1,54 @@
 "use server";
+import { inventoryAction } from "@/lib/error-handling";
+import type { ServerActionResult } from "@/lib/error-handling/types";
 import { db } from "@/prisma/db";
-import { CompleteItemResponse, ItemDTO } from "@/types/itemTypes";
+import { ItemDTO } from "@/types/itemTypes";
 
-const   getBriefOrgItems = async (organizationId:string): Promise<CompleteItemResponse> => {
- 
-  try {
+const toNumber = (value: unknown): number => {
+  if (value && typeof value === "object" && "toNumber" in value && typeof value.toNumber === "function") {
+    return value.toNumber();
+  }
+  return Number(value ?? 0);
+};
+
+const mapItemDTO = (item: any): ItemDTO => ({
+  ...item,
+  costPrice: toNumber(item.costPrice),
+  sellingPrice: toNumber(item.sellingPrice),
+  weight: item.weight == null ? null : toNumber(item.weight),
+  minStockLevel: item.minStockLevel == null ? null : toNumber(item.minStockLevel),
+  maxStockLevel: item.maxStockLevel == null ? null : toNumber(item.maxStockLevel),
+  imageUrls: Array.isArray(item.imageUrls) ? item.imageUrls.join(",") : item.imageUrls ?? "",
+  name: item.nameEn ?? item.nameFr ?? "",
+  description: item.descriptionEn ?? item.descriptionFr ?? "",
+});
+
+export const getBriefOrgItems = inventoryAction(
+  async (organizationId: string): Promise<ServerActionResult<ItemDTO[]>> => {
     // Validate the organizationId
-    const rawItems:ItemDTO[] = await db.item.findMany({
+    const rawItems = await db.item.findMany({
       where: {
         organizationId: organizationId,
-        },
-     
+      },
       orderBy: {
-        name: "desc",
+        nameEn: "desc",
       },
     });
 
-    // const items = rawItems.map(item => ({
-    //   ...item,
-    //   imageUrls: typeof item.imageUrls === "string"
-    //     ? item.imageUrls
-    //     : Array.isArray(item.imageUrls)
-    //       ? (item.imageUrls as string[]).join(",")
-    //       : "",
-    // }));
-
     return {
       success: true,
-      data: rawItems,
-      error: null,
+      data: rawItems.map(mapItemDTO),
     };
-  } catch (error) {
-    console.error("Error fetching the count:", error);
-    return {
-      success: false,
-      data: [],
-      error: error instanceof Error ? error.message : "Unknown error occurred",
-    };
-    };
-};
+  },
+  {
+    actionName: 'getBriefOrgItems',
+    component: 'InventoryManagement',
+    businessContext: {
+      domain: 'inventory',
+      operation: 'read',
+      resourceType: 'item'
+    }
+  }
+)
 
 export default getBriefOrgItems

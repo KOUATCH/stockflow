@@ -3,6 +3,16 @@
 import { db } from "@/prisma/db";
 // import { POSSessionStatus } from "@/types"
 
+type DecimalLike = { toNumber?: () => number; toString: () => string } | number | string | null | undefined
+
+function toNumber(value: DecimalLike): number {
+  if (value == null) return 0
+  if (typeof value === "number") return value
+  if (typeof value === "string") return Number(value) || 0
+  if (typeof value.toNumber === "function") return value.toNumber()
+  return Number(value.toString()) || 0
+}
+
 export async function openPOSSession(data: {
   stationId: string
   userId: string
@@ -47,14 +57,14 @@ export async function openPOSSession(data: {
     // Check if there's already an active session for this station in this organization
     const existingSession = await db.pOSSession.findFirst({
       where: {
-        stationId: data.stationId,
+        terminalId: data.stationId,
         status:"ACTIVE",
-        Location: {
+        location: {
           organizationId: data.organizationId
         }
       },
       include: {
-        Location: true
+        location: true
       }
     })
 
@@ -73,9 +83,10 @@ export async function openPOSSession(data: {
     const session = await db.pOSSession.create({
       data: {
         sessionNumber,
-        stationId: data.stationId,
+        terminalId: data.stationId,
         userId: data.userId,
         locationId: data.locationId,
+        organizationId: data.organizationId,
         status: "ACTIVE",
         startTime: new Date(),
         openingBalance: data.openingBalance,
@@ -85,7 +96,8 @@ export async function openPOSSession(data: {
         transactionCount: 0,
         cashTotal: 0,
         cardTotal: 0,
-        digitalTotal: 0,
+        mobileMoneyTotal: 0,
+        bankTransferTotal: 0,
       },
     })
 
@@ -95,7 +107,7 @@ export async function openPOSSession(data: {
     console.log("[Session] Looking for existing cash drawer for station:", data.stationId)
     let cashDrawer = await db.cashDrawer.findFirst({
       where: {
-        stationId: data.stationId,
+        terminalId: data.stationId,
         locationId: data.locationId,
       },
     })
@@ -104,7 +116,7 @@ export async function openPOSSession(data: {
       console.log("[Session] Creating new cash drawer")
       cashDrawer = await db.cashDrawer.create({
         data: {
-          stationId: data.stationId,
+          terminalId: data.stationId,
           locationId: data.locationId,
           name: `Drawer-${data.stationId}`,
           drawerNumber: "1",
@@ -189,7 +201,7 @@ export async function closePOSSession(data: {
     }
 
     // Calculate session variance
-    const expectedBalance = currentSession.openingBalance + currentSession.totalSales
+    const expectedBalance = toNumber(currentSession.openingBalance) + toNumber(currentSession.totalSales)
     const variance = data.closingBalance - expectedBalance
 
     // Update session with closing information
@@ -207,7 +219,7 @@ export async function closePOSSession(data: {
     // Find the open cash drawer for this station
     const cashDrawer = await db.cashDrawer.findFirst({
       where: {
-        stationId: data.stationId,
+        terminalId: data.stationId,
         isOpen: true,
       },
     })
@@ -240,7 +252,7 @@ export async function closePOSSession(data: {
         type: "CLOSING_BALANCE",
         amount: data.closingBalance,
         reason: "Session closed",
-        balanceBefore: cashDrawer.currentBalance,
+        balanceBefore: toNumber(cashDrawer.currentBalance),
         balanceAfter: data.closingBalance,
         notes: variance !== 0 ? `Variance: $${variance.toFixed(2)}` : undefined,
       },
@@ -267,14 +279,14 @@ export async function forceCloseActiveSession(stationId: string, organizationId:
     // Find any active session for this station
     const activeSession = await db.pOSSession.findFirst({
       where: {
-        stationId,
+        terminalId: stationId,
         status: "ACTIVE",
-        Location: {
+        location: {
           organizationId: organizationId
         }
       },
       include: {
-        Location: true
+        location: true
       }
     })
 
@@ -294,7 +306,7 @@ export async function forceCloseActiveSession(stationId: string, organizationId:
       // Close any open cash drawers for this station
       await db.cashDrawer.updateMany({
         where: {
-          stationId,
+          terminalId: stationId,
           isOpen: true,
         },
         data: {
@@ -328,19 +340,18 @@ export async function getCurrentSession(stationId: string) {
 
     const session = await db.pOSSession.findFirst({
       where: {
-        stationId,
+        terminalId: stationId,
         status: "ACTIVE",
       },
       include: {
         user: {
           select: {
             id: true,
-            name: true,
             firstName: true,
             lastName: true,
           },
         },
-        Location: {
+        location: {
           select: {
             id: true,
             name: true,

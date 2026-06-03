@@ -1,57 +1,35 @@
-// app/actions/createTaxRate.ts
-"use server";
+"use server"
 
-import { db } from "@/prisma/db";
-import { TaxRateCreateDTO } from "@/types/taxRates";
-import { revalidatePath } from "next/cache";
+import { createManagedTaxRate } from "@/actions/taxRate/tax-rate-management-actions"
+import type { TaxRateManagementInput } from "@/actions/taxRate/tax-rate-management-actions"
+import type { TaxRateCreateDTO } from "@/types/taxRates"
 
-const DEFAULT_IMAGE_URL =
-  "https://14J7oh8kso.ufs.sh/f/HLxTbDBCDLwfAXaapcezIN7vwylKf1PXSCqAuseUG0gx8mhd";
-
-const createActionTaxRate = async (data: TaxRateCreateDTO & { organizationId: string }) => {
-  const formattedData = {
-    ...data,
-    organizationId: data.organizationId,
-  };
-
-  try {
-    const result = await db.$transaction(async (tx) => {
-      const existingTaxRate = await tx.taxRate.findUnique({
-         where: {
-          organizationId_taxRateName: {
-            taxRateName: data.taxRateName,
-            organizationId: data.organizationId,
-          }
-        },
-      });
-
-      if (existingTaxRate) {
-        return {
-          success: false,
-          error: `TaxRate "${data.taxRateName}" already exists for this organization`,
-          data: null,
-        };
-      }
-
-      const newTaxRate = await tx.taxRate.create({ data: formattedData });
-
-      revalidatePath("/inventory/taxRates");
-
-      return {
-        success: true,
-        error: null,
-        data: newTaxRate,
-      };
-    });
-
-    return result;
-  } catch (error) {
-    console.error("Error creating taxRate:", error);
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : "Unknown error",
-      data: null,
-    };
+function normalizeTaxRateInput(data: TaxRateCreateDTO): TaxRateManagementInput {
+  return {
+    nameEn: data.nameEn ?? data.taxRateName ?? data.name ?? "",
+    nameFr: data.nameFr ?? null,
+    rate: Number(data.rate ?? 0),
+    type: (data.type as TaxRateManagementInput["type"]) ?? "SALES",
+    isActive: data.isActive ?? true,
   }
 }
+
+const createActionTaxRate = async (data: TaxRateCreateDTO & { organizationId: string }) => {
+  if (!data.organizationId) {
+    return {
+      success: false,
+      error: "Organization is required",
+      data: null,
+    }
+  }
+
+  const result = await createManagedTaxRate(data.organizationId, normalizeTaxRateInput(data))
+
+  return {
+    success: result.success,
+    error: result.error ?? null,
+    data: result.data ?? null,
+  }
+}
+
 export default createActionTaxRate

@@ -1,61 +1,36 @@
 "use client"
 
-// import { navigationConfig, type NavigationItem } from "@/config/navigation-config"
 import { Building2, ChevronDown, ChevronRight, Menu, Package, Package2, Search, X } from "lucide-react"
 import { type ReactNode, useState } from "react"
 import { navigationConfig, NavigationItem } from "./SidebarNavigation"
 
-// Mock session data for demo
-const mockSession = {
-  user: {
-    name: "Sarah Johnson",
-    email: "sarah.johnson@inventorytech.com",
-    image: "https://images.unsplash.com/photo-1494790108755-2616b612b577?w=150&h=150&fit=crop&crop=face",
-    organizationName: "InventoryTech Solutions",
-    organizationId: "ITS-2024-ENTERPRISE",
-    roles: [{ name: "Inventory Manager" }],
-    permissions: [
-      "dashboard.read",
-      "users.read",
-      "roles.read",
-      "inventory.read",
-      "items.read",
-      "categories.read",
-      "brands.read",
-      "units.read",
-      "stock.read",
-      "sales.read",
-      "purchase.orders.read",
-      "settings.read",
-      "blogs.read",
-      "orders.read",
-      "reports.read",
-      "transfers.read",
-      "adjustments.read",
-      "suppliers.read",
-      "locations.read",
-    ],
-  },
+interface User {
+  id: string
+  name: string
+  email: string
+  image?: string | null
+  organizationId: string
+  organization?: {
+    id: string
+    name: string
+    type?: string
+  }
+  roles?: Array<{
+    id: string
+    name: string
+    permissions: Array<{
+      id: string
+      permission: string
+    }>
+  }>
 }
 
-// Mock inventory data
-const mockInventoryStats = {
-  totalItems: 2847,
-  lowStock: 23,
-  outOfStock: 7,
-  totalValue: 847293,
-  pendingOrders: 15,
-  recentTransfers: 8,
+interface EnterpriseNavigationProps {
+  children: ReactNode
+  user?: User
 }
 
-const mockRecentItems = [
-  { id: 1, name: "Industrial Bearings", sku: "IB-2024-001", stock: 145, category: "Mechanical", status: "In Stock" },
-  { id: 2, name: "Steel Pipes 6inch", sku: "SP-6-2024", stock: 8, category: "Plumbing", status: "Low Stock" },
-  { id: 3, name: "Electric Motors 5HP", sku: "EM-5HP-001", stock: 0, category: "Electrical", status: "Out of Stock" },
-  { id: 4, name: "Safety Helmets", sku: "SH-PPE-024", stock: 89, category: "Safety", status: "In Stock" },
-]
-
-const EnterpriseNavigation = ({ children }: { children: ReactNode }) => {
+const EnterpriseNavigation = ({ children, user }: EnterpriseNavigationProps) => {
   const [isMobileOpen, setIsMobileOpen] = useState(false)
   const [expandedItems, setExpandedItems] = useState(new Set(["Inventory Control", "Stock Management"]))
   const [currentPath, setCurrentPath] = useState("/dashboard")
@@ -63,7 +38,14 @@ const EnterpriseNavigation = ({ children }: { children: ReactNode }) => {
   const [hoveredItem, setHoveredItem] = useState<string | null>(null)
 
   const hasPermission = (permission: string) => {
-    return mockSession.user.permissions.includes(permission)
+    if (!user?.roles) return false
+
+    for (const role of user.roles) {
+      if (role.permissions?.some(p => p.permission === permission)) {
+        return true
+      }
+    }
+    return false
   }
 
   const toggleExpanded = (title: string) => {
@@ -305,11 +287,11 @@ const EnterpriseNavigation = ({ children }: { children: ReactNode }) => {
                 <div className="absolute -inset-0.5 bg-gradient-to-br from-emerald-500 to-teal-600 rounded-2xl opacity-20 blur animate-pulse" />
               </div>
               <div className="flex-1 min-w-0">
-                <p className="font-bold text-gray-900 truncate text-lg">{mockSession.user.organizationName}</p>
+                <p className="font-bold text-gray-900 truncate text-lg">{user?.organization?.name || "Organization"}</p>
                 <div className="flex items-center gap-2 mt-1">
                   <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-bold bg-gradient-to-r from-emerald-500 to-teal-600 text-white shadow-lg">
                     <Package className="w-3 h-3 mr-1" />
-                    {mockSession.user.roles[0].name}
+                    {user?.roles?.[0]?.name || "Member"}
                   </span>
                   <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-green-100 text-green-700">
                     <div className="w-2 h-2 bg-green-500 rounded-full mr-1 animate-pulse" />
@@ -353,16 +335,16 @@ const EnterpriseNavigation = ({ children }: { children: ReactNode }) => {
           >
             <div className="relative">
               <img
-                src={mockSession.user.image || "/placeholder.svg"}
-                alt={mockSession.user.name}
+                src={user?.image || "/placeholder.svg"}
+                alt={user?.name || "User"}
                 className="w-10 h-10 rounded-2xl object-cover shadow-md"
               />
               <div className="absolute -bottom-1 -right-1 w-4 h-4 bg-green-500 border-2 border-white rounded-full shadow-sm" />
             </div>
             {!isCollapsed && (
               <div className="flex-1 min-w-0">
-                <p className="font-bold text-gray-900 truncate">{mockSession.user.name}</p>
-                <p className="text-xs text-gray-500 truncate">{mockSession.user.email}</p>
+                <p className="font-bold text-gray-900 truncate">{user?.name || "User"}</p>
+                <p className="text-xs text-gray-500 truncate">{user?.email || ""}</p>
               </div>
             )}
           </div>

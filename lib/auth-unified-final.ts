@@ -14,8 +14,10 @@
 
 import { useSession as useNextAuthSession, signOut as nextSignOut } from "next-auth/react"
 import { auth } from "@/auth"
+import { getLocaleFromPathname, localizePath } from "@/i18n/routing"
 import { redirect } from "next/navigation"
 import { PERMISSIONS, hasPermission, hasAnyPermission, hasAllPermissions } from "@/lib/permissions"
+import { DEFAULT_LOCALE } from "@/types/bilingual"
 
 // Types for better TypeScript support
 export interface AuthUser {
@@ -40,6 +42,12 @@ export interface AuthUser {
 export interface AuthSession {
   user: AuthUser
   expires: string
+}
+
+function localizedClientHref(href: string) {
+  const pathname = typeof window !== "undefined" ? window.location.pathname : ""
+  const locale = getLocaleFromPathname(pathname) ?? DEFAULT_LOCALE
+  return localizePath(href, locale)
 }
 
 // ============================================================================
@@ -136,7 +144,7 @@ export function useAuth(options: {
     canManageOrganization: () => checkPermission(PERMISSIONS.MANAGE_ORGANIZATION),
 
     // Actions
-    signOut: (redirectTo = "/login") => nextSignOut({ callbackUrl: redirectTo })
+    signOut: (redirectTo = "/login") => nextSignOut({ callbackUrl: localizedClientHref(redirectTo) })
   }
 }
 
@@ -164,7 +172,7 @@ export function useRequireAuth() {
   const auth = useAuth()
 
   if (typeof window !== 'undefined' && !auth.isLoading && !auth.isAuthenticated) {
-    window.location.href = '/login'
+    window.location.href = localizedClientHref('/login')
   }
 
   return auth
@@ -188,11 +196,11 @@ export async function getAuthenticatedUser(): Promise<AuthUser> {
   const session = await auth()
 
   if (!session?.user) {
-    redirect("/login")
+    redirect(localizedClientHref("/login"))
   }
 
   if (!session.user.organizationId) {
-    redirect("/register")
+    redirect(localizedClientHref("/register"))
   }
 
   return session.user as AuthUser
@@ -221,16 +229,16 @@ export async function requirePermission(permission: string): Promise<AuthSession
   const session = await auth()
 
   if (!session?.user) {
-    redirect("/login")
+    redirect(localizedClientHref("/login"))
   }
 
   if (!session.user.organizationId) {
-    redirect("/register")
+    redirect(localizedClientHref("/register"))
   }
 
   const user = session.user as AuthUser
   if (!hasPermission(user.permissions, permission)) {
-    redirect("/unauthorized")
+    redirect(localizedClientHref("/unauthorized"))
   }
 
   return session as AuthSession
@@ -243,16 +251,16 @@ export async function requireAnyPermission(permissions: string[]): Promise<AuthS
   const session = await auth()
 
   if (!session?.user) {
-    redirect("/login")
+    redirect(localizedClientHref("/login"))
   }
 
   if (!session.user.organizationId) {
-    redirect("/register")
+    redirect(localizedClientHref("/register"))
   }
 
   const user = session.user as AuthUser
   if (!hasAnyPermission(user.permissions, permissions)) {
-    redirect("/unauthorized")
+    redirect(localizedClientHref("/unauthorized"))
   }
 
   return session as AuthSession
@@ -265,18 +273,18 @@ export async function requireRole(roleCode: string): Promise<AuthSession> {
   const session = await auth()
 
   if (!session?.user) {
-    redirect("/login")
+    redirect(localizedClientHref("/login"))
   }
 
   if (!session.user.organizationId) {
-    redirect("/register")
+    redirect(localizedClientHref("/register"))
   }
 
   const user = session.user as AuthUser
   const hasRequiredRole = user.roles?.some(role => role.code === roleCode)
 
   if (!hasRequiredRole) {
-    redirect("/unauthorized")
+    redirect(localizedClientHref("/unauthorized"))
   }
 
   return session as AuthSession

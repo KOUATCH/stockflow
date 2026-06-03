@@ -8,6 +8,7 @@ export function useDeleteTaxRate() {
   const { success, error } = useNotifications();
 
   return useMutation({
+    meta: { operation: 'delete', entity: 'Tax Rate' , suppressSuccessNotification: true, suppressErrorNotification: true },
     mutationFn: async (id: string) => {
       const result = await deleteTaxRate(id)
 

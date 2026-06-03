@@ -1,8 +1,18 @@
 "use server"
 
 import { db } from "@/prisma/db"
-import type { SupplierPurchases, UpcomingPayment, SupplierPaymentSummary, FinancialFilters } from "@/types/retailFinance"
-import { startOfDay, endOfDay, addDays, differenceInDays, format } from "date-fns"
+import type { FinancialFilters, SupplierPaymentSummary, SupplierPurchases, UpcomingPayment } from "@/types/retailFinance"
+import { addDays, differenceInDays, endOfDay, format, startOfDay } from "date-fns"
+
+type DecimalLike = { toNumber?: () => number; toString: () => string } | number | string | null | undefined
+
+function toNumber(value: DecimalLike): number {
+  if (value == null) return 0
+  if (typeof value === "number") return value
+  if (typeof value === "string") return Number(value) || 0
+  if (typeof value.toNumber === "function") return value.toNumber()
+  return Number(value.toString()) || 0
+}
 
 export class CostAnalytics {
 
@@ -26,7 +36,7 @@ export class CostAnalytics {
           ...(filters.locations?.length && { locationId: { in: filters.locations } })
         },
         include: {
-          purchaseOrderLines: {
+          lines: {
             include: {
               item: {
                 include: {
@@ -52,7 +62,7 @@ export class CostAnalytics {
           status: { not: 'CANCELLED' }
         },
         include: {
-          salesOrderLines: {
+          lines: {
             include: {
               item: true
             }
@@ -61,7 +71,7 @@ export class CostAnalytics {
       })
 
       // Calculate metrics
-      const totalPurchases = purchaseOrders.reduce((sum, po) => sum + po.total, 0)
+      const totalPurchases = purchaseOrders.reduce((sum, po) => sum + toNumber(po.total), 0)
       const costOfGoodsSold = this.calculateCOGS(salesOrders)
       const inventoryValue = await this.getInventoryValue(organizationId, filters)
 
@@ -89,10 +99,10 @@ export class CostAnalytics {
     let totalCOGS = 0
 
     for (const order of salesOrders) {
-      for (const line of order.salesOrderLines) {
+      for (const line of order.lines) {
         // Use item cost price or estimate if not available
-        const itemCost = line.item.costPrice || (line.unitPrice * 0.6) // Assume 60% cost if not available
-        totalCOGS += itemCost * line.quantity
+        const itemCost = toNumber(line.item.costPrice) || (toNumber(line.unitPrice) * 0.6) // Assume 60% cost if not available
+        totalCOGS += itemCost * toNumber(line.quantity)
       }
     }
 
@@ -114,8 +124,8 @@ export class CostAnalytics {
     })
 
     return inventoryLevels.reduce((total, level) => {
-      const avgCost = level.averageCost || level.item.costPrice || 0
-      return total + (level.quantityOnHand * avgCost)
+      const avgCost = toNumber(level.averageCost) || toNumber(level.item.costPrice)
+      return total + (toNumber(level.quantityOnHand) * avgCost)
     }, 0)
   }
 
@@ -148,7 +158,7 @@ export class CostAnalytics {
       }
 
       const stats = supplierStats.get(supplierId)!
-      stats.totalPurchases += po.total
+      stats.totalPurchases += toNumber(po.total)
       stats.orderCount += 1
 
       if (po.orderDate > stats.lastPurchase) {
@@ -157,7 +167,7 @@ export class CostAnalytics {
 
       // Add to pending if not completed
       if (['SUBMITTED', 'APPROVED', 'PARTIALLY_RECEIVED'].includes(po.status)) {
-        stats.pendingAmount += po.total
+        stats.pendingAmount += toNumber(po.total)
       }
     }
 
@@ -176,7 +186,7 @@ export class CostAnalytics {
       }
     })
 
-    return pendingPOs.reduce((sum, po) => sum + po.total, 0)
+    return pendingPOs.reduce((sum, po) => sum + toNumber(po.total), 0)
   }
 
   /**
@@ -214,7 +224,7 @@ export class CostAnalytics {
       }
 
       const trend = trends.get(key)!
-      trend.purchases += po.total
+      trend.purchases += toNumber(po.total)
       trend.orderCount += 1
     }
 
@@ -233,9 +243,9 @@ export class CostAnalytics {
     }>()
 
     for (const po of purchaseOrders) {
-      for (const line of po.purchaseOrderLines) {
+      for (const line of po.lines) {
         const categoryId = line.item.categoryId || 'uncategorized'
-        const categoryName = line.item.category?.title || 'Uncategorized'
+        const categoryName = line.item.category?.titleEn || 'Uncategorized'
 
         if (!categoryStats.has(categoryId)) {
           categoryStats.set(categoryId, {
@@ -247,7 +257,7 @@ export class CostAnalytics {
         }
 
         const stats = categoryStats.get(categoryId)!
-        stats.totalSpent += line.lineTotal
+        stats.totalSpent += toNumber(line.lineTotal)
         stats.orderCount += 1
       }
     }
@@ -285,8 +295,8 @@ export class CostAnalytics {
       })
     ])
 
-    const currentTotal = currentPeriodPOs.reduce((sum, po) => sum + po.total, 0)
-    const previousTotal = previousPeriodPOs.reduce((sum, po) => sum + po.total, 0)
+    const currentTotal = currentPeriodPOs.reduce((sum, po) => sum + toNumber(po.total), 0)
+    const previousTotal = previousPeriodPOs.reduce((sum, po) => sum + toNumber(po.total), 0)
 
     const variance = currentTotal - previousTotal
     const variancePercent = previousTotal > 0 ? (variance / previousTotal) * 100 : 0
@@ -336,8 +346,8 @@ export class CostAnalytics {
       const today = new Date()
 
       for (const po of purchaseOrders) {
-        const totalPaid = po.payments.reduce((sum, payment) => sum + payment.amount, 0)
-        const pendingAmount = po.total - totalPaid
+        const totalPaid = po.payments.reduce((sum, payment) => sum + toNumber(payment.amount), 0)
+        const pendingAmount = toNumber(po.total) - totalPaid
 
         if (pendingAmount > 0) {
           totalPayables += pendingAmount
@@ -380,7 +390,7 @@ export class CostAnalytics {
 
         // Find latest payment
         const latestPayment = po.payments.reduce((latest, payment) =>
-          !latest || payment.processedAt > latest ? payment.processedAt : latest, null as Date | null)
+          !latest || (payment.processedAt && payment.processedAt > latest) ? payment.processedAt : latest, null as Date | null)
 
         if (latestPayment && (!summary.lastPayment || latestPayment > summary.lastPayment)) {
           summary.lastPayment = latestPayment
@@ -392,6 +402,10 @@ export class CostAnalytics {
         overduePayables,
         upcomingPayments: upcomingPayments.sort((a, b) => a.dueDate.getTime() - b.dueDate.getTime()),
         paymentHistory: Array.from(paymentSummaryMap.values())
+          .map(summary => ({
+            ...summary,
+            lastPayment: summary.lastPayment || new Date(0) // Use epoch date if no payment exists
+          }))
           .sort((a, b) => b.totalPaid - a.totalPaid)
       }
 
@@ -441,8 +455,10 @@ export class CostAnalytics {
       }
 
       for (const level of inventoryLevels) {
-        const avgCost = level.averageCost || level.item.costPrice || 0
-        const totalValue = level.quantityOnHand * avgCost
+        const avgCost = toNumber(level.averageCost) || toNumber(level.item.costPrice)
+        const quantityOnHand = toNumber(level.quantityOnHand)
+        const reorderPoint = toNumber(level.reorderPoint)
+        const totalValue = quantityOnHand * avgCost
 
         analysis.totalInventoryValue += totalValue
 
@@ -455,14 +471,14 @@ export class CostAnalytics {
         }
 
         // Identify excess inventory (above reorder point + safety stock)
-        const excessQuantity = Math.max(0, level.quantityOnHand - (level.reorderPoint * 2))
+        const excessQuantity = Math.max(0, quantityOnHand - (reorderPoint * 2))
         if (excessQuantity > 0) {
           analysis.excessInventoryValue += excessQuantity * avgCost
         }
 
         // Category breakdown
         const categoryId = level.item.categoryId || 'uncategorized'
-        const categoryName = level.item.category?.title || 'Uncategorized'
+        const categoryName = level.item.category?.titleEn || 'Uncategorized'
 
         if (!analysis.categoryBreakdown.has(categoryId)) {
           analysis.categoryBreakdown.set(categoryId, {
@@ -476,11 +492,11 @@ export class CostAnalytics {
 
         const categoryStats = analysis.categoryBreakdown.get(categoryId)!
         categoryStats.totalValue += totalValue
-        categoryStats.totalQuantity += level.quantityOnHand
+        categoryStats.totalQuantity += quantityOnHand
 
         // Brand breakdown
         const brandId = level.item.brandId || 'unbranded'
-        const brandName = level.item.brand?.brandName || 'Unbranded'
+        const brandName = level.item.brand?.nameEn || 'Unbranded'
 
         if (!analysis.brandBreakdown.has(brandId)) {
           analysis.brandBreakdown.set(brandId, {
@@ -494,7 +510,7 @@ export class CostAnalytics {
 
         const brandStats = analysis.brandBreakdown.get(brandId)!
         brandStats.totalValue += totalValue
-        brandStats.totalQuantity += level.quantityOnHand
+        brandStats.totalQuantity += quantityOnHand
       }
 
       // Calculate average costs

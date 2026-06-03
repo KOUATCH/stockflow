@@ -1,5 +1,5 @@
 // components/NotAuthorized.tsx
-import Link from "next/link";
+import { Link } from "@/i18n/navigation";
 import { Shield } from "lucide-react";
 import { Button } from "@/components/ui/button";
 

@@ -1,5 +1,6 @@
 "use client"
 
+import { notify } from "@/lib/notifications/notify"
 import { Badge } from "@/components/ui/badge"
 import { type Column, ConfirmationDialog, DataTable, EntityForm, TableActions } from "@/components/ui/data-table"
 import { FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
@@ -12,7 +13,6 @@ import { format } from "date-fns"
 import { Calendar, FileText, Percent, Scale } from "lucide-react"
 import { useCallback, useEffect, useMemo, useState, useTransition } from "react"
 import { useForm } from "react-hook-form"
-import { toast } from "sonner"
 import * as XLSX from "xlsx"
 import { z } from "zod"
 
@@ -95,7 +95,7 @@ const TaxRateFormModern = ({ title, organizationId, editingId, initialData }: Ta
         })
       } catch (error) {
         console.error("[v0] Error populating form:", error)
-        toast.error("Failed to load tax rate data")
+        notify.error("Failed to load tax rate data")
       }
     },
     [form],
@@ -142,12 +142,12 @@ const TaxRateFormModern = ({ title, organizationId, editingId, initialData }: Ta
     async (filteredTaxRates: BriefTaxRatePayload[]) => {
       try {
         if (filteredTaxRates.length === 0) {
-          toast.warning("No tax rates to export")
+          notify.warning("No tax rates to export")
           return
         }
 
-        // Show loading toast
-        const loadingToast = toast.loading("Preparing export...")
+        // Show loading notification
+        const loadingToast = notify.loading("Preparing export...")
 
         // Prepare data for export with enhanced formatting
         const exportData = filteredTaxRates.map((taxRate, index) => ({
@@ -181,14 +181,14 @@ const TaxRateFormModern = ({ title, organizationId, editingId, initialData }: Ta
         // Export to file
         XLSX.writeFile(workbook, fileName)
 
-        // Dismiss loading toast and show success
-        toast.dismiss(loadingToast)
-        toast.success("Export successful", {
+        // Dismiss loading notification and show success
+        notify.dismiss(loadingToast)
+        notify.success("Export successful", {
           description: `${filteredTaxRates.length} tax rates exported to ${fileName}`,
         })
       } catch (error) {
         console.error("[v0] Export error:", error)
-        toast.error("Export failed", {
+        notify.error("Export failed", {
           description: error instanceof Error ? error.message : "Unknown error occurred during export",
         })
       }
@@ -221,14 +221,14 @@ const TaxRateFormModern = ({ title, organizationId, editingId, initialData }: Ta
 
   const handleRefresh = useCallback(async () => {
     try {
-      const refreshToast = toast.loading("Refreshing tax rates...")
+      const refreshToast = notify.loading("Refreshing tax rates...")
       await refetch()
       setLastRefresh(new Date())
-      toast.dismiss(refreshToast)
-      toast.success("Tax rates refreshed successfully")
+      notify.dismiss(refreshToast)
+      notify.success("Tax rates refreshed successfully")
     } catch (error) {
       console.error("[v0] Refresh error:", error)
-      toast.error("Failed to refresh tax rates", {
+      notify.error("Failed to refresh tax rates", {
         description: error instanceof Error ? error.message : "Unknown error occurred",
       })
     }
@@ -238,16 +238,16 @@ const TaxRateFormModern = ({ title, organizationId, editingId, initialData }: Ta
     try {
       // Additional client-side validation
       if (!data.taxRateName.trim()) {
-        toast.error("Tax rate name cannot be empty")
+        notify.error("Tax rate name cannot be empty")
         return
       }
 
       if (data.rate < 0 || data.rate > 100) {
-        toast.error("Tax rate must be between 0% and 100%")
+        notify.error("Tax rate must be between 0% and 100%")
         return
       }
 
-      const submitToast = toast.loading(isEditMode ? "Updating tax rate..." : "Adding tax rate...")
+      const submitToast = notify.loading(isEditMode ? "Updating tax rate..." : "Adding tax rate...")
 
       if (!isEditMode) {
         // Add new tax rate
@@ -258,8 +258,8 @@ const TaxRateFormModern = ({ title, organizationId, editingId, initialData }: Ta
           rate: Number(data.rate),
           organizationId,
         })
-        toast.dismiss(submitToast)
-        toast.success("Tax rate added successfully", {
+        notify.dismiss(submitToast)
+        notify.success("Tax rate added successfully", {
           description: `${data.taxRateName} (${data.rate}%) has been added`,
         })
       } else {
@@ -278,8 +278,8 @@ const TaxRateFormModern = ({ title, organizationId, editingId, initialData }: Ta
             rate: Number(data.rate),
           },
         })
-        toast.dismiss(submitToast)
-        toast.success("Tax rate updated successfully", {
+        notify.dismiss(submitToast)
+        notify.success("Tax rate updated successfully", {
           description: `${data.taxRateName} has been updated`,
         })
       }
@@ -289,7 +289,7 @@ const TaxRateFormModern = ({ title, organizationId, editingId, initialData }: Ta
       await refetch()
     } catch (error) {
       console.error("[v0] Form submission error:", error)
-      toast.error(isEditMode ? "Failed to update tax rate" : "Failed to add tax rate", {
+      notify.error(isEditMode ? "Failed to update tax rate" : "Failed to add tax rate", {
         description: error instanceof Error ? error.message : "Unknown error occurred",
       })
     }
@@ -369,12 +369,12 @@ const TaxRateFormModern = ({ title, organizationId, editingId, initialData }: Ta
     if (!taxRateToDelete) return
 
     try {
-      const deleteToast = toast.loading("Deleting tax rate...")
+      const deleteToast = notify.loading("Deleting tax rate...")
 
       await deleteTaxRateMutation.mutateAsync(taxRateToDelete.id)
 
-      toast.dismiss(deleteToast)
-      toast.success("Tax rate deleted successfully", {
+      notify.dismiss(deleteToast)
+      notify.success("Tax rate deleted successfully", {
         description: `${taxRateToDelete.taxRateName} has been removed`,
       })
 
@@ -383,7 +383,7 @@ const TaxRateFormModern = ({ title, organizationId, editingId, initialData }: Ta
       setTaxRateToDelete(null)
     } catch (error) {
       console.error("[v0] Delete error:", error)
-      toast.error("Failed to delete tax rate", {
+      notify.error("Failed to delete tax rate", {
         description: error instanceof Error ? error.message : "Unknown error occurred",
       })
     }

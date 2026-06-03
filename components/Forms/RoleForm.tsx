@@ -1,5 +1,6 @@
 "use client";
 
+import { notify } from "@/lib/notifications/notify"
 import createRole from "@/actions/roles/createRole";
 import { updateRole } from "@/actions/roles/updateRole";
 import { Card, CardContent } from "@/components/ui/card";
@@ -9,7 +10,6 @@ import { Role } from "@prisma/client";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
-import { toast } from "sonner";
 import { CustomCheckbox } from "../FormInputs/CustomCheckbox";
 import TextInput from "../FormInputs/TextInput";
 import FormFooter from "./FormFooter";
@@ -30,7 +30,7 @@ const RoleForm = ({ editingId, initialData }: RoleFormProps) => {
     setValue,
   } = useForm<RoleFormData>({
     defaultValues: {
-      name: initialData?.name || "",
+      name: initialData?.nameEn || initialData?.nameFr || "",
       description: initialData?.description || "",
       permissions: initialData?.permissions || [],
       organizationId: initialData?.organizationId || ""
@@ -45,17 +45,17 @@ const RoleForm = ({ editingId, initialData }: RoleFormProps) => {
         : await createRole(data);
 
       if (!result.success) {
-        toast.error(result?.error);
+        notify.error(result?.error);
         return;
       }
 
-      toast.success(
+      notify.success(
         editingId ? "Role updated successfully!" : "Role created successfully!"
       );
       router.push("/dashboard/settings/roles");
       router.refresh();
     } catch (error) {
-      toast.error("Something went wrong!", { description: "The role could not be created" });
+      notify.error("Something went wrong!", { description: "The role could not be created" });
       console.error(error);
     } finally {
       setLoading(false);

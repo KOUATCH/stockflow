@@ -60,6 +60,7 @@ export function useDailySalesReporting(date: string, locationId: string, organiz
 
   // Generate report mutation
   const generateReportMutation = useMutation({
+    meta: { operation: 'generate', entity: 'Daily Sales Report' },
     mutationFn: (params: GenerateReportParams) => generateDailySalesReport(params),
     onSuccess: (result) => {
       if (result.success) {
@@ -72,6 +73,7 @@ export function useDailySalesReporting(date: string, locationId: string, organiz
 
   // Finalize report mutation
   const finalizeReportMutation = useMutation({
+    meta: { operation: 'finalize', entity: 'Report' },
     mutationFn: (params: FinalizeReportParams) => finalizeDailySalesReport(params),
     onSuccess: (result) => {
       if (result.success) {
@@ -84,6 +86,7 @@ export function useDailySalesReporting(date: string, locationId: string, organiz
 
   // Export report mutation
   const exportReportMutation = useMutation({
+    meta: { operation: 'export', entity: 'Report' },
     mutationFn: ({ reportId, format }: { reportId: string; format: "pdf" | "csv" | "excel" }) =>
       exportDailySalesReport(reportId, format),
     onSuccess: (result) => {

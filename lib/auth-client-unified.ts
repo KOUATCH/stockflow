@@ -1,7 +1,9 @@
 "use client"
 
 import { useSession as useNextAuthSession, signOut as nextSignOut } from "next-auth/react"
-import { useRouter } from "next/navigation"
+import { getLocaleFromPathname, localizePath } from "@/i18n/routing"
+import { DEFAULT_LOCALE } from "@/types/bilingual"
+import { usePathname, useRouter } from "next/navigation"
 import { useEffect } from "react"
 
 /**
@@ -16,6 +18,11 @@ import { useEffect } from "react"
 export function useAuth(options: { requireAuth?: boolean; requireOrg?: boolean } = {}) {
   const { data: session, status } = useNextAuthSession()
   const router = useRouter()
+  const pathname = usePathname()
+  const locale = getLocaleFromPathname(pathname) ?? DEFAULT_LOCALE
+  const localizedHref = (href: string) => localizePath(href, locale)
+  const loginHref = localizedHref("/login")
+  const registerHref = localizedHref("/register")
 
   const isLoading = status === "loading"
   const isAuthenticated = !!session?.user && !!session?.user?.organizationId
@@ -24,11 +31,11 @@ export function useAuth(options: { requireAuth?: boolean; requireOrg?: boolean }
   // Auto-redirect logic
   useEffect(() => {
     if (options.requireAuth && status === "unauthenticated") {
-      router.push("/login")
+      router.push(loginHref)
     } else if (options.requireOrg && isAuthenticated && !user?.organizationId) {
-      router.push("/register")
+      router.push(registerHref)
     }
-  }, [status, isAuthenticated, user?.organizationId, options.requireAuth, options.requireOrg, router])
+  }, [status, isAuthenticated, user?.organizationId, options.requireAuth, options.requireOrg, router, loginHref, registerHref])
 
   // Permission checking functions
   const hasPermission = (permission: string): boolean => {
@@ -114,7 +121,7 @@ export function useAuth(options: { requireAuth?: boolean; requireOrg?: boolean }
     isSuperAdmin: () => hasRole("super_admin"),
 
     // Actions
-    signOut: (redirectTo = "/login") => nextSignOut({ callbackUrl: redirectTo })
+    signOut: (redirectTo = "/login") => nextSignOut({ callbackUrl: localizedHref(redirectTo) })
   }
 }
 
@@ -192,7 +199,11 @@ export function useRoles() {
 
 // Re-export for convenience
 export const useSession = useNextAuthSession
-export const signOut = (redirectTo = "/login") => nextSignOut({ callbackUrl: redirectTo })
+export const signOut = (redirectTo = "/login") => {
+  const pathname = typeof window !== "undefined" ? window.location.pathname : ""
+  const locale = getLocaleFromPathname(pathname) ?? DEFAULT_LOCALE
+  return nextSignOut({ callbackUrl: localizePath(redirectTo, locale) })
+}
 
 // Default export
 export default useAuth

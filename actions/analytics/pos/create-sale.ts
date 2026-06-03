@@ -1,7 +1,41 @@
 "use server"
 
 import { db } from "@/prisma/db"
+import type { Prisma } from "@prisma/client"
 import { revalidatePath } from "next/cache"
+import {
+  executeFinancialOperation,
+  FinancialTransactionType,
+  systemMonitor,
+  createAlert,
+  AlertType,
+  AlertSeverity
+} from "@/lib/error-handling"
+
+type DecimalLike = { toNumber?: () => number; toString: () => string } | number | string | null | undefined
+type SalePaymentMethod = CreateSaleData["payments"][number]["method"]
+
+function toNumber(value: DecimalLike): number {
+  if (value == null) return 0
+  if (typeof value === "number") return value
+  if (typeof value === "string") return Number(value) || 0
+  if (typeof value.toNumber === "function") return value.toNumber()
+  return Number(value.toString()) || 0
+}
+
+function toPaymentMethod(method: SalePaymentMethod) {
+  switch (method) {
+    case "cash":
+      return "CASH"
+    case "card":
+      return "CARD"
+    case "check":
+      return "CHEQUE"
+    case "gift_card":
+    case "store_credit":
+      return "STORE_CREDIT"
+  }
+}
 
 export interface SaleItem {
   itemId: string
@@ -84,146 +118,307 @@ export interface Sale {
   }
 }
 
-// Create a new sale
+// Create a new sale with enterprise-grade error handling
 export async function createSale(
   saleData: CreateSaleData,
 ): Promise<{ success: boolean; saleId?: string; error?: string }> {
-  try {
-    // Generate sale number
-    const saleNumber = `SALE-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
-    const receiptNumber = `RCP-${Date.now()}`
+  const startTime = Date.now()
+  const timestamp = Date.now()
+  const random = Math.random().toString(36).substring(2, 15)
+  const saleNumber = `SALE-${timestamp}-${random}`
 
-    // Calculate change amount
+  try {
+    // Validate sale data before processing
+    await validateSaleData(saleData)
+
+    // Calculate totals and validate payment amount
     const totalPaid = saleData.payments.reduce((sum, payment) => sum + payment.amount, 0)
     const changeAmount = Math.max(0, totalPaid - saleData.totalAmount)
 
-    const saleDataObj: any = {
-      orderNumber: saleNumber,
-      sessionId: saleData.sessionId,
-      terminalId: saleData.terminalId,
-      createdById: saleData.userId,
-      locationId: saleData.locationId,
-      organizationId: saleData.organizationId,
-      subtotal: saleData.subtotal,
-      taxAmount: saleData.taxAmount,
-      discount: saleData.discountAmount,
-      total: saleData.totalAmount,
-      notes: saleData.notes,
-    }
-    if (saleData.customerId) {
-      saleDataObj.customerId = saleData.customerId
+    if (totalPaid < saleData.totalAmount) {
+      throw new Error(`Insufficient payment: ${totalPaid} < ${saleData.totalAmount}`)
     }
 
-    const sale = await db.salesOrder.create({
-      data: saleDataObj,
-    })
-
-    // Create sale items and update inventory
-    for (const item of saleData.items) {
-      const lineTotal = item.unitPrice * item.quantity - (item.discountAmount || 0) + (item.taxAmount || 0)
-
-      await db.salesOrderLine.create({
-        data: {
-          salesOrderId: sale.id,
-          itemId: item.itemId,
-          quantity: item.quantity,
-          unitPrice: item.unitPrice,
-          discount: item.discountAmount || 0,
-          taxAmount: item.taxAmount || 0,
-          lineTotal,
+    const result = await executeFinancialOperation(
+      {
+        type: FinancialTransactionType.SALE,
+        amount: saleData.totalAmount,
+        currency: "USD",
+        reference: saleNumber,
+        description: "POS Sale Creation",
+        organizationId: saleData.organizationId,
+        userId: saleData.userId,
+        customerId: saleData.customerId,
+        sessionId: saleData.sessionId,
+        locationId: saleData.locationId,
+        metadata: {
+          terminalId: saleData.terminalId,
+          itemsCount: saleData.items.length,
+          paymentsCount: saleData.payments.length,
         },
-      })
-
-      // Update inventory levels
-      const inventoryLevel = await db.inventoryLevel.findFirst({
-        where: {
-          itemId: item.itemId,
-          locationId: saleData.locationId,
-        },
-      })
-
-      if (inventoryLevel) {
-        await db.inventoryLevel.update({
-          where: { id: inventoryLevel.id },
-          data: {
-            quantityOnHand: inventoryLevel.quantityOnHand - item.quantity,
-            quantityAvailable: inventoryLevel.quantityAvailable - item.quantity,
-            lastTransactionAt: new Date(),
-          },
-        })
-      }
-    }
-
-    // Create payments and update cash drawer
-    for (const payment of saleData.payments) {
-      const paymentNumber = `PAY-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
-
-      await db.payment.create({
-        data: {
-          paymentNumber,
-          salesOrderId: sale.id,
-          method: payment.method === "cash" ? "CASH" : "CARD",
-          amount: payment.amount,
-          cardLast4: payment.cardLastFour,
-          cardType: payment.cardType,
-          authorizationCode: payment.authorizationCode,
-          status: "PAID",
-        },
-      })
-
-      // If cash payment, update cash drawer
-      if (payment.method === "cash") {
-        const session = await db.pOSSession.findUnique({
-          where: { id: saleData.sessionId },
-          include: {
-            cashDrawerTransactions: {
-              include: {
-                cashDrawer: {
-                  select: {
-                    id: true,
-                    currentBalance: true,
-                  },
-                },
+      },
+      async (tx: Prisma.TransactionClient) => {
+        const providedCustomer = saleData.customerId
+          ? await tx.customer.findUnique({
+              where: { id: saleData.customerId },
+              select: { id: true },
+            })
+          : null
+        const customer =
+          providedCustomer ??
+          (await tx.customer.upsert({
+            where: {
+              organizationId_code: {
+                organizationId: saleData.organizationId,
+                code: "WALK_IN",
               },
             },
+            update: {},
+            create: {
+              organizationId: saleData.organizationId,
+              name: "Walk-In Customer",
+              code: "WALK_IN",
+            },
+            select: { id: true },
+          }))
+
+        const sale = await tx.salesOrder.create({
+          data: {
+            orderNumber: saleNumber,
+            sessionId: saleData.sessionId,
+            terminalId: saleData.terminalId,
+            customerId: customer.id,
+            createdById: saleData.userId,
+            locationId: saleData.locationId,
+            organizationId: saleData.organizationId,
+            status: "COMPLETED",
+            paymentStatus: totalPaid >= saleData.totalAmount ? "PAID" : "PARTIAL",
+            subtotal: saleData.subtotal,
+            taxAmount: saleData.taxAmount,
+            discount: saleData.discountAmount,
+            total: saleData.totalAmount,
+            notes: saleData.notes,
           },
         })
 
-        if (session?.cashDrawerTransactions[0]?.cashDrawer) {
-          const currentBalance = session.cashDrawerTransactions[0].cashDrawer.currentBalance
-          const newBalance = currentBalance + payment.amount - changeAmount
+        const inventoryUpdates: Array<{ itemId: string; quantityDeducted: number }> = []
 
-          await db.cashDrawer.update({
-            where: { id: session.cashDrawerTransactions[0].cashDrawerId },
+        for (const item of saleData.items) {
+          const lineTotal = item.unitPrice * item.quantity - (item.discountAmount || 0) + (item.taxAmount || 0)
+
+          await tx.salesOrderLine.create({
             data: {
-              currentBalance: newBalance,
-              expectedBalance: newBalance,
+              salesOrderId: sale.id,
+              itemId: item.itemId,
+              quantity: item.quantity,
+              unitPrice: item.unitPrice,
+              discount: item.discountAmount || 0,
+              taxAmount: item.taxAmount || 0,
+              lineTotal,
             },
           })
 
-          // Record cash drawer transaction
-          await db.cashDrawerTransaction.create({
+          const inventoryLevel = await tx.inventoryLevel.findFirst({
+            where: {
+              itemId: item.itemId,
+              locationId: saleData.locationId,
+            },
+          })
+
+          if (!inventoryLevel) {
+            throw new Error(`No inventory level found for item ${item.itemId} at location ${saleData.locationId}`)
+          }
+
+          const quantityOnHand = toNumber(inventoryLevel.quantityOnHand)
+          const quantityAvailable = toNumber(inventoryLevel.quantityAvailable)
+          if (quantityOnHand < item.quantity) {
+            throw new Error(`Insufficient stock for item ${item.itemId}: available ${quantityOnHand}, needed ${item.quantity}`)
+          }
+
+          const newQuantityOnHand = quantityOnHand - item.quantity
+          const newQuantityAvailable = quantityAvailable - item.quantity
+          const updatedInventory = await tx.inventoryLevel.update({
+            where: {
+              id: inventoryLevel.id,
+              quantityOnHand: inventoryLevel.quantityOnHand,
+            },
             data: {
-              cashDrawerId: session?.cashDrawerTransactions[0]?.cashDrawerId,
-              sessionId: saleData.sessionId,
-              userId: saleData.userId,
+              quantityOnHand: newQuantityOnHand,
+              quantityAvailable: newQuantityAvailable,
+              lastTransactionAt: new Date(),
+            },
+          })
+
+          inventoryUpdates.push({ itemId: item.itemId, quantityDeducted: item.quantity })
+
+          await tx.inventoryTransaction.create({
+            data: {
+              itemId: item.itemId,
+              locationId: saleData.locationId,
               type: "SALE",
-              amount: payment.amount - changeAmount,
-              reason: `Sale ${saleNumber}`,
-              balanceBefore: currentBalance,
-              balanceAfter: newBalance,
+              quantity: -item.quantity,
+              balanceAfter: toNumber(updatedInventory.quantityOnHand),
+              referenceId: sale.id,
+              referenceType: "SALES_ORDER",
+              notes: `Sale ${saleNumber}`,
+              createdById: saleData.userId,
+              organizationId: saleData.organizationId,
             },
           })
         }
+
+        for (const payment of saleData.payments) {
+          const paymentNumber = `PAY-${timestamp}-${Math.random().toString(36).substring(2, 9)}`
+          const method = toPaymentMethod(payment.method)
+
+          await tx.payment.create({
+            data: {
+              paymentNumber,
+              salesOrderId: sale.id,
+              method,
+              amount: payment.amount,
+              cashTendered: method === "CASH" ? payment.amount : undefined,
+              changeGiven: method === "CASH" ? changeAmount : undefined,
+              cardLast4: payment.cardLastFour,
+              cardType: payment.cardType,
+              authorizationCode: payment.authorizationCode,
+              status: "PAID",
+              organizationId: saleData.organizationId,
+            },
+          })
+
+          if (payment.method === "cash") {
+            await processCashPayment(tx, saleData, payment, changeAmount, saleNumber)
+          }
+        }
+
+        return { sale, inventoryUpdates }
       }
+    )
+
+    systemMonitor.recordMetric("sale_created", {
+      sale_id: result.sale.id,
+      sale_number: saleNumber,
+      total_amount: saleData.totalAmount,
+      items_count: saleData.items.length,
+      payment_methods: saleData.payments.map(p => p.method),
+      processing_time_ms: Date.now() - startTime,
+      location_id: saleData.locationId,
+      organization_id: saleData.organizationId,
+    })
+
+    if (saleData.totalAmount > 1000) {
+      await createAlert({
+        type: AlertType.BUSINESS,
+        severity: AlertSeverity.LOW,
+        message: `High-value sale created: ${saleNumber} - $${saleData.totalAmount}`,
+        source: "pos-sales",
+        metadata: {
+          saleId: result.sale.id,
+          saleNumber,
+          totalAmount: saleData.totalAmount,
+          locationId: saleData.locationId,
+          userId: saleData.userId,
+        },
+      })
     }
 
     revalidatePath("/pos")
-    return { success: true, saleId: sale.id }
+    revalidatePath("/dashboard/sales")
+    revalidatePath("/dashboard/inventory")
+
+    return { success: true, saleId: result.sale.id }
   } catch (error) {
     console.error("Error creating sale:", error)
-    return { success: false, error: "Failed to create sale" }
+    return { success: false, error: error instanceof Error ? error.message : "Failed to create sale" }
   }
+}
+
+// Helper function to validate sale data
+async function validateSaleData(saleData: CreateSaleData): Promise<void> {
+  // Validate required fields
+  if (!saleData.sessionId) throw new Error("Session ID is required")
+  if (!saleData.terminalId) throw new Error("Terminal ID is required")
+  if (!saleData.userId) throw new Error("User ID is required")
+  if (!saleData.locationId) throw new Error("Location ID is required")
+  if (!saleData.organizationId) throw new Error("Organization ID is required")
+  if (!saleData.items || saleData.items.length === 0) throw new Error("At least one item is required")
+  if (!saleData.payments || saleData.payments.length === 0) throw new Error("At least one payment is required")
+
+  // Validate amounts
+  if (saleData.totalAmount <= 0) throw new Error("Total amount must be positive")
+  if (saleData.subtotal <= 0) throw new Error("Subtotal must be positive")
+
+  // Validate items
+  for (const item of saleData.items) {
+    if (!item.itemId) throw new Error("Item ID is required for all items")
+    if (item.quantity <= 0) throw new Error("Item quantity must be positive")
+    if (item.unitPrice < 0) throw new Error("Item unit price cannot be negative")
+  }
+
+  // Validate payments
+  for (const payment of saleData.payments) {
+    if (payment.amount <= 0) throw new Error("Payment amount must be positive")
+    if (!["cash", "card", "check", "gift_card", "store_credit"].includes(payment.method)) {
+      throw new Error(`Invalid payment method: ${payment.method}`)
+    }
+  }
+}
+
+// Helper function to process cash payments
+async function processCashPayment(
+  tx: Prisma.TransactionClient,
+  saleData: CreateSaleData,
+  payment: CreateSaleData["payments"][number],
+  changeAmount: number,
+  saleNumber: string
+): Promise<void> {
+  const session = await tx.pOSSession.findUnique({
+    where: { id: saleData.sessionId },
+    include: {
+      cashDrawerTransactions: {
+        include: {
+          cashDrawer: {
+            select: {
+              id: true,
+              currentBalance: true,
+            },
+          },
+        },
+      },
+    },
+  })
+
+  if (!session?.cashDrawerTransactions[0]?.cashDrawer) {
+    throw new Error("No active cash drawer found for this session")
+  }
+
+  const currentBalance = toNumber(session.cashDrawerTransactions[0].cashDrawer.currentBalance)
+  const netCashChange = payment.amount - changeAmount
+  const newBalance = currentBalance + netCashChange
+
+  // Update cash drawer balance
+  await tx.cashDrawer.update({
+    where: { id: session.cashDrawerTransactions[0].cashDrawerId },
+    data: {
+      currentBalance: newBalance,
+      expectedBalance: newBalance,
+    },
+  })
+
+  // Record cash drawer transaction
+  await tx.cashDrawerTransaction.create({
+    data: {
+      cashDrawerId: session.cashDrawerTransactions[0].cashDrawerId,
+      sessionId: saleData.sessionId,
+      userId: saleData.userId,
+      type: "SALE",
+      amount: netCashChange,
+      reason: `Sale ${saleNumber}`,
+      balanceBefore: currentBalance,
+      balanceAfter: newBalance,
+    },
+  })
 }
 
 // Get sales for a session
@@ -236,7 +431,8 @@ export async function getSessionSales(sessionId: string, limit = 50): Promise<Sa
           include: {
             item: {
               select: {
-                name: true,
+                nameEn: true,
+                nameFr: true,
                 sku: true,
               },
             },
@@ -247,6 +443,7 @@ export async function getSessionSales(sessionId: string, limit = 50): Promise<Sa
           select: {
             id: true,
             name: true,
+            email: true,
             phone: true,
           },
         },
@@ -266,32 +463,32 @@ export async function getSessionSales(sessionId: string, limit = 50): Promise<Sa
       locationId: sale.locationId,
       organizationId: sale.organizationId ?? "",
       status: sale.status ?? "COMPLETED",
-      subtotal: sale.subtotal,
-      taxAmount: sale.taxAmount,
-      discountAmount: sale.discount ?? 0,
-      totalAmount: sale.total,
-      amountPaid: sale.payments?.reduce((sum: number, p: any) => sum + (p.amount ?? 0), 0) ?? 0,
+      subtotal: toNumber(sale.subtotal),
+      taxAmount: toNumber(sale.taxAmount),
+      discountAmount: toNumber(sale.discount),
+      totalAmount: toNumber(sale.total),
+      amountPaid: sale.payments?.reduce((sum: number, p: any) => sum + toNumber(p.amount), 0) ?? 0,
       changeAmount: sale.changeAmount ?? 0,
       notes: sale.notes ?? undefined,
-      receiptNumber: sale.receiptNumber ?? undefined,
+      receiptNumber: sale.orderNumber,
       createdAt: sale.createdAt,
       items: sale.lines.map((line: any) => ({
         id: line.id,
         itemId: line.itemId,
-        quantity: line.quantity,
-        unitPrice: line.unitPrice,
-        discountAmount: line.discount ?? 0,
-        taxAmount: line.taxAmount ?? 0,
-        lineTotal: line.lineTotal ?? line.unitPrice * line.quantity - (line.discount ?? 0) + (line.taxAmount ?? 0),
+        quantity: toNumber(line.quantity),
+        unitPrice: toNumber(line.unitPrice),
+        discountAmount: toNumber(line.discount),
+        taxAmount: toNumber(line.taxAmount),
+        lineTotal: toNumber(line.lineTotal) || toNumber(line.unitPrice) * toNumber(line.quantity) - toNumber(line.discount) + toNumber(line.taxAmount),
         item: {
-          name: line.item?.name ?? "",
+          name: line.item?.nameEn ?? line.item?.nameFr ?? "",
           sku: line.item?.sku ?? "",
         },
       })),
       payments: sale.payments.map((payment: any) => ({
         id: payment.id,
         paymentMethod: payment.method,
-        amount: payment.amount,
+        amount: toNumber(payment.amount),
         referenceNumber: payment.referenceNumber ?? undefined,
         cardLastFour: payment.cardLast4 ?? undefined,
         cardType: payment.cardType ?? undefined,
@@ -333,7 +530,7 @@ export async function getSaleById(saleId: string): Promise<Sale | null> {
       },
     })
 
-    return sale as Sale | null
+    return sale as unknown as Sale | null
   } catch (error) {
     console.error("Error getting sale by ID:", error)
     return null
@@ -391,8 +588,8 @@ export async function voidSale(
           await tx.inventoryLevel.update({
             where: { id: inventoryLevel.id },
             data: {
-              quantityOnHand: inventoryLevel.quantityOnHand + item.quantity,
-              quantityAvailable: inventoryLevel.quantityAvailable + item.quantity,
+              quantityOnHand: toNumber(inventoryLevel.quantityOnHand) + toNumber(item.quantity),
+              quantityAvailable: toNumber(inventoryLevel.quantityAvailable) + toNumber(item.quantity),
               lastTransactionAt: new Date(),
             },
           })
@@ -417,11 +614,11 @@ export async function voidSale(
         }
 
         if (session?.cashDrawerTransactions[0]?.cashDrawer) {
-          const totalCashAmount = cashPayments.reduce((sum, p) => sum + p.amount, 0)
-          const currentBalance = session.cashDrawerTransactions[0]?.cashDrawer?.currentBalance ?? 0
+          const totalCashAmount = cashPayments.reduce((sum, p) => sum + toNumber(p.amount), 0)
+          const currentBalance = toNumber(session.cashDrawerTransactions[0]?.cashDrawer?.currentBalance)
           const changeGiven =
             sale?.payments && sale.payments.length > 0 && sale.payments[0]?.changeGiven
-              ? sale.payments[0].changeGiven
+              ? toNumber(sale.payments[0].changeGiven)
               : 0
           const newBalance = currentBalance - totalCashAmount + changeGiven
 
@@ -509,12 +706,12 @@ export async function generateDailySalesReport(
     })
 
     // Calculate totals
-    const totalRevenue = sales.reduce((sum, sale) => sum + sale.totalAmount, 0)
+    const totalRevenue = sales.reduce((sum, sale) => sum + toNumber(sale.total), 0)
     const totalCost = sales.reduce((sum, sale) => {
       return (
         sum +
-        sale.items.reduce((lineSum, line) => {
-          return lineSum + line.item.costPrice * line.quantity
+        sale.lines.reduce((lineSum, line) => {
+          return lineSum + toNumber(line.item.costPrice) * toNumber(line.quantity)
         }, 0)
       )
     }, 0)
@@ -524,14 +721,18 @@ export async function generateDailySalesReport(
     const totalTransactions = sales.length
     const averageTransactionValue = totalTransactions > 0 ? totalRevenue / totalTransactions : 0
     const totalQuantitySold = sales.reduce((sum, sale) => {
-      return sum + sale.items.reduce((lineSum, line) => lineSum + line.quantity, 0)
+      return sum + sale.lines.reduce((lineSum, line) => lineSum + toNumber(line.quantity), 0)
     }, 0)
 
     // Payment method breakdown
     const payments = sales.flatMap((sale) => sale.payments)
-    const cashSales = payments.filter((p) => p.method === "cash").reduce((sum, p) => sum + p.amount, 0)
-    const cardSales = payments.filter((p) => p.method === "card").reduce((sum, p) => sum + p.amount, 0)
-    const digitalSales = payments.filter((p) => p.method === "digital").reduce((sum, p) => sum + p.amount, 0)
+    const cashSales = payments.filter((p) => p.method === "CASH").reduce((sum, p) => sum + toNumber(p.amount), 0)
+    const cardSales = payments.filter((p) => p.method === "CARD").reduce((sum, p) => sum + toNumber(p.amount), 0)
+    const mobileMoneySales = payments.filter((p) => p.method === "MOBILE_MONEY").reduce((sum, p) => sum + toNumber(p.amount), 0)
+    const bankTransferSales = payments.filter((p) => p.method === "BANK_TRANSFER").reduce((sum, p) => sum + toNumber(p.amount), 0)
+    const creditSales = payments
+      .filter((p) => p.method === "CREDIT" || p.method === "STORE_CREDIT")
+      .reduce((sum, p) => sum + toNumber(p.amount), 0)
 
     // Get cash drawer data
     const cashTransactions = await db.cashDrawerTransaction.findMany({
@@ -548,19 +749,19 @@ export async function generateDailySalesReport(
 
     const openingBalance = cashTransactions
       .filter((t) => t.type === "OPENING_BALANCE")
-      .reduce((sum, t) => sum + t.amount, 0)
+      .reduce((sum, t) => sum + toNumber(t.amount), 0)
 
     const closingBalance = cashTransactions
       .filter((t) => t.type === "CLOSING_BALANCE")
-      .reduce((sum, t) => sum + t.amount, 0)
+      .reduce((sum, t) => sum + toNumber(t.amount), 0)
 
     const cashIn = cashTransactions
       .filter((t) => ["SALE", "CASH_IN"].includes(t.type))
-      .reduce((sum, t) => sum + t.amount, 0)
+      .reduce((sum, t) => sum + toNumber(t.amount), 0)
 
     const cashOut = cashTransactions
       .filter((t) => ["REFUND", "CASH_OUT", "PAYOUT"].includes(t.type))
-      .reduce((sum, t) => sum + t.amount, 0)
+      .reduce((sum, t) => sum + toNumber(t.amount), 0)
 
     const variance = closingBalance - (openingBalance + cashIn - cashOut)
 
@@ -577,10 +778,14 @@ export async function generateDailySalesReport(
         totalQuantitySold,
         totalTransactions,
         averageTransactionValue,
-        itemsSold: totalQuantitySold,
+        itemsSold: Math.round(totalQuantitySold),
         cashSales,
         cardSales,
-        digitalSales,
+        mobileMoneySales,
+        bankTransferSales,
+        creditSales,
+        totalExpenses: 0,
+        netProfit: grossProfit,
         openingBalance,
         closingBalance,
         cashIn,

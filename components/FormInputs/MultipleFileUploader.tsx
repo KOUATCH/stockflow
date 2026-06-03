@@ -1,3 +1,4 @@
+import { notify } from "@/lib/notifications/notify"
 import { UploadDropzone } from "@/lib/uploadthing";
 import { Pencil, XCircle } from "lucide-react";
 import {
@@ -10,7 +11,6 @@ import {
     FaImage,
 } from "react-icons/fa";
 import { MdTextSnippet } from "react-icons/md"; // For .txt files
-import { toast } from "sonner";
 ;
 
 type MultipleImageInputProps = {
@@ -145,7 +145,7 @@ export default function MultipleFileUpload({
             console.log("Upload Completed");
           }}
           onUploadError={(error) => {
-            toast.error("File Upload Failed, Try Again");
+            notify.error("File Upload Failed, Try Again");
             console.log(`ERROR! ${error.message}`, error);
           }}
         />

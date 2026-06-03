@@ -1,5 +1,6 @@
 "use client"
 
+import { notify } from "@/lib/notifications/notify"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Calendar } from "@/components/ui/calendar"
@@ -10,15 +11,16 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import { useUpdatePurchaseOrder } from "@/hooks/useRecentPurchaseOrderQueries"
+import { getLocaleFromPathname, localizePath } from "@/i18n/routing"
 import { cn } from "@/lib/utils"
+import { DEFAULT_LOCALE } from "@/types/bilingual"
 import { PurchaseOrderWithRelations } from "@/types/purchase-orders-system-types"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { format } from "date-fns"
 import { ArrowLeft, CalendarIcon, CheckCircle, Plus, Save, Trash2 } from "lucide-react"
-import { useRouter } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 import { useEffect, useMemo, useState } from "react"
 import { useForm } from "react-hook-form"
-import { toast } from "sonner"
 import { z } from "zod"
 
 const lineItemSchema = z.object({
@@ -65,6 +67,9 @@ export function ModernEditPurchaseOrderForm({
   organizationId
 }: ModernEditPurchaseOrderFormProps) {
   const router = useRouter()
+  const pathname = usePathname()
+  const locale = getLocaleFromPathname(pathname) ?? DEFAULT_LOCALE
+  const localizedHref = (href: string) => localizePath(href, locale)
   const { mutate: updatePurchaseOrder, isPending } = useUpdatePurchaseOrder()
   const [currentStep, setCurrentStep] = useState(0)
 
@@ -174,15 +179,15 @@ export function ModernEditPurchaseOrderForm({
 
     updatePurchaseOrder(updateData, {
       onSuccess: () => {
-        toast.success("Purchase order updated successfully!")
-        router.push(`/dashboard/purchase-orders/${purchaseOrder.id}`)
+        notify.success("Purchase order updated successfully!")
+        router.push(localizedHref(`/dashboard/purchase-orders/${purchaseOrder.id}`))
       },
       onError: (error: any) => {
         if (error?.message?.includes("NEXT_REDIRECT")) {
-          toast.success("Purchase order updated successfully!")
-          router.push(`/dashboard/purchase-orders/${purchaseOrder.id}`)
+          notify.success("Purchase order updated successfully!")
+          router.push(localizedHref(`/dashboard/purchase-orders/${purchaseOrder.id}`))
         } else {
-          toast.error(error?.message || "Failed to update purchase order")
+          notify.error(error?.message || "Failed to update purchase order")
         }
       }
     })
@@ -204,27 +209,26 @@ export function ModernEditPurchaseOrderForm({
   const selectedLocation = locations.find(l => l.id === watch("locationId"))
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-emerald-50 to-teal-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-800 p-6 space-y-6 transition-colors duration-300">
-      <div className="container mx-auto max-w-5xl p-6">
-        {/* Enhanced Header with POSTerminal styling */}
-        <div className="flex items-center justify-between bg-gradient-to-r from-emerald-50 via-teal-50 to-cyan-50 dark:from-slate-800 dark:via-slate-700 dark:to-slate-800 p-6 rounded-2xl shadow-xl border border-emerald-200/60 dark:border-slate-600/60 backdrop-blur-sm mb-8">
+    <div className="dashboard-landing-theme dark min-h-screen overflow-x-hidden">
+      <div className="dashboard-landing-content mx-auto w-full max-w-[72rem] px-4 py-6 text-[var(--dash-text)] sm:px-6 sm:py-8">
+        <div className="dashboard-glass-panel mb-8 flex items-center justify-between rounded-lg p-6">
           <div className="flex items-center gap-4">
-            <div className="p-3 rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg">
+            <div className="rounded-lg border border-[var(--dash-border-subtle)] bg-[var(--dash-brand-soft)] p-3 text-[var(--dash-brand-strong)] shadow-[0_16px_34px_rgba(47,125,246,0.18)]">
               <Save className="h-8 w-8" />
             </div>
             <div>
-              <h1 className="text-4xl font-heading font-bold bg-gradient-to-r from-emerald-600 to-teal-600 bg-clip-text text-transparent flex items-center gap-3">
+              <h1 className="flex items-center gap-3 text-2xl font-semibold tracking-normal text-[var(--dash-text)]">
                 Edit Purchase Order
               </h1>
-              <p className="text-muted-foreground text-lg mt-1">
+              <p className="mt-1 text-sm text-[var(--dash-text-soft)]">
                 Modify your purchase order with modern efficiency
               </p>
               <div className="flex items-center gap-4 mt-3">
-                <Badge variant="outline" className="flex items-center gap-2 px-3 py-1 bg-white/80 backdrop-blur-sm">
-                  <CheckCircle className="h-4 w-4 text-emerald-500" />
+                <Badge variant="outline" className="dashboard-filter-chip flex items-center gap-2 rounded-lg px-3 py-1">
+                  <CheckCircle className="h-4 w-4 text-[var(--dash-info)]" />
                   {purchaseOrder.orderNumber}
                 </Badge>
-                <Badge variant={purchaseOrder.status === 'DRAFT' ? 'secondary' : 'default'} className="px-3 py-1 font-medium bg-white/80 backdrop-blur-sm">
+                <Badge variant={purchaseOrder.status === 'DRAFT' ? 'secondary' : 'default'} className="dashboard-filter-chip rounded-lg px-3 py-1 font-medium">
                   {purchaseOrder.status}
                 </Badge>
               </div>
@@ -236,7 +240,7 @@ export function ModernEditPurchaseOrderForm({
               variant="outline"
               size="sm"
               onClick={() => router.back()}
-              className="flex items-center gap-2 bg-white/80 backdrop-blur-sm shadow-sm hover:shadow-md transition-all"
+              className="dashboard-button-secondary flex items-center gap-2 rounded-lg"
             >
               <ArrowLeft className="w-4 h-4" />
               Back
@@ -250,12 +254,12 @@ export function ModernEditPurchaseOrderForm({
             {steps.map((step, index) => (
               <div key={index} className="flex items-center">
                 <div className={cn(
-                  "flex h-10 w-10 items-center justify-center rounded-full border-2 text-sm font-medium transition-all duration-300 shadow-lg",
+                  "flex h-10 w-10 items-center justify-center rounded-md border text-sm font-medium transition-colors",
                   index === currentStep
-                    ? "border-emerald-500 bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-emerald-500/30"
+                    ? "border-[var(--dash-brand)] bg-[var(--dash-brand)] text-white"
                     : index < currentStep
-                      ? "border-emerald-500 bg-gradient-to-br from-emerald-500 to-green-500 text-white shadow-emerald-500/20"
-                      : "border-slate-300 bg-white text-slate-400 shadow-slate-300/20"
+                      ? "border-[var(--dash-success)] bg-[var(--dash-success)] text-white"
+                      : "border-[var(--dash-border-subtle)] bg-[rgba(37,57,67,0.74)] text-[var(--dash-text-soft)]"
                 )}>
                   {index < currentStep ? (
                     <CheckCircle className="h-5 w-5" />
@@ -265,22 +269,22 @@ export function ModernEditPurchaseOrderForm({
                 </div>
                 {index < steps.length - 1 && (
                   <div className={cn(
-                    "h-1 w-20 ml-4",
-                    index < currentStep ? "bg-green-500" : "bg-slate-200"
+                    "ml-4 h-1 w-20 rounded-md",
+                    index < currentStep ? "bg-[var(--dash-success)]" : "bg-[var(--dash-border-subtle)]"
                   )} />
                 )}
               </div>
             ))}
           </div>
           <div className="mt-4">
-            <h3 className="font-semibold text-slate-900">{steps[currentStep].title}</h3>
-            <p className="text-sm text-slate-600">{steps[currentStep].description}</p>
+            <h3 className="font-semibold text-[var(--dash-text)]">{steps[currentStep].title}</h3>
+            <p className="text-sm text-[var(--dash-text-soft)]">{steps[currentStep].description}</p>
           </div>
         </div>
 
         <Form {...form}>
           <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-            <Card className="backdrop-blur-xl bg-white/80 border-white/20 shadow-2xl hover:shadow-3xl transition-all duration-300">
+            <Card className="dashboard-glass-panel rounded-lg text-[var(--dash-text)]">
               <CardContent className="p-8">
                 {/* Step 1: Order Details */}
                 {currentStep === 0 && (
@@ -291,11 +295,11 @@ export function ModernEditPurchaseOrderForm({
                         name="orderNumber"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel className="text-slate-700 font-medium">Order Number</FormLabel>
+                            <FormLabel className="font-medium text-[var(--dash-text-muted)]">Order Number</FormLabel>
                             <FormControl>
                               <Input
                                 {...field}
-                                className="border-slate-200 focus:border-blue-500 focus:ring-blue-500/20"
+                                className="dashboard-control rounded-lg"
                                 placeholder="PO-001"
                                 disabled={purchaseOrder.status !== 'DRAFT'}
                               />
@@ -309,11 +313,11 @@ export function ModernEditPurchaseOrderForm({
                         name="reference"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel className="text-slate-700 font-medium">Reference</FormLabel>
+                            <FormLabel className="font-medium text-[var(--dash-text-muted)]">Reference</FormLabel>
                             <FormControl>
                               <Input
                                 {...field}
-                                className="border-slate-200 focus:border-blue-500 focus:ring-blue-500/20"
+                                className="dashboard-control rounded-lg"
                                 placeholder="External reference"
                               />
                             </FormControl>
@@ -327,14 +331,14 @@ export function ModernEditPurchaseOrderForm({
                       name="expectedDeliveryDate"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel className="text-slate-700 font-medium">Expected Delivery Date</FormLabel>
+                          <FormLabel className="font-medium text-[var(--dash-text-muted)]">Expected Delivery Date</FormLabel>
                           <Popover>
                             <PopoverTrigger asChild>
                               <FormControl>
                                 <Button
                                   variant="outline"
                                   className={cn(
-                                    "w-full pl-3 text-left font-normal border-slate-200 focus:border-blue-500",
+                                    "dashboard-button-secondary w-full rounded-lg pl-3 text-left font-normal",
                                     !field.value && "text-muted-foreground"
                                   )}
                                 >
@@ -374,10 +378,10 @@ export function ModernEditPurchaseOrderForm({
                       name="supplierId"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel className="text-slate-700 font-medium">Supplier</FormLabel>
+                          <FormLabel className="font-medium text-[var(--dash-text-muted)]">Supplier</FormLabel>
                           <Select onValueChange={field.onChange} value={field.value}>
                             <FormControl>
-                              <SelectTrigger className="border-slate-200 focus:border-blue-500 focus:ring-blue-500/20">
+                              <SelectTrigger className="dashboard-control rounded-lg">
                                 <SelectValue placeholder="Select a supplier" />
                               </SelectTrigger>
                             </FormControl>
@@ -403,10 +407,10 @@ export function ModernEditPurchaseOrderForm({
                       name="locationId"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel className="text-slate-700 font-medium">Delivery Location</FormLabel>
+                          <FormLabel className="font-medium text-[var(--dash-text-muted)]">Delivery Location</FormLabel>
                           <Select onValueChange={field.onChange} value={field.value}>
                             <FormControl>
-                              <SelectTrigger className="border-slate-200 focus:border-blue-500 focus:ring-blue-500/20">
+                              <SelectTrigger className="dashboard-control rounded-lg">
                                 <SelectValue placeholder="Select a location" />
                               </SelectTrigger>
                             </FormControl>
@@ -423,15 +427,15 @@ export function ModernEditPurchaseOrderForm({
                       )}
                     />
                     {(selectedSupplier || selectedLocation) && (
-                      <div className="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
-                        <h4 className="font-medium text-blue-900 mb-2">Selection Summary</h4>
+                      <div className="mt-6 rounded-lg border border-[var(--dash-border-subtle)] bg-[rgba(24,38,45,0.58)] p-4">
+                        <h4 className="mb-2 font-medium text-[var(--dash-text)]">Selection Summary</h4>
                         {selectedSupplier && (
-                          <p className="text-sm text-blue-700">
+                          <p className="text-sm text-[var(--dash-text-soft)]">
                             <span className="font-medium">Supplier:</span> {selectedSupplier.name}
                           </p>
                         )}
                         {selectedLocation && (
-                          <p className="text-sm text-blue-700">
+                          <p className="text-sm text-[var(--dash-text-soft)]">
                             <span className="font-medium">Location:</span> {selectedLocation.name}
                           </p>
                         )}
@@ -444,13 +448,13 @@ export function ModernEditPurchaseOrderForm({
                 {currentStep === 2 && (
                   <div className="space-y-6">
                     <div className="flex items-center justify-between">
-                      <h3 className="text-lg font-semibold text-slate-900">Line Items</h3>
+                      <h3 className="text-lg font-semibold text-[var(--dash-text)]">Line Items</h3>
                       <Button
                         type="button"
                         onClick={addLineItem}
                         variant="outline"
                         size="sm"
-                        className="text-blue-600 border-blue-200 hover:bg-blue-50"
+                        className="dashboard-button-secondary rounded-lg"
                       >
                         <Plus className="h-4 w-4 mr-2" />
                         Add Item
@@ -459,7 +463,7 @@ export function ModernEditPurchaseOrderForm({
 
                     <div className="space-y-4">
                       {watchedLines.map((line, index) => (
-                        <Card key={index} className="border border-slate-200 bg-slate-50/50">
+                        <Card key={index} className="rounded-lg border border-[var(--dash-border-subtle)] bg-[rgba(24,38,45,0.5)]">
                           <CardContent className="p-4">
                             <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
                               <div className="md:col-span-2">
@@ -468,7 +472,7 @@ export function ModernEditPurchaseOrderForm({
                                   name={`lines.${index}.itemId`}
                                   render={({ field }) => (
                                     <FormItem>
-                                      <FormLabel className="text-sm text-slate-700">Item</FormLabel>
+                                      <FormLabel className="text-sm text-[var(--dash-text-muted)]">Item</FormLabel>
                                       <Select
                                         onValueChange={(value) => {
                                           field.onChange(value)
@@ -483,7 +487,7 @@ export function ModernEditPurchaseOrderForm({
                                         value={field.value}
                                       >
                                         <FormControl>
-                                          <SelectTrigger className="text-sm">
+                                          <SelectTrigger className="dashboard-control rounded-lg text-sm">
                                             <SelectValue placeholder="Select item" />
                                           </SelectTrigger>
                                         </FormControl>
@@ -508,14 +512,14 @@ export function ModernEditPurchaseOrderForm({
                                 name={`lines.${index}.orderedQuantity`}
                                 render={({ field }) => (
                                   <FormItem>
-                                    <FormLabel className="text-sm text-slate-700">Quantity</FormLabel>
+                                    <FormLabel className="text-sm text-[var(--dash-text-muted)]">Quantity</FormLabel>
                                     <FormControl>
                                       <Input
                                         type="number"
                                         step="0.01"
                                         {...field}
                                         onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
-                                        className="text-sm"
+                                        className="dashboard-control rounded-lg text-sm"
                                       />
                                     </FormControl>
                                     <FormMessage />
@@ -527,14 +531,14 @@ export function ModernEditPurchaseOrderForm({
                                 name={`lines.${index}.unitCost`}
                                 render={({ field }) => (
                                   <FormItem>
-                                    <FormLabel className="text-sm text-slate-700">Unit Cost</FormLabel>
+                                    <FormLabel className="text-sm text-[var(--dash-text-muted)]">Unit Cost</FormLabel>
                                     <FormControl>
                                       <Input
                                         type="number"
                                         step="0.01"
                                         {...field}
                                         onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
-                                        className="text-sm"
+                                        className="dashboard-control rounded-lg text-sm"
                                       />
                                     </FormControl>
                                     <FormMessage />
@@ -546,14 +550,14 @@ export function ModernEditPurchaseOrderForm({
                                 name={`lines.${index}.taxAmount`}
                                 render={({ field }) => (
                                   <FormItem>
-                                    <FormLabel className="text-sm text-slate-700">Tax</FormLabel>
+                                    <FormLabel className="text-sm text-[var(--dash-text-muted)]">Tax</FormLabel>
                                     <FormControl>
                                       <Input
                                         type="number"
                                         step="0.01"
                                         {...field}
                                         onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
-                                        className="text-sm"
+                                        className="dashboard-control rounded-lg text-sm"
                                       />
                                     </FormControl>
                                     <FormMessage />
@@ -562,8 +566,8 @@ export function ModernEditPurchaseOrderForm({
                               />
                               <div className="flex items-end gap-2">
                                 <div className="flex-1">
-                                  <FormLabel className="text-sm text-slate-700">Line Total</FormLabel>
-                                  <div className="text-sm font-medium text-slate-900 mt-2">
+                                  <FormLabel className="text-sm text-[var(--dash-text-muted)]">Line Total</FormLabel>
+                                  <div className="mt-2 text-sm font-medium text-[var(--dash-text)]">
                                     ${((line.orderedQuantity * line.unitCost) - (line.discount || 0) + line.taxAmount).toFixed(2)}
                                   </div>
                                 </div>
@@ -573,7 +577,7 @@ export function ModernEditPurchaseOrderForm({
                                     onClick={() => removeLineItem(index)}
                                     variant="ghost"
                                     size="sm"
-                                    className="text-red-600 hover:bg-red-50"
+                                    className="rounded-md text-rose-600 hover:bg-rose-50 dark:text-rose-400 dark:hover:bg-rose-950/40"
                                   >
                                     <Trash2 className="h-4 w-4" />
                                   </Button>
@@ -586,20 +590,20 @@ export function ModernEditPurchaseOrderForm({
                     </div>
 
                     {/* Summary */}
-                    <Card className="bg-gradient-to-r from-blue-50 to-indigo-50 border-blue-200">
+                    <Card className="rounded-lg border border-[var(--dash-border-subtle)] bg-[rgba(24,38,45,0.58)]">
                       <CardContent className="p-4">
                         <div className="grid grid-cols-3 gap-4 text-sm">
                           <div>
-                            <div className="text-slate-600">Subtotal</div>
-                            <div className="font-semibold text-slate-900">${subtotal.toFixed(2)}</div>
+                            <div className="text-[var(--dash-text-soft)]">Subtotal</div>
+                            <div className="font-semibold text-[var(--dash-text)]">${subtotal.toFixed(2)}</div>
                           </div>
                           <div>
-                            <div className="text-slate-600">Tax Total</div>
-                            <div className="font-semibold text-slate-900">${taxTotal.toFixed(2)}</div>
+                            <div className="text-[var(--dash-text-soft)]">Tax Total</div>
+                            <div className="font-semibold text-[var(--dash-text)]">${taxTotal.toFixed(2)}</div>
                           </div>
                           <div>
-                            <div className="text-slate-600">Total</div>
-                            <div className="font-semibold text-lg text-blue-900">${total.toFixed(2)}</div>
+                            <div className="text-[var(--dash-text-soft)]">Total</div>
+                            <div className="text-lg font-semibold text-[var(--dash-info)]">${total.toFixed(2)}</div>
                           </div>
                         </div>
                       </CardContent>
@@ -616,11 +620,11 @@ export function ModernEditPurchaseOrderForm({
                         name="shippingMethod"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel className="text-slate-700 font-medium">Shipping Method</FormLabel>
+                            <FormLabel className="font-medium text-[var(--dash-text-muted)]">Shipping Method</FormLabel>
                             <FormControl>
                               <Input
                                 {...field}
-                                className="border-slate-200 focus:border-blue-500 focus:ring-blue-500/20"
+                                className="dashboard-control rounded-lg"
                                 placeholder="e.g., Standard, Express"
                               />
                             </FormControl>
@@ -633,14 +637,14 @@ export function ModernEditPurchaseOrderForm({
                         name="shippingCost"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel className="text-slate-700 font-medium">Shipping Cost</FormLabel>
+                            <FormLabel className="font-medium text-[var(--dash-text-muted)]">Shipping Cost</FormLabel>
                             <FormControl>
                               <Input
                                 type="number"
                                 step="0.01"
                                 {...field}
                                 onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
-                                className="border-slate-200 focus:border-blue-500 focus:ring-blue-500/20"
+                                className="dashboard-control rounded-lg"
                               />
                             </FormControl>
                             <FormMessage />
@@ -654,11 +658,11 @@ export function ModernEditPurchaseOrderForm({
                         name="paymentTerms"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel className="text-slate-700 font-medium">Payment Terms</FormLabel>
+                            <FormLabel className="font-medium text-[var(--dash-text-muted)]">Payment Terms</FormLabel>
                             <FormControl>
                               <Input
                                 {...field}
-                                className="border-slate-200 focus:border-blue-500 focus:ring-blue-500/20"
+                                className="dashboard-control rounded-lg"
                                 placeholder="e.g., Net 30"
                               />
                             </FormControl>
@@ -671,14 +675,14 @@ export function ModernEditPurchaseOrderForm({
                         name="discount"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel className="text-slate-700 font-medium">Order Discount</FormLabel>
+                            <FormLabel className="font-medium text-[var(--dash-text-muted)]">Order Discount</FormLabel>
                             <FormControl>
                               <Input
                                 type="number"
                                 step="0.01"
                                 {...field}
                                 onChange={(e) => field.onChange(parseFloat(e.target.value) || 0)}
-                                className="border-slate-200 focus:border-blue-500 focus:ring-blue-500/20"
+                                className="dashboard-control rounded-lg"
                               />
                             </FormControl>
                             <FormMessage />
@@ -691,11 +695,11 @@ export function ModernEditPurchaseOrderForm({
                       name="notes"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel className="text-slate-700 font-medium">Notes</FormLabel>
+                          <FormLabel className="font-medium text-[var(--dash-text-muted)]">Notes</FormLabel>
                           <FormControl>
                             <Textarea
                               {...field}
-                              className="border-slate-200 focus:border-blue-500 focus:ring-blue-500/20"
+                              className="dashboard-control rounded-lg"
                               placeholder="Public notes visible to supplier"
                               rows={3}
                             />
@@ -709,11 +713,11 @@ export function ModernEditPurchaseOrderForm({
                       name="internalNotes"
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel className="text-slate-700 font-medium">Internal Notes</FormLabel>
+                          <FormLabel className="font-medium text-[var(--dash-text-muted)]">Internal Notes</FormLabel>
                           <FormControl>
                             <Textarea
                               {...field}
-                              className="border-slate-200 focus:border-blue-500 focus:ring-blue-500/20"
+                              className="dashboard-control rounded-lg"
                               placeholder="Internal notes (not visible to supplier)"
                               rows={3}
                             />
@@ -724,38 +728,38 @@ export function ModernEditPurchaseOrderForm({
                     />
 
                     {/* Final Summary */}
-                    <Card className="bg-gradient-to-r from-green-50 to-emerald-50 border-green-200">
+                    <Card className="rounded-lg border border-[var(--dash-border-subtle)] bg-[rgba(24,38,45,0.58)]">
                       <CardHeader>
-                        <CardTitle className="text-green-900">Order Summary</CardTitle>
+                        <CardTitle className="text-[var(--dash-text)]">Order Summary</CardTitle>
                       </CardHeader>
                       <CardContent>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
                           <div>
                             <div className="space-y-2">
                               <div className="flex justify-between">
-                                <span className="text-slate-600">Subtotal:</span>
+                                <span className="text-[var(--dash-text-soft)]">Subtotal:</span>
                                 <span className="font-medium">${subtotal.toFixed(2)}</span>
                               </div>
                               <div className="flex justify-between">
-                                <span className="text-slate-600">Tax:</span>
+                                <span className="text-[var(--dash-text-soft)]">Tax:</span>
                                 <span className="font-medium">${taxTotal.toFixed(2)}</span>
                               </div>
                               <div className="flex justify-between">
-                                <span className="text-slate-600">Shipping:</span>
+                                <span className="text-[var(--dash-text-soft)]">Shipping:</span>
                                 <span className="font-medium">${(watchedShippingCost || 0).toFixed(2)}</span>
                               </div>
                               <div className="flex justify-between">
-                                <span className="text-slate-600">Discount:</span>
+                                <span className="text-[var(--dash-text-soft)]">Discount:</span>
                                 <span className="font-medium">-${(watchedDiscount || 0).toFixed(2)}</span>
                               </div>
                               <div className="flex justify-between border-t pt-2">
-                                <span className="font-semibold text-green-900">Total:</span>
-                                <span className="font-bold text-lg text-green-900">${total.toFixed(2)}</span>
+                                <span className="font-semibold text-[var(--dash-text)]">Total:</span>
+                                <span className="text-lg font-bold text-[var(--dash-success)]">${total.toFixed(2)}</span>
                               </div>
                             </div>
                           </div>
                           <div>
-                            <div className="text-xs text-slate-600 space-y-1">
+                            <div className="space-y-1 text-xs text-[var(--dash-text-soft)]">
                               <div><span className="font-medium">Items:</span> {watchedLines.length}</div>
                               <div><span className="font-medium">Supplier:</span> {selectedSupplier?.name}</div>
                               <div><span className="font-medium">Location:</span> {selectedLocation?.name}</div>
@@ -768,13 +772,13 @@ export function ModernEditPurchaseOrderForm({
                 )}
 
                 {/* Navigation Buttons */}
-                <div className="flex justify-between pt-6 border-t border-slate-200">
+                <div className="flex justify-between border-t border-[var(--dash-border-subtle)] pt-6">
                   <Button
                     type="button"
                     variant="outline"
                     onClick={prevStep}
                     disabled={currentStep === 0}
-                    className="min-w-24"
+                    className="dashboard-button-secondary min-w-24 rounded-lg"
                   >
                     Previous
                   </Button>
@@ -784,7 +788,7 @@ export function ModernEditPurchaseOrderForm({
                       <Button
                         type="button"
                         onClick={nextStep}
-                        className="min-w-24 bg-blue-600 hover:bg-blue-700"
+                        className="dashboard-button-primary min-w-24 rounded-lg"
                       >
                         Next
                       </Button>
@@ -792,7 +796,7 @@ export function ModernEditPurchaseOrderForm({
                       <Button
                         type="submit"
                         disabled={isPending}
-                        className="min-w-32 bg-green-600 hover:bg-green-700"
+                        className="dashboard-button-primary min-w-32 rounded-lg"
                       >
                         {isPending ? (
                           <div className="flex items-center gap-2">

@@ -1,4 +1,6 @@
 import { signIn, auth } from "@/auth"
+import { getRequestLocale } from "@/i18n/server-routing"
+import { localizePath } from "@/i18n/routing"
 import { redirect } from "next/navigation"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -11,13 +13,18 @@ export default async function SignInPage({
   searchParams: Promise<{ callbackUrl?: string; error?: string }>
 }) {
   const session = await auth()
+  const locale = await getRequestLocale()
 
   if (session) {
-    redirect("/dashboard")
+    redirect(localizePath("/dashboard", locale))
   }
 
   // Await searchParams in Next.js 15
   const params = await searchParams
+  const redirectTo =
+    params.callbackUrl?.startsWith("/") && !params.callbackUrl.startsWith("//")
+      ? localizePath(params.callbackUrl, locale)
+      : localizePath("/dashboard", locale)
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-gray-50 py-12 px-4 sm:px-6 lg:px-8">
@@ -43,7 +50,7 @@ export default async function SignInPage({
               await signIn("credentials", {
                 email: formData.get("email") as string,
                 password: formData.get("password") as string,
-                redirectTo: params.callbackUrl || "/dashboard",
+                redirectTo,
               })
             }}
             className="space-y-4"
@@ -92,7 +99,7 @@ export default async function SignInPage({
             action={async () => {
               "use server"
               await signIn("google", {
-                redirectTo: params.callbackUrl || "/dashboard",
+                redirectTo,
               })
             }}
           >
@@ -121,7 +128,7 @@ export default async function SignInPage({
 
           <div className="text-center text-sm text-gray-600">
             Don't have an account?{" "}
-            <a href="/auth/register" className="font-medium text-primary hover:underline">
+            <a href={localizePath("/register", locale)} className="font-medium text-primary hover:underline">
               Contact your administrator
             </a>
           </div>

@@ -1,6 +1,6 @@
 'use client'
 
-import { updatePurchaseOrder } from '@/actions/purchaseOrders/updatePurchaseOrder'
+import { updatePurchaseOrder } from '@/actions/purchaseOrderWorkflow/purchaseOrderSystemAction'
 import type {
   PurchaseOrderResponse,
   PurchaseOrderWithRelations,
@@ -17,10 +17,11 @@ export function useUpdatePurchaseOrderHook() {
   const qc = useQueryClient()
 
   return useMutation({
+    meta: { operation: 'update', entity: 'Purchase Order' },
     mutationFn: async (payload: UpdatePurchaseOrderDTO) => {
       const res = await updatePurchaseOrder(payload)
       if (!res?.success) {
-        throw new Error(res?.message || 'Failed to update purchase order')
+        throw new Error(res?.error || 'Failed to update purchase order')
       }
       return res as PurchaseOrderResponse<PurchaseOrderWithRelations>
     },

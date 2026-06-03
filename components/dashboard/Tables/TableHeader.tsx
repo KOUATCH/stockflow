@@ -1,4 +1,6 @@
 "use client";
+
+import { notify } from "@/lib/notifications/notify"
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import * as XLSX from "xlsx";
@@ -26,7 +28,6 @@ import {
   Options,
   SelectValue,
 } from "react-tailwindcss-select/dist/components/type";
-import { toast } from "sonner";
 ;
 
 type TableHeaderProps = {
@@ -35,7 +36,7 @@ type TableHeaderProps = {
   linkTitle: string;
   data: any;
   model: string;
-    modalForm:ReactNode,
+  modalForm?: ReactNode;
   showImport?: boolean;
 };
 export default function TableHeader({
@@ -127,12 +128,14 @@ export default function TableHeader({
             if (model === "category") {
               const categories = json.map((item: any) => {
                 return {
+                  titleEn: item.Title,
                   title: item.Title,
                   slug: generateSlug(item.Title),
+                  descriptionEn: item.Description,
                   description: item.Description,
                   imageUrl: item.Image,
-                  mainCategoryId: item.mainCategoryId,
-                  status: true,
+                  parentId: item.mainCategoryId,
+                  isActive: true,
                 };
               });
               await createBulkCategories(categories);
@@ -140,11 +143,11 @@ export default function TableHeader({
             setLoading(false);
             setUploadSuccess(true);
             // window.location.reload();
-            // toast.success("All Data Synced Successfully with No errors 👍");
+            // notify.success("All Data Synced Successfully with No errors 👍");
           } catch (error) {
             setUploadSuccess(false);
             setLoading(false);
-            toast.error("Something went wrong, Please Try again 😢");
+            notify.error("Something went wrong, Please Try again 😢");
             console.log(error);
           }
         }

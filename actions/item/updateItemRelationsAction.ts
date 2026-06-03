@@ -1,14 +1,14 @@
+import { inventoryAction } from "@/lib/error-handling";
+import type { ServerActionResult } from "@/lib/error-handling/types";
 import { itemStandardInclude } from "@/lib/item/includes"
-import { ActionResult, ItemWithRelations, revalidateItems, updateRelationsSchema } from "@/lib/item/schemas"
+import { ItemWithRelations, updateRelationsSchema } from "@/lib/item/schemas"
+import { revalidateItem } from "@/lib/item/revalidation"
 import { db } from "@/prisma/db"
 import { Prisma } from "@prisma/client"
 
-
 // Update: Relations
-export async function updateItemRelationsAction(
-  input: unknown
-): Promise<ActionResult<ItemWithRelations>> {
-  try {
+export const updateItemRelationsAction = inventoryAction(
+  async (input: unknown): Promise<ServerActionResult<ItemWithRelations>> => {
     const data = updateRelationsSchema.parse(input)
 
     const updated = await db.item.update({
@@ -22,16 +22,16 @@ export async function updateItemRelationsAction(
       include: itemStandardInclude,
     })
 
-    revalidateItems(updated.id, data.organizationId)
-    return { success: true, data: updated, message: 'Item relations updated' }
-  } catch (error) {
-    console.error('updateItemRelationsAction error:', error)
-    const message =
-      error instanceof Prisma.PrismaClientKnownRequestError
-        ? `Database error: ${error.code}`
-        : error instanceof Error
-        ? error.message
-        : 'Failed to update relations'
-    return { success: false, error: message }
+    revalidateItem(updated.id, data.organizationId)
+    return { success: true, data: updated }
+  },
+  {
+    actionName: 'updateItemRelationsAction',
+    component: 'InventoryManagement',
+    businessContext: {
+      domain: 'inventory',
+      operation: 'update',
+      resourceType: 'item'
+    }
   }
-}
+)

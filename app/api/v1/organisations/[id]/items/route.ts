@@ -1,5 +1,7 @@
 import { db } from "@/prisma/db";
+import { requireApiSessionForOrg } from "@/lib/security/server-authz";
 import { NextRequest } from "next/server";
+import { NextResponse } from "next/server";
 
 
 export const GET = async (
@@ -10,10 +12,15 @@ export const GET = async (
 
     try {
         const orgId = (await params).id;
+        const authz = await requireApiSessionForOrg(orgId);
+        if (authz.error) {
+            return NextResponse.json({ error: authz.error }, { status: authz.status });
+        }
+
         // parse pagination parameters from url
         const searchParams = request.nextUrl.searchParams;
-        const pageParams = parseInt(searchParams.get('page') || '1', 10);
-        const limitParams = parseInt(searchParams.get('limit') || '10', 10);
+        const pageParams = Math.max(parseInt(searchParams.get('page') || '1', 10) || 1, 1);
+        const limitParams = Math.min(Math.max(parseInt(searchParams.get('limit') || '10', 10) || 10, 1), 100);
 
 
         // check if pagination is requested
@@ -87,15 +94,5 @@ export const GET = async (
     }
 }
 export async function POST(request: Request) {
-    // Parse the request body
-    const body = await request.json();
-    const { name } = body;
-
-    // e.g. Insert new user into your DB
-    const newUser = { id: Date.now(), name };
-
-    return new Response(JSON.stringify(newUser), {
-        status: 201,
-        headers: { 'Content-Type': 'application/json' }
-    });
+    return NextResponse.json({ error: "Method not allowed" }, { status: 405 });
 }

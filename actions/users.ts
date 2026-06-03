@@ -3,37 +3,43 @@
 import { db } from "@/prisma/db";
 import { CreateUserProps } from "@/types/types";
 import { hashPassword, verifyPassword } from "@/lib/password";
+import { getAuthenticatedUser } from "@/config/useAuth";
+import { hasAppPermission, safeUserSelect } from "@/lib/security/server-authz";
+import { checkPasswordPolicy } from "@/services/auth/password-policy";
+
+const displayUserName = (user: { firstName: string | null; lastName: string | null; email: string }) =>
+  [user.firstName, user.lastName].filter(Boolean).join(" ") || user.email;
+
+const withDisplayRoleName = <T extends { nameEn: string; nameFr: string | null }>(role: T) => ({
+  ...role,
+  name: role.nameEn || role.nameFr || "",
+});
+
+async function requireUserPermission(permission: string) {
+  const authUser = await getAuthenticatedUser()
+  if (!hasAppPermission(authUser, permission)) {
+    throw new Error("Forbidden")
+  }
+  return authUser
+}
 
 // Get all users for an organization
 export async function getUsers(organizationId: string) {
   try {
+    const authUser = await requireUserPermission("users.read")
+
+    if (organizationId !== authUser.organizationId) {
+      return {
+        error: "Forbidden",
+        success: false,
+      }
+    }
 
     const users = await db.user.findMany({
       where: {
-        organizationId,
+        organizationId: authUser.organizationId,
       },
-      select: {
-        id: true,
-        name: true,
-        firstName: true,
-        lastName: true,
-        email: true,
-        phone: true,
-        image: true,
-        jobTitle: true,
-        isActive: true,
-        isVerified: true,
-        createdAt: true,
-        updatedAt: true,
-        roles: {
-          select: {
-            id: true,
-            name: true,
-            code: true,
-            description: true,
-          },
-        },
-      },
+      select: safeUserSelect,
       orderBy: {
         createdAt: 'desc',
       },
@@ -41,7 +47,11 @@ export async function getUsers(organizationId: string) {
 
     return {
       success: true,
-      data: users,
+      data: users.map((user) => ({
+        ...user,
+        name: displayUserName(user),
+        roles: user.roles.map(withDisplayRoleName),
+      })),
     };
   } catch (error) {
     console.error("Error fetching users:", error);
@@ -55,19 +65,20 @@ export async function getUsers(organizationId: string) {
 // Get a single user by ID
 export async function getUser(userId: string) {
   try {
+    const authUser = await getAuthenticatedUser()
+    const canReadUsers = hasAppPermission(authUser, "users.read")
 
-    const user = await db.user.findUnique({
-      where: { id: userId },
-      include: {
-        roles: {
-          select: {
-            id: true,
-            name: true,
-            code: true,
-            description: true,
-            permissions: true,
-          },
-        },
+    if (userId !== authUser.id && !canReadUsers) {
+      return {
+        error: "Forbidden",
+        success: false,
+      }
+    }
+
+    const user = await db.user.findFirst({
+      where: { id: userId, organizationId: authUser.organizationId },
+      select: {
+        ...safeUserSelect,
         organization: {
           select: {
             id: true,
@@ -88,7 +99,11 @@ export async function getUser(userId: string) {
 
     return {
       success: true,
-      data: user,
+      data: {
+        ...user,
+        name: displayUserName(user),
+        roles: user.roles.map(withDisplayRoleName),
+      },
     };
   } catch (error) {
     console.error("Error fetching user:", error);
@@ -102,6 +117,7 @@ export async function getUser(userId: string) {
 // Create a new user directly
 export async function createUser(data: CreateUserProps) {
   try {
+    const authUser = await requireUserPermission("users.create")
 
     const {
       firstName,
@@ -109,7 +125,6 @@ export async function createUser(data: CreateUserProps) {
       email,
       phone,
       image,
-      organizationId,
       roleId,
       password,
       jobTitle,
@@ -118,8 +133,9 @@ export async function createUser(data: CreateUserProps) {
 
 
     // Check if user already exists
-    const existingUser = await db.user.findUnique({
-      where: { email },
+    const normalizedEmail = email.trim().toLowerCase()
+    const existingUser = await db.user.findFirst({
+      where: { email: { equals: normalizedEmail, mode: "insensitive" } },
     });
 
     if (existingUser) {
@@ -130,15 +146,23 @@ export async function createUser(data: CreateUserProps) {
     }
 
     // Verify the role exists and belongs to the organization
-    const role = await db.role.findUnique({
-      where: { id: roleId },
+    const role = await db.role.findFirst({
+      where: { id: roleId, organizationId: authUser.organizationId },
     });
 
-    if (!role || role.organizationId !== organizationId) {
+    if (!role) {
       return {
         error: "Invalid role selected",
         success: false,
       };
+    }
+
+    const passwordPolicy = await checkPasswordPolicy({ password, email: normalizedEmail })
+    if (!passwordPolicy.ok) {
+      return {
+        error: passwordPolicy.message,
+        success: false,
+      }
     }
 
     // Hash the password
@@ -149,14 +173,13 @@ export async function createUser(data: CreateUserProps) {
       data: {
         firstName,
         lastName,
-        name: `${firstName} ${lastName}`,
-        email,
+        email: normalizedEmail,
         phone,
         image,
         password: hashedPassword,
         jobTitle,
         isActive,
-        organizationId,
+        organizationId: authUser.organizationId,
         isVerified: true, // Auto-verify created users
         roles: {
           connect: { id: roleId },
@@ -166,7 +189,8 @@ export async function createUser(data: CreateUserProps) {
         roles: {
           select: {
             id: true,
-            name: true,
+            nameEn: true,
+            nameFr: true,
             code: true,
             description: true,
           },
@@ -174,18 +198,25 @@ export async function createUser(data: CreateUserProps) {
       },
     });
 
+    await db.passwordHistory.create({
+      data: {
+        userId: newUser.id,
+        passwordHash: hashedPassword,
+      },
+    })
+
     return {
       success: true,
       message: "User created successfully",
       data: {
         id: newUser.id,
         email: newUser.email,
-        name: newUser.name,
+        name: displayUserName(newUser),
         firstName: newUser.firstName,
         lastName: newUser.lastName,
         jobTitle: newUser.jobTitle,
         isActive: newUser.isActive,
-        roles: newUser.roles,
+        roles: newUser.roles.map(withDisplayRoleName),
       },
     };
   } catch (error) {
@@ -209,10 +240,11 @@ export async function updateUser(
   }
 ) {
   try {
+    const authUser = await requireUserPermission("users.update")
 
     // Get the existing user
-    const existingUser = await db.user.findUnique({
-      where: { id: userId },
+    const existingUser = await db.user.findFirst({
+      where: { id: userId, organizationId: authUser.organizationId },
       include: { roles: true },
     });
 
@@ -232,17 +264,11 @@ export async function updateUser(
     if (data.jobTitle !== undefined) updateData.jobTitle = data.jobTitle;
     if (data.image !== undefined) updateData.image = data.image;
 
-    // Update name if first or last name changed
-    if (data.firstName || data.lastName) {
-      updateData.name = `${data.firstName || existingUser.firstName} ${data.lastName || existingUser.lastName}`;
-    }
-
     const updatedUser = await db.user.update({
       where: { id: userId },
       data: updateData,
       select: {
         id: true,
-        name: true,
         firstName: true,
         lastName: true,
         email: true,
@@ -255,7 +281,8 @@ export async function updateUser(
         roles: {
           select: {
             id: true,
-            name: true,
+            nameEn: true,
+            nameFr: true,
             code: true,
             description: true,
           },
@@ -266,7 +293,11 @@ export async function updateUser(
     return {
       success: true,
       message: "User updated successfully",
-      data: updatedUser,
+      data: {
+        ...updatedUser,
+        name: displayUserName(updatedUser),
+        roles: updatedUser.roles.map(withDisplayRoleName),
+      },
     };
   } catch (error) {
     console.error("Error updating user:", error);
@@ -280,10 +311,11 @@ export async function updateUser(
 // Deactivate/Activate user
 export async function toggleUserStatus(userId: string, isActive: boolean) {
   try {
+    const authUser = await requireUserPermission(isActive ? "users.activate" : "users.deactivate")
 
     // Get the user with roles
-    const user = await db.user.findUnique({
-      where: { id: userId },
+    const user = await db.user.findFirst({
+      where: { id: userId, organizationId: authUser.organizationId },
       include: { roles: true },
     });
 
@@ -329,7 +361,8 @@ export async function toggleUserStatus(userId: string, isActive: boolean) {
       data: { isActive },
       select: {
         id: true,
-        name: true,
+        firstName: true,
+        lastName: true,
         email: true,
         isActive: true,
       },
@@ -338,7 +371,10 @@ export async function toggleUserStatus(userId: string, isActive: boolean) {
     return {
       success: true,
       message: `User ${isActive ? 'activated' : 'deactivated'} successfully`,
-      data: updatedUser,
+      data: {
+        ...updatedUser,
+        name: displayUserName(updatedUser),
+      },
     };
   } catch (error) {
     console.error("Error toggling user status:", error);
@@ -352,10 +388,11 @@ export async function toggleUserStatus(userId: string, isActive: boolean) {
 // Delete user (soft delete by deactivation)
 export async function deleteUser(userId: string) {
   try {
+    const authUser = await requireUserPermission("users.delete")
 
     // Get the user with roles
-    const user = await db.user.findUnique({
-      where: { id: userId },
+    const user = await db.user.findFirst({
+      where: { id: userId, organizationId: authUser.organizationId },
       include: { roles: true },
     });
 
@@ -427,9 +464,17 @@ export async function updateUserPassword(
   }
 ) {
   try {
+    const authUser = await getAuthenticatedUser()
 
-    const user = await db.user.findUnique({
-      where: { id: userId },
+    if (userId !== authUser.id && !hasAppPermission(authUser, "users.password.reset")) {
+      return {
+        error: "Forbidden",
+        success: false,
+      }
+    }
+
+    const user = await db.user.findFirst({
+      where: { id: userId, organizationId: authUser.organizationId },
     });
 
     if (!user) {
@@ -440,7 +485,7 @@ export async function updateUserPassword(
     }
 
     // If current password is provided, verify it
-    if (data.currentPassword) {
+    if (userId === authUser.id && data.currentPassword) {
       const isValidPassword = await verifyPassword(user.password, data.currentPassword);
       if (!isValidPassword) {
         return {
@@ -450,12 +495,41 @@ export async function updateUserPassword(
       }
     }
 
+    if (userId === authUser.id && !data.currentPassword) {
+      return {
+        error: "Current password is required",
+        success: false,
+      }
+    }
+
+    const passwordPolicy = await checkPasswordPolicy({
+      password: data.newPassword,
+      userId: user.id,
+      email: user.email,
+    })
+
+    if (!passwordPolicy.ok) {
+      return {
+        error: passwordPolicy.message,
+        success: false,
+      }
+    }
+
     // Hash new password
     const hashedPassword = await hashPassword(data.newPassword);
 
-    await db.user.update({
-      where: { id: userId },
-      data: { password: hashedPassword },
+    await db.$transaction(async (tx) => {
+      await tx.user.update({
+        where: { id: userId },
+        data: { password: hashedPassword },
+      })
+
+      await tx.passwordHistory.create({
+        data: {
+          userId,
+          passwordHash: hashedPassword,
+        },
+      })
     });
 
     return {

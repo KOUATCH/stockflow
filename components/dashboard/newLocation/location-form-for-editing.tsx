@@ -1,13 +1,12 @@
 "use client"
 
+import { notify } from "@/lib/notifications/notify"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { Hash, Package, Settings, Warehouse } from "lucide-react"
 import { useEffect, useState } from "react"
 import { useForm } from "react-hook-form"
-import { toast } from "sonner"
-
 import { useUpdateLocationBasicInfo, useUpdateLocationTracking } from "@/hooks/locationHooks/use-form-mutations"
 import { BasicInfoFormValues, basicInfoSchema, LocationDTO, TrackingFormValues, trackingSchema } from "@/types/location"
 import { BasicInfoForm } from "./forms/basic-info-form"
@@ -134,7 +133,7 @@ export default function LocationFormForEditing({
   const createSubmissionHandler = <T,>(mutation: any, successMessage: string, errorMessage: string) => {
     return async (data: T) => {
       if (!locationData) {
-        toast.error("Location data is missing. Cannot update location.")
+        notify.error("Location data is missing. Cannot update location.")
         return
       }
 
@@ -152,18 +151,18 @@ export default function LocationFormForEditing({
           },
           {
             onSuccess: () => {
-              toast.success(successMessage)
+              notify.success(successMessage)
               onSuccess?.()
             },
             onError: (error: any) => {
-              toast.error(errorMessage, {
+              notify.error(errorMessage, {
                 description: error?.message || "Unknown error occurred",
               })
             },
           },
         )
       } catch (error) {
-        toast.error(errorMessage)
+        notify.error(errorMessage)
       } finally {
         setIsSubmitting(false)
       }

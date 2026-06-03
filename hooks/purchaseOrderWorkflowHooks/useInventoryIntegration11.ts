@@ -1,8 +1,7 @@
 "use client"
 
+import { notify } from "@/lib/notifications/notify"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { toast } from "sonner"
-
 export type InventoryLevel = {
   id: string
   itemId: string
@@ -97,6 +96,7 @@ export function useInventoryIntegration(organizationId?: string) {
 
   // Reserve inventory for purchase order
   const reserveInventoryMutation = useMutation({
+    meta: { operation: 'reserve', entity: 'Inventory', suppressSuccessNotification: true, suppressErrorNotification: true },
     mutationFn: async (reservations: { itemId: string; locationId: string; quantity: number }[]) => {
       const response = await fetch("/api/inventory/reserve", {
         method: "POST",
@@ -107,16 +107,17 @@ export function useInventoryIntegration(organizationId?: string) {
       return response.json()
     },
     onSuccess: () => {
-      toast.success("Inventory reserved successfully")
+      notify.success("Inventory reserved successfully")
       invalidateInventoryQueries()
     },
     onError: (error) => {
-      toast.error(`Failed to reserve inventory: ${error.message}`)
+      notify.error(`Failed to reserve inventory: ${error.message}`)
     },
   })
 
   // Release inventory reservations
   const releaseInventoryMutation = useMutation({
+    meta: { operation: 'release', entity: 'Inventory', suppressSuccessNotification: true, suppressErrorNotification: true },
     mutationFn: async (reservations: { itemId: string; locationId: string; quantity: number }[]) => {
       const response = await fetch("/api/inventory/release", {
         method: "POST",
@@ -127,11 +128,11 @@ export function useInventoryIntegration(organizationId?: string) {
       return response.json()
     },
     onSuccess: () => {
-      toast.success("Inventory reservations released")
+      notify.success("Inventory reservations released")
       invalidateInventoryQueries()
     },
     onError: (error) => {
-      toast.error(`Failed to release inventory: ${error.message}`)
+      notify.error(`Failed to release inventory: ${error.message}`)
     },
   })
 

@@ -1,56 +1,35 @@
 "use server"
 
-import { getAuthenticatedUser } from "@/lib/auth-server"
-import { db } from "@/prisma/db"
+import { deleteManagedTaxRate } from "@/actions/taxRate/tax-rate-management-actions"
+import { getAuthenticatedUser } from "@/config/useAuth"
 
 const deleteTaxRate = async (id: string) => {
   try {
-    // Use a transaction for atomic operations
-    return await db.$transaction(async (tx) => {
-      const user = await getAuthenticatedUser()
-      // Check if the user is authenticated and has an organizationId
-      if (!user || !user.organizationId) {
-        return {
-          error: `User not found`,
-          success: false,
-          data: null,
-        }
-      }
-      //check if the TaxRate already exists
-      const existingTaxRate = await tx.taxRate.findUnique({
-        where: {
-          id: id,
-          organizationId: user.organizationId,
-        },
-      })
+    const user = await getAuthenticatedUser()
 
-      if (!existingTaxRate) {
-        return {
-          error: `Something went wrong, TaxRate not found`,
-          success: false,
-          data: null,
-        }
-      }
-
-      const deletedTaxRate = await tx.taxRate.delete({
-        where: {
-          id: id,
-        },
-      })
-
+    if (!user?.organizationId) {
       return {
-        success: true,
-        error: null,
-        data: deletedTaxRate,
+        error: "Organization is required",
+        success: false,
+        data: null,
       }
-    })
+    }
+
+    const result = await deleteManagedTaxRate(user.organizationId, id)
+
+    return {
+      success: result.success,
+      error: result.error ?? null,
+      data: result.data ?? null,
+    }
   } catch (error) {
     console.error("Error deleting TaxRate:", error)
     return {
-      error: `Something went wrong, Please try again`,
+      error: error instanceof Error ? error.message : "Something went wrong, please try again",
       success: false,
       data: null,
     }
   }
 }
+
 export default deleteTaxRate

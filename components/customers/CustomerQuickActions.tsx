@@ -4,6 +4,8 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Card, CardContent } from "@/components/ui/card"
 import { useNotifications } from "@/components/notifications/NotificationProvider"
+import { getLocaleFromPathname, localizePath } from "@/i18n/routing"
+import { DEFAULT_LOCALE } from "@/types/bilingual"
 import { useRouter, usePathname } from "next/navigation"
 import {
   User,
@@ -32,13 +34,15 @@ interface CustomerQuickActionsProps {
 export function CustomerQuickActions({ customer, currentPage }: CustomerQuickActionsProps) {
   const router = useRouter()
   const pathname = usePathname()
+  const locale = getLocaleFromPathname(pathname) ?? DEFAULT_LOCALE
+  const localizedHref = (href: string) => localizePath(href, locale)
   const { info, success, warning } = useNotifications()
 
   const handleNavigation = (page: string, pageName: string) => {
     if (pathname.includes(page)) return // Already on this page
 
     info(`Navigate to ${pageName}`, `Opening ${customer.name}'s ${pageName.toLowerCase()}`)
-    router.push(`/dashboard/customers/${customer.id}${page === 'profile' ? '' : `/${page}`}`)
+    router.push(localizedHref(`/dashboard/customers/${customer.id}${page === 'profile' ? '' : `/${page}`}`))
   }
 
   const handleContact = (type: 'email' | 'phone') => {
@@ -67,7 +71,7 @@ export function CustomerQuickActions({ customer, currentPage }: CustomerQuickAct
 
   const handleCreateOrder = () => {
     info("Create Order", `Redirecting to create order for ${customer.name}`)
-    router.push(`/dashboard/sales/new?customerId=${customer.id}`)
+    router.push(localizedHref(`/dashboard/sales/new?customerId=${customer.id}`))
   }
 
   return (
@@ -80,7 +84,7 @@ export function CustomerQuickActions({ customer, currentPage }: CustomerQuickAct
             size="sm"
             onClick={() => {
               info("Back to Customers", "Returning to customer list")
-              router.push("/dashboard/customers")
+              router.push(localizedHref("/dashboard/customers"))
             }}
             className="w-full justify-start bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm border-slate-200 dark:border-slate-700"
           >

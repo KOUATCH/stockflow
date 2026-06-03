@@ -84,6 +84,7 @@ export function useAddCashToDrawer() {
   const { cashOperation, formError, operationStart } = useNotifications()
 
   return useMutation({
+    meta: { operation: 'add', entity: 'Cash To Drawer', suppressSuccessNotification: true, suppressErrorNotification: true },
     mutationFn: (operation: CashDrawerOperation) => {
       operationStart("Adding Cash")
       return addCashToDrawer(operation)
@@ -114,6 +115,7 @@ export function useRemoveCashFromDrawer() {
   const { cashOperation, formError, operationStart } = useNotifications()
 
   return useMutation({
+    meta: { operation: 'delete', entity: 'Cash From Drawer' , suppressSuccessNotification: true, suppressErrorNotification: true },
     mutationFn: (operation: CashDrawerOperation) => {
       operationStart("Removing Cash")
       return removeCashFromDrawer(operation)
@@ -144,6 +146,7 @@ export function useReconcileCashDrawer() {
   const { reconciliationResult, formError, operationStart } = useNotifications()
 
   return useMutation({
+    meta: { operation: 'reconcile', entity: 'Cash Drawer', suppressSuccessNotification: true, suppressErrorNotification: true },
     mutationFn: (params: {
       drawerId: string
       countedAmount: number
@@ -180,6 +183,7 @@ export function useCreateCashDrawer() {
   const { formSuccess, formError, operationStart } = useNotifications()
 
   return useMutation({
+    meta: { operation: 'create', entity: 'Cash Drawer' , suppressSuccessNotification: true, suppressErrorNotification: true },
     mutationFn: (data: {
       name: string
       drawerNumber: string

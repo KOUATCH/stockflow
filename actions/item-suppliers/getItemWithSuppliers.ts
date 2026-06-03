@@ -21,11 +21,29 @@ export default async function getItemWithSuppliersById(id: string): Promise<Supp
   }
 
   try {
+    const toNumber = (value: any): number => {
+      if (value === null || value === undefined) return 0
+      if (typeof value === "number") return value
+      if (typeof value === "string") return Number(value) || 0
+      if (typeof value.toNumber === "function") return value.toNumber()
+      return Number(value) || 0
+    }
+
     const item = await db.item.findUnique({
       where: { id },
       select: {
         id: true,
-        name: true,
+        nameEn: true,
+        nameFr: true,
+        slug: true,
+        sku: true,
+        imageUrls: true,
+        thumbnail: true,
+        costPrice: true,
+        sellingPrice: true,
+        organizationId: true,
+        createdAt: true,
+        updatedAt: true,
         // supplierId:true,
         supplierItems: {
           select: {
@@ -63,25 +81,34 @@ export default async function getItemWithSuppliersById(id: string): Promise<Supp
     }
     }
 
-    const itemSuppliers: ItemWithSupplierDTO[] = (item.supplierItems ?? []).map((rel: any) => ({
+    const itemSuppliers = (item.supplierItems ?? []).map((rel: any) => ({
       id: rel.id,
+      name: item.nameEn ?? item.nameFr ?? item.sku,
+      slug: item.slug,
       itemId: rel.itemId,
       supplierId: rel.supplierId,
       isPreferred: rel.isPreferred,
-      supplierSku: rel.supplierSku ?? null,
+      supplierSku: rel.supplierSku ?? "",
       leadTime: rel.leadTimeDays ?? null,
       minOrderQty: rel.minOrderQuantity ?? null,
-      unitCost: rel.unitCost ?? null,
+      unitCost: rel.unitCost ? toNumber(rel.unitCost) : null,
       lastPurchaseDate: rel.lastPurchaseDate ?? null,
-      notes: rel.notes ?? null,
+      notes: rel.notes ?? "",
       createdAt: rel.createdAt,
       updatedAt: rel.updatedAt,
+      costPrice: toNumber(item.costPrice),
+      sellingPrice: toNumber(item.sellingPrice),
+      imageUrls: item.imageUrls?.[0] ?? "",
+      thumbnail: item.thumbnail,
+      organizationId: item.organizationId,
+      sku: item.sku,
+      supplierItems: rel,
       supplier: {
         id: rel.supplier?.id,
         name: rel.supplier?.name ?? rel.supplierName ?? "Unknown",
         email: rel.supplier?.email ?? null,
       },
-    }))
+    })) as ItemWithSupplierDTO[]
 
     return {
       success: true,

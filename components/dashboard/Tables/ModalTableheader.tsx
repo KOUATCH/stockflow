@@ -1,4 +1,6 @@
 "use client";
+
+import { notify } from "@/lib/notifications/notify"
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import * as XLSX from "xlsx";
@@ -25,7 +27,6 @@ import {
   Options,
   SelectValue,
 } from "react-tailwindcss-select/dist/components/type";
-import { toast } from "sonner";
 ;
 
 type TableHeaderProps = {
@@ -139,11 +140,11 @@ export default function ModalTableHeader({
             setLoading(false);
             setUploadSuccess(true);
             // window.location.reload();
-            // toast.success("All Data Synced Successfully with No errors 👍");
+            // notify.success("All Data Synced Successfully with No errors 👍");
           } catch (error) {
             setUploadSuccess(false);
             setLoading(false);
-            toast.error("Something went wrong, Please Try again 😢");
+            notify.error("Something went wrong, Please Try again 😢");
             console.log(error);
           }
         }

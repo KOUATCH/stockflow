@@ -1,5 +1,6 @@
 "use client"
 
+import { notify } from "@/lib/notifications/notify"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -45,15 +46,16 @@ import {
 import { useRouter } from "next/navigation"
 import { useForm } from "react-hook-form"
 import { useState, useCallback } from "react"
-import { toast } from "sonner"
 import { z } from "zod"
 import { generateSimpleSKU } from "@/lib/generateSKU"
 import ImageUploadButtonModernOriginal from "@/components/FormInputs/ImageUploadButtonModernOriginal"
 
 // Enhanced validation schema for items
 const itemCreationSchema = z.object({
-  name: z.string().min(1, "Product name is required").max(100, "Name must be less than 100 characters").trim(),
-  description: z.string().optional(),
+  nameEn: z.string().min(1, "English product name is required").max(100, "Name must be less than 100 characters").trim(),
+  nameFr: z.string().optional(),
+  descriptionEn: z.string().optional(),
+  descriptionFr: z.string().optional(),
   sku: z.string()
     .min(3, "SKU must be at least 3 characters")
     .max(50, "SKU must be less than 50 characters")
@@ -118,8 +120,10 @@ export function CreateItemForm({
   const form = useForm<ItemCreationFormData>({
     resolver: zodResolver(itemCreationSchema),
     defaultValues: {
-      name: "",
-      description: "",
+      nameEn: "",
+      nameFr: "",
+      descriptionEn: "",
+      descriptionFr: "",
       sku: "",
       barcode: "",
       costPrice: 0,
@@ -165,7 +169,7 @@ export function CreateItemForm({
   const generateSKU = useCallback(() => {
     const newSku = generateSimpleSKU(9, "ITEM")
     form.setValue("sku", newSku, { shouldValidate: true })
-    toast.success("SKU generated successfully")
+    notify.success("SKU generated successfully")
   }, [form])
 
   // Copy SKU to clipboard
@@ -174,9 +178,9 @@ export function CreateItemForm({
     if (currentSku) {
       try {
         await navigator.clipboard.writeText(currentSku)
-        toast.success("SKU copied to clipboard!")
+        notify.success("SKU copied to clipboard!")
       } catch (err) {
-        toast.error("Failed to copy SKU to clipboard")
+        notify.error("Failed to copy SKU to clipboard")
       }
     }
   }, [form])
@@ -189,7 +193,7 @@ export function CreateItemForm({
     : "0"
 
   // Generate preview initials
-  const itemName = form.watch("name")
+  const itemName = form.watch("nameEn")
   const itemSKU = form.watch("sku")
   const isActiveItem = form.watch("isActive")
 
@@ -267,16 +271,36 @@ export function CreateItemForm({
                           <div className="grid gap-6 md:grid-cols-2">
                             <FormField
                               control={form.control}
-                              name="name"
+                              name="nameEn"
                               render={({ field }) => (
                                 <FormItem>
                                   <FormLabel className="text-slate-700 dark:text-slate-300 font-medium flex items-center gap-2">
                                     <Package className="h-4 w-4" />
-                                    Product Name *
+                                    English Product Name *
                                   </FormLabel>
                                   <FormControl>
                                     <Input
                                       placeholder="Enter product name"
+                                      className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500"
+                                      {...field}
+                                    />
+                                  </FormControl>
+                                  <FormMessage />
+                                </FormItem>
+                              )}
+                            />
+
+                            <FormField
+                              control={form.control}
+                              name="nameFr"
+                              render={({ field }) => (
+                                <FormItem>
+                                  <FormLabel className="text-slate-700 dark:text-slate-300 font-medium">
+                                    French Product Name
+                                  </FormLabel>
+                                  <FormControl>
+                                    <Input
+                                      placeholder="Enter French product name"
                                       className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500"
                                       {...field}
                                     />
@@ -337,13 +361,31 @@ export function CreateItemForm({
 
                           <FormField
                             control={form.control}
-                            name="description"
+                            name="descriptionEn"
                             render={({ field }) => (
                               <FormItem>
-                                <FormLabel className="text-slate-700 dark:text-slate-300 font-medium">Product Description</FormLabel>
+                                <FormLabel className="text-slate-700 dark:text-slate-300 font-medium">English Product Description</FormLabel>
                                 <FormControl>
                                   <Textarea
                                     placeholder="Describe the product features, benefits, and details..."
+                                    className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500 min-h-[100px]"
+                                    {...field}
+                                  />
+                                </FormControl>
+                                <FormMessage />
+                              </FormItem>
+                            )}
+                          />
+
+                          <FormField
+                            control={form.control}
+                            name="descriptionFr"
+                            render={({ field }) => (
+                              <FormItem>
+                                <FormLabel className="text-slate-700 dark:text-slate-300 font-medium">French Product Description</FormLabel>
+                                <FormControl>
+                                  <Textarea
+                                    placeholder="Describe the product in French..."
                                     className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm border-slate-200 dark:border-slate-700 focus:ring-2 focus:ring-violet-500/20 focus:border-violet-500 min-h-[100px]"
                                     {...field}
                                   />

@@ -1,15 +1,18 @@
 "use client"
 
+import { notify } from "@/lib/notifications/notify"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { Checkbox } from "@/components/ui/checkbox"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { useToast } from "@/hooks/use-toast"
-import type { SupplierDTO, SupplierFilters } from "@/types/suppliers"
+import { getLocaleFromPathname, localizePath } from "@/i18n/routing"
+import { DEFAULT_LOCALE } from "@/types/bilingual"
+import type { SupplierDTO, SupplierFilters } from "@/types/suppliersSystemTypes"
 import { MoreVertical } from "lucide-react"
 import Link from "next/link"
+import { usePathname } from "next/navigation"
 import { useState, useTransition } from "react"
 
 export function SupplierTable({
@@ -23,7 +26,9 @@ export function SupplierTable({
   onToggleActive: (id: string, isActive: boolean) => Promise<void>
   onDelete: (id: string) => Promise<void>
 }) {
-  const { toast } = useToast()
+  const pathname = usePathname()
+  const locale = getLocaleFromPathname(pathname) ?? DEFAULT_LOCALE
+  const localizedHref = (href: string) => localizePath(href, locale)
   const [checked, setChecked] = useState<Record<string, boolean>>({})
   const [isPending, startTransition] = useTransition()
 
@@ -37,9 +42,9 @@ export function SupplierTable({
     startTransition(async () => {
       try {
         await onToggleActive(id, !curr)
-        toast({ title: !curr ? "Activated" : "Deactivated", description: "Supplier status updated." })
+        notify({ title: !curr ? "Activated" : "Deactivated", description: "Supplier status updated." })
       } catch (e: any) {
-        toast({ title: "Update failed", description: e?.message || "Please try again.", variant: "destructive" })
+        notify({ title: "Update failed", description: e?.message || "Please try again.", variant: "destructive" })
       }
     })
   }
@@ -48,9 +53,9 @@ export function SupplierTable({
     startTransition(async () => {
       try {
         await onDelete(id)
-        toast({ title: "Deleted", description: "Supplier removed." })
+        notify({ title: "Deleted", description: "Supplier removed." })
       } catch (e: any) {
-        toast({ title: "Delete failed", description: e?.message || "Please try again.", variant: "destructive" })
+        notify({ title: "Delete failed", description: e?.message || "Please try again.", variant: "destructive" })
       }
     })
   }
@@ -70,9 +75,8 @@ export function SupplierTable({
               <TableRow>
                 <TableHead className="w-10">
                   <Checkbox
-                    checked={allChecked}
+                    checked={someChecked && !allChecked ? "indeterminate" : allChecked}
                     onCheckedChange={(v) => toggleAll(Boolean(v))}
-                    indeterminate={someChecked && !allChecked}
                     aria-label="Select all"
                   />
                 </TableHead>
@@ -97,7 +101,7 @@ export function SupplierTable({
                   </TableCell>
                   <TableCell className="font-medium">
                     <Link
-                      href={`/dashboard/suppliers/${r.id}/edit?organizationId=${filters.organizationId}`}
+                      href={localizedHref(`/dashboard/suppliers/${r.id}/edit?organizationId=${filters.organizationId}`)}
                       className="text-teal-700 hover:underline"
                     >
                       {r.name}
@@ -123,11 +127,11 @@ export function SupplierTable({
                       </DropdownMenuTrigger>
                       <DropdownMenuContent align="end" className="w-44">
                         <DropdownMenuItem asChild>
-                          <Link href={`/dashboard/suppliers/${r.id}/edit?organizationId=${filters.organizationId}`}>
+                          <Link href={localizedHref(`/dashboard/suppliers/${r.id}/edit?organizationId=${filters.organizationId}`)}>
                             Edit
                           </Link>
                         </DropdownMenuItem>
-                        <DropdownMenuItem onClick={() => onToggle(r.id, r.isActive)}>
+                        <DropdownMenuItem onClick={() => onToggle(r.id, r.isActive ?? false)}>
                           {r.isActive ? "Deactivate" : "Activate"}
                         </DropdownMenuItem>
                         <DropdownMenuItem className="text-rose-600" onClick={() => onRemove(r.id)}>

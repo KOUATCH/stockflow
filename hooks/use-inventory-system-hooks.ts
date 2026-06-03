@@ -46,6 +46,7 @@ export function useCreateInventoryTransaction() {
   const queryClient = useQueryClient()
 
   return useMutation({
+    meta: { operation: 'create', entity: 'Inventory Transaction' },
     mutationFn: createInventoryTransaction,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["inventory-levels"] })
@@ -59,6 +60,7 @@ export function useAdjustInventory() {
   const queryClient = useQueryClient()
 
   return useMutation({
+    meta: { operation: 'update', entity: 'Inventory' },
     mutationFn: adjustInventory,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["inventory-levels"] })

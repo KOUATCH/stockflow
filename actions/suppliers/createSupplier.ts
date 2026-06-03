@@ -56,7 +56,8 @@ export async function createSupplier(payload: CreateSupplierDTO): Promise<Suppli
 
     return {
       success: true,
-      error: 'Supplier created successfully',
+      error: null,
+      message: 'Supplier created successfully',
       data: created as SupplierWithRelations,
     }
   } catch (error) {
@@ -72,3 +73,5 @@ export async function createSupplier(payload: CreateSupplierDTO): Promise<Suppli
     throw new Error(error instanceof Error ? error.message : 'Failed to create supplier. Please try again.')
   }
 }
+
+export default createSupplier

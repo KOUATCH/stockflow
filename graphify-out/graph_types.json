@@ -1,0 +1,1039 @@
+{
+  "directed": false,
+  "multigraph": false,
+  "graph": {},
+  "nodes": [
+    {
+      "label": "brand.ts",
+      "file_type": "code",
+      "source_file": "types\\brand.ts",
+      "source_location": "L1",
+      "id": "types_brand_ts",
+      "community": 5,
+      "norm_label": "brand.ts"
+    },
+    {
+      "label": "category.ts",
+      "file_type": "code",
+      "source_file": "types\\category.ts",
+      "source_location": "L1",
+      "id": "types_category_ts",
+      "community": 6,
+      "norm_label": "category.ts"
+    },
+    {
+      "label": "commercialAgent.ts",
+      "file_type": "code",
+      "source_file": "types\\commercialAgent.ts",
+      "source_location": "L1",
+      "id": "types_commercialagent_ts",
+      "community": 7,
+      "norm_label": "commercialagent.ts"
+    },
+    {
+      "label": "customerTypes.ts",
+      "file_type": "code",
+      "source_file": "types\\customerTypes.ts",
+      "source_location": "L1",
+      "id": "types_customertypes_ts",
+      "community": 8,
+      "norm_label": "customertypes.ts"
+    },
+    {
+      "label": "dailySalesReportingTypes.ts",
+      "file_type": "code",
+      "source_file": "types\\dailySalesReportingTypes.ts",
+      "source_location": "L1",
+      "id": "types_dailysalesreportingtypes_ts",
+      "community": 9,
+      "norm_label": "dailysalesreportingtypes.ts"
+    },
+    {
+      "label": "delivery.ts",
+      "file_type": "code",
+      "source_file": "types\\delivery.ts",
+      "source_location": "L1",
+      "id": "types_delivery_ts",
+      "community": 2,
+      "norm_label": "delivery.ts"
+    },
+    {
+      "label": "getDeliveryStatusLabel()",
+      "file_type": "code",
+      "source_file": "types\\delivery.ts",
+      "source_location": "L267",
+      "id": "delivery_getdeliverystatuslabel",
+      "community": 2,
+      "norm_label": "getdeliverystatuslabel()"
+    },
+    {
+      "label": "getPriorityLabel()",
+      "file_type": "code",
+      "source_file": "types\\delivery.ts",
+      "source_location": "L271",
+      "id": "delivery_getprioritylabel",
+      "community": 2,
+      "norm_label": "getprioritylabel()"
+    },
+    {
+      "label": "calculateDeliveryTime()",
+      "file_type": "code",
+      "source_file": "types\\delivery.ts",
+      "source_location": "L275",
+      "id": "delivery_calculatedeliverytime",
+      "community": 2,
+      "norm_label": "calculatedeliverytime()"
+    },
+    {
+      "label": "isDeliveryOnTime()",
+      "file_type": "code",
+      "source_file": "types\\delivery.ts",
+      "source_location": "L280",
+      "id": "delivery_isdeliveryontime",
+      "community": 2,
+      "norm_label": "isdeliveryontime()"
+    },
+    {
+      "label": "canEditDelivery()",
+      "file_type": "code",
+      "source_file": "types\\delivery.ts",
+      "source_location": "L285",
+      "id": "delivery_caneditdelivery",
+      "community": 2,
+      "norm_label": "caneditdelivery()"
+    },
+    {
+      "label": "canCancelDelivery()",
+      "file_type": "code",
+      "source_file": "types\\delivery.ts",
+      "source_location": "L289",
+      "id": "delivery_cancanceldelivery",
+      "community": 2,
+      "norm_label": "cancanceldelivery()"
+    },
+    {
+      "label": "canRescheduleDelivery()",
+      "file_type": "code",
+      "source_file": "types\\delivery.ts",
+      "source_location": "L293",
+      "id": "delivery_canrescheduledelivery",
+      "community": 2,
+      "norm_label": "canrescheduledelivery()"
+    },
+    {
+      "label": "getNextDeliveryStatus()",
+      "file_type": "code",
+      "source_file": "types\\delivery.ts",
+      "source_location": "L297",
+      "id": "delivery_getnextdeliverystatus",
+      "community": 2,
+      "norm_label": "getnextdeliverystatus()"
+    },
+    {
+      "label": "financialTypes.ts",
+      "file_type": "code",
+      "source_file": "types\\financialTypes.ts",
+      "source_location": "L1",
+      "id": "types_financialtypes_ts",
+      "community": 10,
+      "norm_label": "financialtypes.ts"
+    },
+    {
+      "label": "inventory.ts",
+      "file_type": "code",
+      "source_file": "types\\inventory.ts",
+      "source_location": "L1",
+      "id": "types_inventory_ts",
+      "community": 11,
+      "norm_label": "inventory.ts"
+    },
+    {
+      "label": "inventoryMovementTypes.ts",
+      "file_type": "code",
+      "source_file": "types\\inventoryMovementTypes.ts",
+      "source_location": "L1",
+      "id": "types_inventorymovementtypes_ts",
+      "community": 12,
+      "norm_label": "inventorymovementtypes.ts"
+    },
+    {
+      "label": "inventoryTypes.ts",
+      "file_type": "code",
+      "source_file": "types\\inventoryTypes.ts",
+      "source_location": "L1",
+      "id": "types_inventorytypes_ts",
+      "community": 13,
+      "norm_label": "inventorytypes.ts"
+    },
+    {
+      "label": "item.ts",
+      "file_type": "code",
+      "source_file": "types\\item.ts",
+      "source_location": "L1",
+      "id": "types_item_ts",
+      "community": 14,
+      "norm_label": "item.ts"
+    },
+    {
+      "label": "itemSuppliers.ts",
+      "file_type": "code",
+      "source_file": "types\\itemSuppliers.ts",
+      "source_location": "L1",
+      "id": "types_itemsuppliers_ts",
+      "community": 15,
+      "norm_label": "itemsuppliers.ts"
+    },
+    {
+      "label": "itemTypes.ts",
+      "file_type": "code",
+      "source_file": "types\\itemTypes.ts",
+      "source_location": "L1",
+      "id": "types_itemtypes_ts",
+      "community": 16,
+      "norm_label": "itemtypes.ts"
+    },
+    {
+      "label": "location.ts",
+      "file_type": "code",
+      "source_file": "types\\location.ts",
+      "source_location": "L1",
+      "id": "types_location_ts",
+      "community": 17,
+      "norm_label": "location.ts"
+    },
+    {
+      "label": "orders.ts",
+      "file_type": "code",
+      "source_file": "types\\orders.ts",
+      "source_location": "L1",
+      "id": "types_orders_ts",
+      "community": 1,
+      "norm_label": "orders.ts"
+    },
+    {
+      "label": "getOrderStatusLabel()",
+      "file_type": "code",
+      "source_file": "types\\orders.ts",
+      "source_location": "L286",
+      "id": "orders_getorderstatuslabel",
+      "community": 1,
+      "norm_label": "getorderstatuslabel()"
+    },
+    {
+      "label": "getPaymentStatusLabel()",
+      "file_type": "code",
+      "source_file": "types\\orders.ts",
+      "source_location": "L290",
+      "id": "orders_getpaymentstatuslabel",
+      "community": 1,
+      "norm_label": "getpaymentstatuslabel()"
+    },
+    {
+      "label": "formatCurrency()",
+      "file_type": "code",
+      "source_file": "types\\orders.ts",
+      "source_location": "L294",
+      "id": "orders_formatcurrency",
+      "community": 1,
+      "norm_label": "formatcurrency()"
+    },
+    {
+      "label": "formatOrderNumber()",
+      "file_type": "code",
+      "source_file": "types\\orders.ts",
+      "source_location": "L301",
+      "id": "orders_formatordernumber",
+      "community": 1,
+      "norm_label": "formatordernumber()"
+    },
+    {
+      "label": "calculateOrderProgress()",
+      "file_type": "code",
+      "source_file": "types\\orders.ts",
+      "source_location": "L305",
+      "id": "orders_calculateorderprogress",
+      "community": 1,
+      "norm_label": "calculateorderprogress()"
+    },
+    {
+      "label": "canCancelOrder()",
+      "file_type": "code",
+      "source_file": "types\\orders.ts",
+      "source_location": "L312",
+      "id": "orders_cancancelorder",
+      "community": 1,
+      "norm_label": "cancancelorder()"
+    },
+    {
+      "label": "canEditOrder()",
+      "file_type": "code",
+      "source_file": "types\\orders.ts",
+      "source_location": "L316",
+      "id": "orders_caneditorder",
+      "community": 1,
+      "norm_label": "caneditorder()"
+    },
+    {
+      "label": "canProcessOrder()",
+      "file_type": "code",
+      "source_file": "types\\orders.ts",
+      "source_location": "L320",
+      "id": "orders_canprocessorder",
+      "community": 1,
+      "norm_label": "canprocessorder()"
+    },
+    {
+      "label": "canDeliverOrder()",
+      "file_type": "code",
+      "source_file": "types\\orders.ts",
+      "source_location": "L324",
+      "id": "orders_candeliverorder",
+      "community": 1,
+      "norm_label": "candeliverorder()"
+    },
+    {
+      "label": "organization.ts",
+      "file_type": "code",
+      "source_file": "types\\organization.ts",
+      "source_location": "L1",
+      "id": "types_organization_ts",
+      "community": 18,
+      "norm_label": "organization.ts"
+    },
+    {
+      "label": "payments.ts",
+      "file_type": "code",
+      "source_file": "types\\payments.ts",
+      "source_location": "L1",
+      "id": "types_payments_ts",
+      "community": 19,
+      "norm_label": "payments.ts"
+    },
+    {
+      "label": "posTypes.ts",
+      "file_type": "code",
+      "source_file": "types\\posTypes.ts",
+      "source_location": "L1",
+      "id": "types_postypes_ts",
+      "community": 20,
+      "norm_label": "postypes.ts"
+    },
+    {
+      "label": "presence.ts",
+      "file_type": "code",
+      "source_file": "types\\presence.ts",
+      "source_location": "L1",
+      "id": "types_presence_ts",
+      "community": 21,
+      "norm_label": "presence.ts"
+    },
+    {
+      "label": "production.ts",
+      "file_type": "code",
+      "source_file": "types\\production.ts",
+      "source_location": "L1",
+      "id": "types_production_ts",
+      "community": 0,
+      "norm_label": "production.ts"
+    },
+    {
+      "label": "getProductionStatusLabel()",
+      "file_type": "code",
+      "source_file": "types\\production.ts",
+      "source_location": "L522",
+      "id": "production_getproductionstatuslabel",
+      "community": 0,
+      "norm_label": "getproductionstatuslabel()"
+    },
+    {
+      "label": "getPriorityLabel()",
+      "file_type": "code",
+      "source_file": "types\\production.ts",
+      "source_location": "L526",
+      "id": "production_getprioritylabel",
+      "community": 0,
+      "norm_label": "getprioritylabel()"
+    },
+    {
+      "label": "calculateRecipeCost()",
+      "file_type": "code",
+      "source_file": "types\\production.ts",
+      "source_location": "L530",
+      "id": "production_calculaterecipecost",
+      "community": 0,
+      "norm_label": "calculaterecipecost()"
+    },
+    {
+      "label": "calculateMarginPercentage()",
+      "file_type": "code",
+      "source_file": "types\\production.ts",
+      "source_location": "L534",
+      "id": "production_calculatemarginpercentage",
+      "community": 0,
+      "norm_label": "calculatemarginpercentage()"
+    },
+    {
+      "label": "calculateMarkupPercentage()",
+      "file_type": "code",
+      "source_file": "types\\production.ts",
+      "source_location": "L539",
+      "id": "production_calculatemarkuppercentage",
+      "community": 0,
+      "norm_label": "calculatemarkuppercentage()"
+    },
+    {
+      "label": "formatCurrency()",
+      "file_type": "code",
+      "source_file": "types\\production.ts",
+      "source_location": "L544",
+      "id": "production_formatcurrency",
+      "community": 0,
+      "norm_label": "formatcurrency()"
+    },
+    {
+      "label": "formatPercentage()",
+      "file_type": "code",
+      "source_file": "types\\production.ts",
+      "source_location": "L551",
+      "id": "production_formatpercentage",
+      "community": 0,
+      "norm_label": "formatpercentage()"
+    },
+    {
+      "label": "convertUnits()",
+      "file_type": "code",
+      "source_file": "types\\production.ts",
+      "source_location": "L555",
+      "id": "production_convertunits",
+      "community": 0,
+      "norm_label": "convertunits()"
+    },
+    {
+      "label": "canEditRecipe()",
+      "file_type": "code",
+      "source_file": "types\\production.ts",
+      "source_location": "L566",
+      "id": "production_caneditrecipe",
+      "community": 0,
+      "norm_label": "caneditrecipe()"
+    },
+    {
+      "label": "canStartProduction()",
+      "file_type": "code",
+      "source_file": "types\\production.ts",
+      "source_location": "L570",
+      "id": "production_canstartproduction",
+      "community": 0,
+      "norm_label": "canstartproduction()"
+    },
+    {
+      "label": "canCancelProduction()",
+      "file_type": "code",
+      "source_file": "types\\production.ts",
+      "source_location": "L574",
+      "id": "production_cancancelproduction",
+      "community": 0,
+      "norm_label": "cancancelproduction()"
+    },
+    {
+      "label": "getNextProductionStatus()",
+      "file_type": "code",
+      "source_file": "types\\production.ts",
+      "source_location": "L578",
+      "id": "production_getnextproductionstatus",
+      "community": 0,
+      "norm_label": "getnextproductionstatus()"
+    },
+    {
+      "label": "purchase-orders-system-types.ts",
+      "file_type": "code",
+      "source_file": "types\\purchase-orders-system-types.ts",
+      "source_location": "L1",
+      "id": "types_purchase_orders_system_types_ts",
+      "community": 4,
+      "norm_label": "purchase-orders-system-types.ts"
+    },
+    {
+      "label": "useDebounce()",
+      "file_type": "code",
+      "source_file": "types\\purchase-orders-system-types.ts",
+      "source_location": "L174",
+      "id": "purchase_orders_system_types_usedebounce",
+      "community": 4,
+      "norm_label": "usedebounce()"
+    },
+    {
+      "label": "queryKeys.ts",
+      "file_type": "code",
+      "source_file": "types\\queryKeys.ts",
+      "source_location": "L1",
+      "id": "types_querykeys_ts",
+      "community": 22,
+      "norm_label": "querykeys.ts"
+    },
+    {
+      "label": "recentPurchaseOrderTypes.ts",
+      "file_type": "code",
+      "source_file": "types\\recentPurchaseOrderTypes.ts",
+      "source_location": "L1",
+      "id": "types_recentpurchaseordertypes_ts",
+      "community": 23,
+      "norm_label": "recentpurchaseordertypes.ts"
+    },
+    {
+      "label": "retailFinance.ts",
+      "file_type": "code",
+      "source_file": "types\\retailFinance.ts",
+      "source_location": "L1",
+      "id": "types_retailfinance_ts",
+      "community": 24,
+      "norm_label": "retailfinance.ts"
+    },
+    {
+      "label": "roles.ts",
+      "file_type": "code",
+      "source_file": "types\\roles.ts",
+      "source_location": "L1",
+      "id": "types_roles_ts",
+      "community": 25,
+      "norm_label": "roles.ts"
+    },
+    {
+      "label": "salesTypes.ts",
+      "file_type": "code",
+      "source_file": "types\\salesTypes.ts",
+      "source_location": "L1",
+      "id": "types_salestypes_ts",
+      "community": 26,
+      "norm_label": "salestypes.ts"
+    },
+    {
+      "label": "stockTransferTypes.ts",
+      "file_type": "code",
+      "source_file": "types\\stockTransferTypes.ts",
+      "source_location": "L1",
+      "id": "types_stocktransfertypes_ts",
+      "community": 27,
+      "norm_label": "stocktransfertypes.ts"
+    },
+    {
+      "label": "storage.ts",
+      "file_type": "code",
+      "source_file": "types\\storage.ts",
+      "source_location": "L1",
+      "id": "types_storage_ts",
+      "community": 28,
+      "norm_label": "storage.ts"
+    },
+    {
+      "label": "supplier.ts",
+      "file_type": "code",
+      "source_file": "types\\supplier.ts",
+      "source_location": "L1",
+      "id": "types_supplier_ts",
+      "community": 3,
+      "norm_label": "supplier.ts"
+    },
+    {
+      "label": "normalizeSort()",
+      "file_type": "code",
+      "source_file": "types\\supplier.ts",
+      "source_location": "L158",
+      "id": "supplier_normalizesort",
+      "community": 3,
+      "norm_label": "normalizesort()"
+    },
+    {
+      "label": "buildSupplierSearchFilter()",
+      "file_type": "code",
+      "source_file": "types\\supplier.ts",
+      "source_location": "L164",
+      "id": "supplier_buildsuppliersearchfilter",
+      "community": 3,
+      "norm_label": "buildsuppliersearchfilter()"
+    },
+    {
+      "label": "sanitizeEmail()",
+      "file_type": "code",
+      "source_file": "types\\supplier.ts",
+      "source_location": "L179",
+      "id": "supplier_sanitizeemail",
+      "community": 3,
+      "norm_label": "sanitizeemail()"
+    },
+    {
+      "label": "sanitizeOptionalString()",
+      "file_type": "code",
+      "source_file": "types\\supplier.ts",
+      "source_location": "L189",
+      "id": "supplier_sanitizeoptionalstring",
+      "community": 3,
+      "norm_label": "sanitizeoptionalstring()"
+    },
+    {
+      "label": "suppliersSystemTypes.ts",
+      "file_type": "code",
+      "source_file": "types\\suppliersSystemTypes.ts",
+      "source_location": "L1",
+      "id": "types_supplierssystemtypes_ts",
+      "community": 29,
+      "norm_label": "supplierssystemtypes.ts"
+    },
+    {
+      "label": "systemTypes.ts",
+      "file_type": "code",
+      "source_file": "types\\systemTypes.ts",
+      "source_location": "L1",
+      "id": "types_systemtypes_ts",
+      "community": 30,
+      "norm_label": "systemtypes.ts"
+    },
+    {
+      "label": "taxRates.ts",
+      "file_type": "code",
+      "source_file": "types\\taxRates.ts",
+      "source_location": "L1",
+      "id": "types_taxrates_ts",
+      "community": 31,
+      "norm_label": "taxrates.ts"
+    },
+    {
+      "label": "types.ts",
+      "file_type": "code",
+      "source_file": "types\\types.ts",
+      "source_location": "L1",
+      "id": "types_types_ts",
+      "community": 32,
+      "norm_label": "types.ts"
+    },
+    {
+      "label": "unit.ts",
+      "file_type": "code",
+      "source_file": "types\\unit.ts",
+      "source_location": "L1",
+      "id": "types_unit_ts",
+      "community": 33,
+      "norm_label": "unit.ts"
+    },
+    {
+      "label": "types.ts",
+      "file_type": "code",
+      "source_file": "types\\newPOSSession\\types.ts",
+      "source_location": "L1",
+      "id": "types_newpossession_types_ts",
+      "community": 34,
+      "norm_label": "types.ts"
+    }
+  ],
+  "links": [
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "types\\delivery.ts",
+      "source_location": "L267",
+      "weight": 1.0,
+      "_src": "types_delivery_ts",
+      "_tgt": "delivery_getdeliverystatuslabel",
+      "source": "types_delivery_ts",
+      "target": "delivery_getdeliverystatuslabel",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "types\\delivery.ts",
+      "source_location": "L271",
+      "weight": 1.0,
+      "_src": "types_delivery_ts",
+      "_tgt": "delivery_getprioritylabel",
+      "source": "types_delivery_ts",
+      "target": "delivery_getprioritylabel",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "types\\delivery.ts",
+      "source_location": "L275",
+      "weight": 1.0,
+      "_src": "types_delivery_ts",
+      "_tgt": "delivery_calculatedeliverytime",
+      "source": "types_delivery_ts",
+      "target": "delivery_calculatedeliverytime",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "types\\delivery.ts",
+      "source_location": "L280",
+      "weight": 1.0,
+      "_src": "types_delivery_ts",
+      "_tgt": "delivery_isdeliveryontime",
+      "source": "types_delivery_ts",
+      "target": "delivery_isdeliveryontime",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "types\\delivery.ts",
+      "source_location": "L285",
+      "weight": 1.0,
+      "_src": "types_delivery_ts",
+      "_tgt": "delivery_caneditdelivery",
+      "source": "types_delivery_ts",
+      "target": "delivery_caneditdelivery",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "types\\delivery.ts",
+      "source_location": "L289",
+      "weight": 1.0,
+      "_src": "types_delivery_ts",
+      "_tgt": "delivery_cancanceldelivery",
+      "source": "types_delivery_ts",
+      "target": "delivery_cancanceldelivery",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "types\\delivery.ts",
+      "source_location": "L293",
+      "weight": 1.0,
+      "_src": "types_delivery_ts",
+      "_tgt": "delivery_canrescheduledelivery",
+      "source": "types_delivery_ts",
+      "target": "delivery_canrescheduledelivery",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "types\\delivery.ts",
+      "source_location": "L297",
+      "weight": 1.0,
+      "_src": "types_delivery_ts",
+      "_tgt": "delivery_getnextdeliverystatus",
+      "source": "types_delivery_ts",
+      "target": "delivery_getnextdeliverystatus",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "types\\orders.ts",
+      "source_location": "L286",
+      "weight": 1.0,
+      "_src": "types_orders_ts",
+      "_tgt": "orders_getorderstatuslabel",
+      "source": "types_orders_ts",
+      "target": "orders_getorderstatuslabel",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "types\\orders.ts",
+      "source_location": "L290",
+      "weight": 1.0,
+      "_src": "types_orders_ts",
+      "_tgt": "orders_getpaymentstatuslabel",
+      "source": "types_orders_ts",
+      "target": "orders_getpaymentstatuslabel",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "types\\orders.ts",
+      "source_location": "L294",
+      "weight": 1.0,
+      "_src": "types_orders_ts",
+      "_tgt": "orders_formatcurrency",
+      "source": "types_orders_ts",
+      "target": "orders_formatcurrency",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "types\\orders.ts",
+      "source_location": "L301",
+      "weight": 1.0,
+      "_src": "types_orders_ts",
+      "_tgt": "orders_formatordernumber",
+      "source": "types_orders_ts",
+      "target": "orders_formatordernumber",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "types\\orders.ts",
+      "source_location": "L305",
+      "weight": 1.0,
+      "_src": "types_orders_ts",
+      "_tgt": "orders_calculateorderprogress",
+      "source": "types_orders_ts",
+      "target": "orders_calculateorderprogress",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "types\\orders.ts",
+      "source_location": "L312",
+      "weight": 1.0,
+      "_src": "types_orders_ts",
+      "_tgt": "orders_cancancelorder",
+      "source": "types_orders_ts",
+      "target": "orders_cancancelorder",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "types\\orders.ts",
+      "source_location": "L316",
+      "weight": 1.0,
+      "_src": "types_orders_ts",
+      "_tgt": "orders_caneditorder",
+      "source": "types_orders_ts",
+      "target": "orders_caneditorder",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "types\\orders.ts",
+      "source_location": "L320",
+      "weight": 1.0,
+      "_src": "types_orders_ts",
+      "_tgt": "orders_canprocessorder",
+      "source": "types_orders_ts",
+      "target": "orders_canprocessorder",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "types\\orders.ts",
+      "source_location": "L324",
+      "weight": 1.0,
+      "_src": "types_orders_ts",
+      "_tgt": "orders_candeliverorder",
+      "source": "types_orders_ts",
+      "target": "orders_candeliverorder",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "types\\production.ts",
+      "source_location": "L522",
+      "weight": 1.0,
+      "_src": "types_production_ts",
+      "_tgt": "production_getproductionstatuslabel",
+      "source": "types_production_ts",
+      "target": "production_getproductionstatuslabel",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "types\\production.ts",
+      "source_location": "L526",
+      "weight": 1.0,
+      "_src": "types_production_ts",
+      "_tgt": "production_getprioritylabel",
+      "source": "types_production_ts",
+      "target": "production_getprioritylabel",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "types\\production.ts",
+      "source_location": "L530",
+      "weight": 1.0,
+      "_src": "types_production_ts",
+      "_tgt": "production_calculaterecipecost",
+      "source": "types_production_ts",
+      "target": "production_calculaterecipecost",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "types\\production.ts",
+      "source_location": "L534",
+      "weight": 1.0,
+      "_src": "types_production_ts",
+      "_tgt": "production_calculatemarginpercentage",
+      "source": "types_production_ts",
+      "target": "production_calculatemarginpercentage",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "types\\production.ts",
+      "source_location": "L539",
+      "weight": 1.0,
+      "_src": "types_production_ts",
+      "_tgt": "production_calculatemarkuppercentage",
+      "source": "types_production_ts",
+      "target": "production_calculatemarkuppercentage",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "types\\production.ts",
+      "source_location": "L544",
+      "weight": 1.0,
+      "_src": "types_production_ts",
+      "_tgt": "production_formatcurrency",
+      "source": "types_production_ts",
+      "target": "production_formatcurrency",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "types\\production.ts",
+      "source_location": "L551",
+      "weight": 1.0,
+      "_src": "types_production_ts",
+      "_tgt": "production_formatpercentage",
+      "source": "types_production_ts",
+      "target": "production_formatpercentage",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "types\\production.ts",
+      "source_location": "L555",
+      "weight": 1.0,
+      "_src": "types_production_ts",
+      "_tgt": "production_convertunits",
+      "source": "types_production_ts",
+      "target": "production_convertunits",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "types\\production.ts",
+      "source_location": "L566",
+      "weight": 1.0,
+      "_src": "types_production_ts",
+      "_tgt": "production_caneditrecipe",
+      "source": "types_production_ts",
+      "target": "production_caneditrecipe",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "types\\production.ts",
+      "source_location": "L570",
+      "weight": 1.0,
+      "_src": "types_production_ts",
+      "_tgt": "production_canstartproduction",
+      "source": "types_production_ts",
+      "target": "production_canstartproduction",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "types\\production.ts",
+      "source_location": "L574",
+      "weight": 1.0,
+      "_src": "types_production_ts",
+      "_tgt": "production_cancancelproduction",
+      "source": "types_production_ts",
+      "target": "production_cancancelproduction",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "types\\production.ts",
+      "source_location": "L578",
+      "weight": 1.0,
+      "_src": "types_production_ts",
+      "_tgt": "production_getnextproductionstatus",
+      "source": "types_production_ts",
+      "target": "production_getnextproductionstatus",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "types\\purchase-orders-system-types.ts",
+      "source_location": "L174",
+      "weight": 1.0,
+      "_src": "types_purchase_orders_system_types_ts",
+      "_tgt": "purchase_orders_system_types_usedebounce",
+      "source": "types_purchase_orders_system_types_ts",
+      "target": "purchase_orders_system_types_usedebounce",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "types\\supplier.ts",
+      "source_location": "L158",
+      "weight": 1.0,
+      "_src": "types_supplier_ts",
+      "_tgt": "supplier_normalizesort",
+      "source": "types_supplier_ts",
+      "target": "supplier_normalizesort",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "types\\supplier.ts",
+      "source_location": "L164",
+      "weight": 1.0,
+      "_src": "types_supplier_ts",
+      "_tgt": "supplier_buildsuppliersearchfilter",
+      "source": "types_supplier_ts",
+      "target": "supplier_buildsuppliersearchfilter",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "types\\supplier.ts",
+      "source_location": "L179",
+      "weight": 1.0,
+      "_src": "types_supplier_ts",
+      "_tgt": "supplier_sanitizeemail",
+      "source": "types_supplier_ts",
+      "target": "supplier_sanitizeemail",
+      "confidence_score": 1.0
+    },
+    {
+      "relation": "contains",
+      "confidence": "EXTRACTED",
+      "source_file": "types\\supplier.ts",
+      "source_location": "L189",
+      "weight": 1.0,
+      "_src": "types_supplier_ts",
+      "_tgt": "supplier_sanitizeoptionalstring",
+      "source": "types_supplier_ts",
+      "target": "supplier_sanitizeoptionalstring",
+      "confidence_score": 1.0
+    }
+  ],
+  "hyperedges": []
+}

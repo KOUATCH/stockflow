@@ -3,6 +3,7 @@
 import * as React from "react"
 import { format } from "date-fns"
 import { Calendar as CalendarIcon } from "lucide-react"
+import type { DateRange } from "react-day-picker"
 
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
@@ -17,6 +18,7 @@ interface DatePickerProps {
   date?: Date
   onDateChange?: (date: Date | undefined) => void
   placeholder?: string
+  showTimeSelect?: boolean
   disabled?: boolean
   className?: string
   align?: "start" | "center" | "end"
@@ -29,6 +31,7 @@ export function DatePicker({
   date,
   onDateChange,
   placeholder = "Pick a date",
+  showTimeSelect: _showTimeSelect,
   disabled = false,
   className,
   align = "start",
@@ -80,8 +83,8 @@ export function DatePicker({
 }
 
 interface DateRangePickerProps {
-  dateRange?: { from: Date | undefined; to: Date | undefined }
-  onDateRangeChange?: (range: { from: Date | undefined; to: Date | undefined } | undefined) => void
+  dateRange?: DateRange
+  onDateRangeChange?: (range: DateRange | undefined) => void
   placeholder?: string
   disabled?: boolean
   className?: string
@@ -104,7 +107,7 @@ export function DateRangePicker({
 }: DateRangePickerProps) {
   const [open, setOpen] = React.useState(false)
 
-  const handleDateSelect = (range: { from: Date | undefined; to: Date | undefined } | undefined) => {
+  const handleDateSelect = (range: DateRange | undefined) => {
     onDateRangeChange?.(range)
     if (range?.from && range?.to) {
       setOpen(false)

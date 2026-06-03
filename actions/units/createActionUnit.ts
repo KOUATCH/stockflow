@@ -1,57 +1,55 @@
-// app/actions/createUnit.ts
-"use server";
+"use server"
 
-import { db } from "@/prisma/db";
-import { UnitCreateDTO } from "@/types/unit";
-import { revalidatePath } from "next/cache";
+import { createManagedUnit } from "@/actions/units/unit-management-actions"
+import type { UnitManagementInput } from "@/actions/units/unit-management-actions"
 
-const DEFAULT_IMAGE_URL =
-  "https://14J7oh8kso.ufs.sh/f/HLxTbDBCDLwfAXaapcezIN7vwylKf1PXSCqAuseUG0gx8mhd";
+type CreateUnitInput = {
+  nameEn: string
+  nameFr?: string | null
+  symbol: string
+  organizationId: string
+  type?: string
+  baseUnit?: string | null
+  conversionRate?: number | string | null
+  isActive?: boolean
+}
 
-const createActionUnit = async (data: UnitCreateDTO & { organizationId: string }) => {
-  const formattedData = {
-    ...data,
-    organizationId: data.organizationId,
-  };
+const UNIT_TYPES = new Set(["QUANTITY", "WEIGHT", "VOLUME", "LENGTH", "AREA", "TIME"])
 
-  try {
-    const result = await db.$transaction(async (tx) => {
-      const existingUnit = await tx.unit.findUnique({
-        where: {
-          organizationId_name: {
-            name: data.name,
-            organizationId: data.organizationId,
-          }
-        },
-      });
-
-      if (existingUnit) {
-        return {
-          success: false,
-          error: `Unit "${data.name}" already exists for this organization`,
-          data: null,
-        };
-      }
-
-      const newUnit = await tx.unit.create({ data: formattedData });
-
-      revalidatePath("/inventory/units");
-
-      return {
-        success: true,
-        error: null,
-        data: newUnit,
-      };
-    });
-
-    return result;
-  } catch (error) {
-    console.error("Error creating unit:", error);
+const createActionUnit = async (data: CreateUnitInput) => {
+  if (!data?.organizationId || !data?.nameEn || !data?.symbol) {
     return {
       success: false,
-      error: error instanceof Error ? error.message : "Unknown error",
+      error: "Unit name, symbol, and organization are required",
       data: null,
-    };
+    }
+  }
+
+  const conversionRate =
+    data.conversionRate === undefined || data.conversionRate === null || data.conversionRate === ""
+      ? null
+      : typeof data.conversionRate === "string"
+      ? Number(data.conversionRate)
+      : data.conversionRate
+  const type = UNIT_TYPES.has(data.type ?? "")
+    ? (data.type as UnitManagementInput["type"])
+    : "QUANTITY"
+
+  const result = await createManagedUnit(data.organizationId, {
+    nameEn: data.nameEn,
+    nameFr: data.nameFr ?? null,
+    symbol: data.symbol,
+    type,
+    baseUnit: data.baseUnit ?? null,
+    conversionRate,
+    isActive: data.isActive ?? true,
+  })
+
+  return {
+    success: result.success,
+    error: result.error ?? null,
+    data: result.data ?? null,
   }
 }
+
 export default createActionUnit

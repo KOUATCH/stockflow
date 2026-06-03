@@ -15,7 +15,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea"
 import { useInventoryAdjustment } from "@/hooks/useInventoryQueries"
 import { formatCurrency } from "@/lib/utils"
-import type { InventoryWithRelations } from "@/actions/inventory/inventoryActions"
+import type { InventoryLevel } from "@/types/inventory"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { AlertTriangle, Package, Plus, Minus } from "lucide-react"
 import { useClientAuth } from "@/hooks/useClientAuth"
@@ -30,16 +30,22 @@ const adjustmentSchema = z.object({
 
 type AdjustmentFormData = z.infer<typeof adjustmentSchema>
 
+type InventoryLevelForAdjustment = InventoryLevel & {
+  item: NonNullable<InventoryLevel["item"]>
+  location: NonNullable<InventoryLevel["location"]>
+}
+
 interface InventoryAdjustmentModalProps {
   open: boolean
   onOpenChange: (open: boolean) => void
-  inventory: InventoryWithRelations
+  inventory: InventoryLevelForAdjustment
   onSuccess: () => void
 }
 
 export function InventoryAdjustmentModal({ open, onOpenChange, inventory, onSuccess }: InventoryAdjustmentModalProps) {
-  const { data: session } = useSession()
+  const { user, organizationId } = useClientAuth()
   const { mutate: createAdjustment, isPending } = useInventoryAdjustment()
+  const currentQuantity = inventory.quantityOnHand
 
   const form = useForm<AdjustmentFormData>({
     resolver: zodResolver(adjustmentSchema),
@@ -54,7 +60,7 @@ export function InventoryAdjustmentModal({ open, onOpenChange, inventory, onSucc
   const quantity = form.watch("quantity")
 
   const handleSubmit = (data: AdjustmentFormData) => {
-    if (!user || !user) return
+    if (!user?.id || !organizationId) return
 
     const adjustmentQuantity = data.adjustmentType === "increase" ? data.quantity : -data.quantity
 
@@ -64,8 +70,8 @@ export function InventoryAdjustmentModal({ open, onOpenChange, inventory, onSucc
         locationId: inventory.locationId,
         adjustmentQuantity,
         reason: data.reason,
-        organizationId: session.user.organizationId,
-        userId: session.user.id,
+        organizationId,
+        userId: user.id,
       },
       {
         onSuccess: () => {
@@ -82,7 +88,7 @@ export function InventoryAdjustmentModal({ open, onOpenChange, inventory, onSucc
   }
 
   const newQuantity =
-    adjustmentType === "increase" ? inventory.quantity + quantity : Math.max(0, inventory.quantity - quantity)
+    adjustmentType === "increase" ? currentQuantity + quantity : Math.max(0, currentQuantity - quantity)
 
   const estimatedValueChange =
     adjustmentType === "increase" ? quantity * inventory.averageCost : -(quantity * inventory.averageCost)
@@ -116,7 +122,7 @@ export function InventoryAdjustmentModal({ open, onOpenChange, inventory, onSucc
               </div>
               <div className="flex justify-between text-sm">
                 <span className="font-medium">Current Quantity:</span>
-                <span className="font-semibold">{inventory.quantity}</span>
+                <span className="font-semibold">{currentQuantity}</span>
               </div>
               <div className="flex justify-between text-sm">
                 <span className="font-medium">Average Cost:</span>
@@ -168,7 +174,7 @@ export function InventoryAdjustmentModal({ open, onOpenChange, inventory, onSucc
                     <Input
                       type="number"
                       min="1"
-                      max={adjustmentType === "decrease" ? inventory.quantity : undefined}
+                      max={adjustmentType === "decrease" ? currentQuantity : undefined}
                       {...field}
                       onChange={(e) => field.onChange(Number.parseInt(e.target.value) || 0)}
                     />
@@ -216,13 +222,13 @@ export function InventoryAdjustmentModal({ open, onOpenChange, inventory, onSucc
             </div>
 
             {/* Warning for decrease */}
-            {adjustmentType === "decrease" && quantity > inventory.quantity && (
+            {adjustmentType === "decrease" && quantity > currentQuantity && (
               <div className="flex items-start gap-3 p-3 bg-red-50 border border-red-200 rounded-lg">
                 <AlertTriangle className="h-4 w-4 text-red-500 mt-0.5 flex-shrink-0" />
                 <div className="text-sm">
                   <p className="font-medium text-red-800">Invalid Quantity</p>
                   <p className="text-red-700 mt-1">
-                    Cannot remove {quantity} items. Only {inventory.quantity} available.
+                    Cannot remove {quantity} items. Only {currentQuantity} available.
                   </p>
                 </div>
               </div>
@@ -234,7 +240,7 @@ export function InventoryAdjustmentModal({ open, onOpenChange, inventory, onSucc
               </Button>
               <Button
                 type="submit"
-                disabled={isPending || (adjustmentType === "decrease" && quantity > inventory.quantity)}
+                disabled={isPending || (adjustmentType === "decrease" && quantity > currentQuantity)}
               >
                 {isPending ? (
                   <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent mr-2" />

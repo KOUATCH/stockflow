@@ -5,7 +5,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
+import { getLocaleFromPathname, localizePath } from "@/i18n/routing";
 import { cn } from "@/lib/utils";
+import { DEFAULT_LOCALE } from "@/types/bilingual";
 import {
   AlertCircle,
   ArrowLeft,
@@ -18,6 +20,7 @@ import {
   Shield
 } from "lucide-react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import Logo from "../global/Logo";
@@ -28,6 +31,9 @@ interface ForgotPasswordFormData {
 }
 
 export default function ForgotPasswordForm() {
+  const pathname = usePathname();
+  const locale = getLocaleFromPathname(pathname) ?? DEFAULT_LOCALE;
+  const localizedHref = (href: string) => localizePath(href, locale);
   const [loading, setLoading] = useState(false);
   const [emailSent, setEmailSent] = useState(false);
   const [emailValue, setEmailValue] = useState("");
@@ -88,7 +94,7 @@ export default function ForgotPasswordForm() {
             </div>
             <CardTitle className="text-xl text-green-800">Email Sent Successfully</CardTitle>
             <CardDescription>
-              We've sent password reset instructions to <strong>{emailValue}</strong>
+              We have sent password reset instructions to <strong>{emailValue}</strong>
             </CardDescription>
           </CardHeader>
 
@@ -112,7 +118,7 @@ export default function ForgotPasswordForm() {
               <div className="flex items-start gap-3">
                 <HelpCircle className="h-5 w-5 text-teal-600 flex-shrink-0 mt-0.5" />
                 <div className="text-sm text-teal-800">
-                  <p className="font-medium mb-1">Didn't receive the email?</p>
+                  <p className="font-medium mb-1">Did not receive the email?</p>
                   <p className="text-teal-700">
                     Check your spam folder or{" "}
                     <button
@@ -142,7 +148,7 @@ export default function ForgotPasswordForm() {
                 Send to Different Email
               </Button>
 
-              <Link href="/login">
+              <Link href={localizedHref("/login")}>
                 <Button className="w-full h-12 bg-gradient-to-r from-green-600 to-teal-600 hover:from-green-700 hover:to-teal-700">
                   <ArrowLeft className="mr-2 h-4 w-4" />
                   Back to Login
@@ -187,7 +193,7 @@ export default function ForgotPasswordForm() {
             Password Recovery
           </CardTitle>
           <CardDescription>
-            We'll send you instructions to reset your password
+            We will send you instructions to reset your password
           </CardDescription>
         </CardHeader>
 
@@ -263,7 +269,7 @@ export default function ForgotPasswordForm() {
           </div>
 
           {/* Back to Login */}
-          <Link href="/login">
+          <Link href={localizedHref("/login")}>
             <Button variant="outline" className="w-full h-12">
               <ArrowLeft className="mr-2 h-4 w-4" />
               Back to Login
@@ -277,8 +283,8 @@ export default function ForgotPasswordForm() {
               <div className="text-sm text-orange-800">
                 <p className="font-medium mb-1">Need help?</p>
                 <p className="text-orange-700">
-                  If you're still having trouble, please{" "}
-                  <Link href="/support" className="underline hover:no-underline font-medium">
+                  If you are still having trouble, please{" "}
+                  <Link href={localizedHref("/support")} className="underline hover:no-underline font-medium">
                     contact our support team
                   </Link>
                 </p>

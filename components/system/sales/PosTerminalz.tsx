@@ -9,7 +9,7 @@ import { useEffect, useState } from "react"
 
 import { createPayment, createSale } from "@/actions/cashSystem/sales/sales-actions"
 import type { ItemWithInventory } from "@/actions/inventory/itemWithInventoryFetch"
-import { createInventoryTransactions, updateInventoryLevels } from "@/actions/pos/POSActionFinal"
+import { createInventoryTransactions, updateInventoryLevels } from "@/actions/newPOSSession/pos/POSActionFinal"
 import { Alert, AlertDescription } from "@/components/ui/alert"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -69,7 +69,7 @@ interface pOSStationProps {
   userId: string
 }
 
-export function pOSStation({ organizationId, locationId, terminalId, userId }: pOSStationProps): ReactElement {
+export function POSStation({ organizationId, locationId, terminalId, userId }: pOSStationProps): ReactElement {
   const [cart, setCart] = useState<CartItem[]>([])
   const [searchTerm, setSearchTerm] = useState("")
   // Define SimpleCustomer type if not already imported
@@ -188,6 +188,7 @@ export function pOSStation({ organizationId, locationId, terminalId, userId }: p
   const queryClient = useQueryClient()
 
   const createSalesOrderMutation = useMutation({
+    meta: { operation: 'create', entity: 'Sales Order' , suppressSuccessNotification: true, suppressErrorNotification: true },
     mutationFn: createSale,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["sales-orders"] })
@@ -200,6 +201,7 @@ export function pOSStation({ organizationId, locationId, terminalId, userId }: p
   })
 
   const createPaymentMutation = useMutation({
+    meta: { operation: 'create', entity: 'Payment' , suppressSuccessNotification: true, suppressErrorNotification: true },
     mutationFn: createPayment,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["payments"] })
@@ -211,6 +213,7 @@ export function pOSStation({ organizationId, locationId, terminalId, userId }: p
   })
 
   const updateInventoryMutation = useMutation({
+    meta: { operation: 'update', entity: 'Inventory' },
     mutationFn: updateInventoryLevels,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["inventory-levels"] })
@@ -219,6 +222,7 @@ export function pOSStation({ organizationId, locationId, terminalId, userId }: p
   })
 
   const createTransactionsMutation = useMutation({
+    meta: { operation: 'create', entity: 'Transactions' },
     mutationFn: createInventoryTransactions,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["inventory-transactions"] })
@@ -1089,5 +1093,6 @@ export function pOSStation({ organizationId, locationId, terminalId, userId }: p
   )
 }
 
-// export { pOSStation as pOSStationRecent }
-export default pOSStation
+// export { POSStation as pOSStationRecent }
+export { POSStation as pOSStation }
+export default POSStation

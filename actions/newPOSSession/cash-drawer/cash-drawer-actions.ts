@@ -3,6 +3,16 @@
 import { db } from "@/prisma/db"
 import { revalidatePath } from "next/cache"
 
+type DecimalLike = { toNumber?: () => number; toString: () => string } | number | string | null | undefined
+
+function toNumber(value: DecimalLike): number {
+  if (value == null) return 0
+  if (typeof value === "number") return value
+  if (typeof value === "string") return Number(value) || 0
+  if (typeof value.toNumber === "function") return value.toNumber()
+  return Number(value.toString()) || 0
+}
+
 export interface CashDrawerSession {
   id: string
   sessionNumber: string
@@ -80,7 +90,7 @@ export async function openPosSession(
     // Check if there's already an active session for this station
     const existingSession = await db.pOSSession.findFirst({
       where: {
-        stationId,
+        terminalId: stationId,
         status: "ACTIVE",
       },
     })
@@ -96,9 +106,10 @@ export async function openPosSession(
     const session = await db.pOSSession.create({
       data: {
         sessionNumber,
-        stationId,
+        terminalId: stationId,
         userId,
         locationId,
+        organizationId,
         status: "ACTIVE",
         openingBalance,
         expectedBalance: openingBalance,
@@ -107,7 +118,7 @@ export async function openPosSession(
 
     // Get or create cash drawer for this station
     let cashDrawer = await db.cashDrawer.findFirst({
-      where: { stationId },
+      where: { terminalId: stationId },
     })
 
     if (!cashDrawer) {
@@ -115,7 +126,7 @@ export async function openPosSession(
         data: {
           drawerNumber: `DRAWER-${stationId}`,
           name: `Drawer for station ${stationId}`,
-          stationId,
+          terminalId: stationId,
           locationId,
           currentBalance: openingBalance,
           expectedBalance: openingBalance,
@@ -188,7 +199,8 @@ export async function closePosSession(
       return { success: false, error: "Session is not active" }
     }
 
-    const variance = actualBalance - (session.expectedBalance || 0)
+    const expectedBalance = toNumber(session.expectedBalance)
+    const variance = actualBalance - expectedBalance
 
     // Update session
     await db.pOSSession.update({
@@ -222,7 +234,7 @@ export async function closePosSession(
           amount: actualBalance,
           reason: "Session closing balance",
           notes: notes,
-          balanceBefore: session.expectedBalance || 0,
+          balanceBefore: expectedBalance,
           balanceAfter: actualBalance,
         },
       })
@@ -263,7 +275,7 @@ export async function addCashToDrawer(
       return { success: false, error: "Session or cash drawer not found" }
     }
 
-    const currentBalance = session.cashDrawerTransactions[0]?.cashDrawer?.currentBalance ?? 0
+    const currentBalance = toNumber(session.cashDrawerTransactions[0]?.cashDrawer?.currentBalance)
     const newBalance = currentBalance + amount
 
     // Update cash drawer balance
@@ -336,7 +348,7 @@ export async function removeCashFromDrawer(
     }
   
 
-    const currentBalance = session.cashDrawerTransactions[0]?.cashDrawer?.currentBalance ?? 0
+    const currentBalance = toNumber(session.cashDrawerTransactions[0]?.cashDrawer?.currentBalance)
     const newBalance = currentBalance - amount
 
     if (newBalance < 0) {
@@ -388,15 +400,15 @@ export async function getCurrentSession(stationId: string): Promise<CashDrawerSe
   try {
     const session = await db.pOSSession.findFirst({
       where: {
-        stationId,
+        terminalId: stationId,
         status: "ACTIVE",
       },
       include: {
-        station: {
+        terminal: {
           select: {
             id: true,
             name: true,
-            stationNumber: true,
+            terminalNumber: true,
           },
         },
         user: {
@@ -423,7 +435,7 @@ export async function getCurrentSession(stationId: string): Promise<CashDrawerSe
     })
 
 
-    return session as CashDrawerSession | null
+    return session as unknown as CashDrawerSession | null
   } catch (error) {
     console.error("Error getting current session:", error)
     return null
@@ -453,9 +465,17 @@ export async function getCashDrawerTransactions(sessionId: string, limit = 50): 
     return transactions
       .filter((t) => allowedTypes.includes(t.type.toLowerCase() as any))
       .map((t) => ({
-        ...t,
-        drawerId: (t as any).cashDrawerId,
+        id: t.id,
+        drawerId: t.cashDrawerId,
+        sessionId: t.sessionId ?? "",
+        userId: t.userId,
         type: t.type.toLowerCase() as CashDrawerTransaction["type"],
+        amount: toNumber(t.amount),
+        reason: t.reason ?? undefined,
+        description: t.notes ?? undefined,
+        balanceBefore: toNumber(t.balanceBefore),
+        balanceAfter: toNumber(t.balanceAfter),
+        createdAt: t.createdAt,
         user: {
           firstName: t.user?.firstName ?? "",
           lastName: t.user?.lastName ?? "",
@@ -495,15 +515,15 @@ export async function getCashDrawerSummary(sessionId: string): Promise<CashDrawe
       where: { sessionId },
     })
 
-    const totalSales = transactions.filter((t) => t.type === "SALE").reduce((sum, t) => sum + t.amount, 0)
+    const totalSales = transactions.filter((t) => t.type === "SALE").reduce((sum, t) => sum + toNumber(t.amount), 0)
 
     const totalCashIn = transactions
       .filter((t) => t.type === "CASH_IN")
-      .reduce((sum, t) => sum + t.amount, 0)
+      .reduce((sum, t) => sum + toNumber(t.amount), 0)
 
     const totalCashOut = transactions
       .filter((t) => t.type === "CASH_OUT")
-      .reduce((sum, t) => sum + t.amount, 0)
+      .reduce((sum, t) => sum + toNumber(t.amount), 0)
 
     const lastTransaction =
       transactions.length > 0
@@ -511,9 +531,11 @@ export async function getCashDrawerSummary(sessionId: string): Promise<CashDrawe
         : undefined
 
     return {
-      currentBalance: session?.cashDrawerTransactions[0]?.cashDrawer.currentBalance,
-      expectedBalance: session?.cashDrawerTransactions[0]?.cashDrawer.expectedBalance,
-      variance: session?.cashDrawerTransactions[0]?.cashDrawer.currentBalance - session?.cashDrawerTransactions[0]?.cashDrawer.expectedBalance,
+      currentBalance: toNumber(session?.cashDrawerTransactions[0]?.cashDrawer.currentBalance),
+      expectedBalance: toNumber(session?.cashDrawerTransactions[0]?.cashDrawer.expectedBalance),
+      variance:
+        toNumber(session?.cashDrawerTransactions[0]?.cashDrawer.currentBalance) -
+        toNumber(session?.cashDrawerTransactions[0]?.cashDrawer.expectedBalance),
       totalSales,
       totalCashIn,
       totalCashOut,

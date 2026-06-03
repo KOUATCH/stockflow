@@ -1,8 +1,7 @@
 "use client"
 
+import { notify } from "@/lib/notifications/notify"
 import { useQuery } from "@tanstack/react-query"
-import { toast } from "sonner"
-
 // Mock location data
 const mockLocations = [
   {
@@ -42,7 +41,7 @@ export const useOrgLocationsNew = () => {
     retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
     onError: (error: any) => {
       console.error("Failed to fetch locations:", error)
-      toast.error("Failed to load locations")
+      notify.error("Failed to load locations")
     },
   })
 }

@@ -1,68 +1,108 @@
 'use server'
-
+import { inventoryAction } from "@/lib/error-handling";
+import type { ServerActionResult } from "@/lib/error-handling/types";
 import { db } from '@/prisma/db';
 import { z } from 'zod';
 
 const orgSchema = z.object({ organizationId: z.string().min(1) })
 
-type Result<T> = { success: true; data: T } | { success: false; error: string }
-
-export async function listBrandsAction(input: unknown): Promise<Result<Array<{ id: string; brandName: string }>>> {
-  try {
+export const listBrandsAction = inventoryAction(
+  async (input: unknown): Promise<ServerActionResult<Array<{ id: string; brandName: string }>>> => {
     const { organizationId } = orgSchema.parse(input)
-    const data = await db.brand.findMany({
+    const brands = await db.brand.findMany({
       where: { organizationId },
-      select: { id: true, brandName: true },
-      orderBy: { brandName: 'asc' },
+      select: { id: true, nameEn: true },
+      orderBy: { nameEn: 'asc' },
     })
+    const data = brands.map((brand) => ({
+      id: brand.id,
+      brandName: brand.nameEn,
+    }))
     return { success: true, data }
-  } catch (e) {
-    return { success: false, error: 'Failed to load brands' }
+  },
+  {
+    actionName: 'listBrandsAction',
+    component: 'InventoryManagement',
+    businessContext: {
+      domain: 'inventory',
+      operation: 'read',
+      resourceType: 'brand'
+    }
   }
-}
+)
 
-export async function listCategoriesAction(
-  input: unknown
-): Promise<Result<Array<{ id: string; title: string }>>> {
-  try {
+export const listCategoriesAction = inventoryAction(
+  async (input: unknown): Promise<ServerActionResult<Array<{ id: string; title: string }>>> => {
     const { organizationId } = orgSchema.parse(input)
-    const data = await db.category.findMany({
+    const categories = await db.category.findMany({
       where: { organizationId },
-      select: { id: true, title: true },
-      orderBy: { title: 'asc' },
+      select: { id: true, titleEn: true, titleFr: true },
+      orderBy: { titleEn: 'asc' },
     })
+    const data = categories.map((category) => ({
+      id: category.id,
+      title: category.titleEn,
+    }))
     return { success: true, data }
-  } catch (e) {
-    return { success: false, error: 'Failed to load categories' }
+  },
+  {
+    actionName: 'listCategoriesAction',
+    component: 'InventoryManagement',
+    businessContext: {
+      domain: 'inventory',
+      operation: 'read',
+      resourceType: 'category'
+    }
   }
-}
+)
 
-export async function listUnitsAction(input: unknown): Promise<Result<Array<{ id: string; name: string; }>>> {
-  try {
+export const listUnitsAction = inventoryAction(
+  async (input: unknown): Promise<ServerActionResult<Array<{ id: string; name: string; }>>> => {
     const { organizationId } = orgSchema.parse(input)
-    const data = await db.unit.findMany({
+    const units = await db.unit.findMany({
       where: { organizationId },
-      select: { id: true, name: true},
-      orderBy: { name: 'asc' },
+      select: { id: true, nameEn: true, nameFr: true },
+      orderBy: { nameEn: 'asc' },
     })
+    const data = units.map((unit) => ({
+      id: unit.id,
+      name: unit.nameEn,
+    }))
     return { success: true, data }
-  } catch (e) {
-    return { success: false, error: 'Failed to load units' }
+  },
+  {
+    actionName: 'listUnitsAction',
+    component: 'InventoryManagement',
+    businessContext: {
+      domain: 'inventory',
+      operation: 'read',
+      resourceType: 'unit'
+    }
   }
-}
+)
 
-export async function listTaxRatesAction(
-  input: unknown
-): Promise<Result<Array<{ id: string; taxRateName: string; rate: number }>>> {
-  try {
+export const listTaxRatesAction = inventoryAction(
+  async (input: unknown): Promise<ServerActionResult<Array<{ id: string; taxRateName: string; rate: number }>>> => {
     const { organizationId } = orgSchema.parse(input)
-    const data = await db.taxRate.findMany({
+    const taxRates = await db.taxRate.findMany({
       where: { organizationId },
-      select: { id: true, taxRateName: true, rate: true },
-      orderBy: { taxRateName: 'asc' },
+      select: { id: true, nameEn: true, rate: true },
+      orderBy: { nameEn: 'asc' },
     })
+    const data = taxRates.map((taxRate) => ({
+      id: taxRate.id,
+      taxRateName: taxRate.nameEn,
+      rate: Number(taxRate.rate),
+    }))
     return { success: true, data }
-  } catch (e) {
-    return { success: false, error: 'Failed to load tax rates' }
+  },
+  {
+    actionName: 'listTaxRatesAction',
+    component: 'InventoryManagement',
+    businessContext: {
+      domain: 'inventory',
+      operation: 'read',
+      resourceType: 'taxRate'
+    }
   }
-}
+)

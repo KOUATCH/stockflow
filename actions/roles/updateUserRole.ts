@@ -1,5 +1,8 @@
 'use server'
 
+import { getAuthenticatedUser } from "@/config/useAuth";
+import { hasAppPermission, safeUserSelect } from "@/lib/security/server-authz";
+import { logSecurityEvent, SecurityEventType } from "@/lib/security/audit-log";
 import { db } from "@/prisma/db";
 import { UpdateUserRoleResponse } from "@/types/types";
 import { revalidatePath } from "next/cache";
@@ -9,9 +12,19 @@ export async function updateUserRole(
   roleId: string
 ): Promise<UpdateUserRoleResponse> {
   try {
+    const authUser = await getAuthenticatedUser();
+
+    if (!hasAppPermission(authUser, "users.roles.assign")) {
+      return {
+        error: "Forbidden",
+        status: 403,
+        data: null,
+      };
+    }
+
     // Check if user exists
-    const existingUser = await db.user.findUnique({
-      where: { id: userId },
+    const existingUser = await db.user.findFirst({
+      where: { id: userId, organizationId: authUser.organizationId },
       include: { roles: true },
     });
 
@@ -24,8 +37,8 @@ export async function updateUserRole(
     }
 
     // Check if role exists
-    const role = await db.role.findUnique({
-      where: { id: roleId },
+    const role = await db.role.findFirst({
+      where: { id: roleId, organizationId: authUser.organizationId },
     });
 
     if (!role) {
@@ -45,10 +58,19 @@ export async function updateUserRole(
           connect: { id: roleId }, // Then connect new role
         },
       },
-      include: {
-        roles: true,
-      },
+      select: safeUserSelect,
     });
+
+    void logSecurityEvent({
+      type: SecurityEventType.ROLE_CHANGED,
+      userId: authUser.id,
+      organizationId: authUser.organizationId,
+      resource: userId,
+      details: {
+        previousRoleIds: existingUser.roles.map((userRole) => userRole.id),
+        nextRoleId: role.id,
+      },
+    })
 
     // Revalidate relevant paths
     revalidatePath("/dashboard/users");
@@ -57,7 +79,7 @@ export async function updateUserRole(
     return {
       error: null,
       status: 200,
-      data: updatedUser,
+      data: updatedUser as unknown as UpdateUserRoleResponse["data"],
     };
   } catch (error) {
     console.error("Error updating user role:", error);

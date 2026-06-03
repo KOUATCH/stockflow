@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/dialog"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { useSessionManagementOld } from "@/hooks/newPOSSession/useSessionManagementOld"
+import { useSessionManagement } from "@/hooks/newPOSSession/useSessionManagement"
 import { formatCurrency } from "@/lib/formatCurrency"
 import { AlertTriangle, CheckCircle, Clock, DollarSign, Play, Square } from "lucide-react"
 import { useState } from "react"
@@ -31,7 +31,7 @@ export function SessionControlButtons1({ terminalId, locationId, organizationId,
   const [isCloseDialogOpen, setIsCloseDialogOpen] = useState(false)
 
   const { currentSession, sessionLoading, openSession, closeSession, isOpeningSession, isClosingSession } =
-    useSessionManagementOld(terminalId)
+    useSessionManagement(terminalId)
 
   const handleOpenSession = () => {
     console.log("[v0] Opening session with data:", {

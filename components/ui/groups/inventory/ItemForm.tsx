@@ -1,10 +1,9 @@
 "use client"
 
+import { notify } from "@/lib/notifications/notify"
 import { DollarSign, Package } from "lucide-react"
 import { useCallback } from "react"
 import type { UseFormReturn } from "react-hook-form"
-import { toast } from "sonner"
-
 import { Button } from "@/components/ui/button"
 import { Card, CardContent } from "@/components/ui/card"
 import { FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
@@ -12,7 +11,7 @@ import { Input } from "@/components/ui/input"
 // import { ImageUploadButton } from "@/components/FormInputs/ImageUploadButton"
 import { generateSimpleSKU } from "@/lib/generateSKU"
 
-import ImageUploadButtonModernOriginal from "@/components/FormInputs/ImageUploadButtonModernOriginal"
+import EnhancedImageUploadButton from "@/components/FormInputs/EnhancedImageUploadButton"
 import type { ItemFormValues } from "./ItemManagement"
 
 interface ItemFormProps {
@@ -28,10 +27,10 @@ export const ItemForm = ({ form, itemImageUrl, setItemImageUrl, organizationId }
     if (currentSku) {
       try {
         await navigator.clipboard.writeText(currentSku)
-        toast.success("SKU copied to clipboard!")
+        notify.success("SKU copied to clipboard!")
       } catch (err) {
         console.error("Failed to copy SKU:", err)
-        toast.error("Failed to copy SKU to clipboard")
+        notify.error("Failed to copy SKU to clipboard")
       }
     }
   }, [form])
@@ -191,10 +190,11 @@ export const ItemForm = ({ form, itemImageUrl, setItemImageUrl, organizationId }
             {/* Image Upload */}
             <div className="space-y-2">
               <FormLabel>Item Image</FormLabel>
-              <ImageUploadButtonModernOriginal
+              <EnhancedImageUploadButton
                 title="Upload Item Image"
                 imageUrl={itemImageUrl}
                 setImageUrl={setItemImageUrl}
+                organizationId={organizationId}
                 endpoint="itemImageUpload"
               />
               <FormDescription>Upload image to identify this item</FormDescription>

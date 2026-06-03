@@ -1,14 +1,39 @@
-import { unitAPI } from "@/services/unitAPI"
-import { UpdateModelData } from "@/types/item"
-import { UpdateUnitPayload } from "@/types/unit"
-import { useUnitMutation } from "./useUnitMutation"
+import { useUpdateUnit as useUpdateUnitMutation } from "@/hooks/useUnits"
+import { useNotifications } from "@/components/notifications/NotificationProvider"
 
 export function useUpdateUnit() {
-  return useUnitMutation(
-    async ({ id, data }: UpdateModelData<UpdateUnitPayload>) => {
-      return await unitAPI.updateUnit(id, data)
+  const { formSuccess, formError } = useNotifications()
+  const updateUnitMutation = useUpdateUnitMutation()
+
+  return {
+    ...updateUnitMutation,
+    mutate: (data: any) => {
+      updateUnitMutation.mutate(data, {
+        onSuccess: () => {
+          formSuccess("Unit Update", "Unit has been updated successfully")
+        },
+        onError: (error: Error) => {
+          formError(
+            "Unit Update",
+            error.message || "Unknown error occurred",
+            "Failed to update unit",
+          )
+        },
+      })
     },
-    "New Unit  updated successfully",
-    "Failed to update unit stock",
-  )
+    mutateAsync: async (data: any) => {
+      try {
+        const result = await updateUnitMutation.mutateAsync(data)
+        formSuccess("Unit Update", "Unit has been updated successfully")
+        return result
+      } catch (error: any) {
+        formError(
+          "Unit Update",
+          error.message || "Unknown error occurred",
+          "Failed to update unit",
+        )
+        throw error
+      }
+    },
+  }
 }

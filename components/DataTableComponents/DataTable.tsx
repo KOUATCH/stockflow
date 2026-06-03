@@ -24,6 +24,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { cn } from "@/lib/utils";
 import { useState } from "react";
 
 import { DropdownMenu, DropdownMenuCheckboxItem, DropdownMenuContent, DropdownMenuLabel, DropdownMenuSeparator } from "@radix-ui/react-dropdown-menu";
@@ -41,12 +42,15 @@ interface DataTableProps<TData, TValue> {
   data: TData[];
   model?: string;
   searchPlaceholder?: string;
+  showToolbar?: boolean;
+  variant?: "default" | "landing";
 }
 export default function DataTable<TData, TValue>({
   columns,
   data,
-  model = "",
   searchPlaceholder = "",
+  showToolbar = true,
+  variant = "default",
 }: DataTableProps<TData, TValue>) {
   const [rowSelection, setRowSelection] = useState({});
   const [columnVisibility, setColumnVisibility] = useState({});
@@ -57,6 +61,14 @@ export default function DataTable<TData, TValue>({
   const [filteredData, setFilteredData] = useState(data);
   const [sorting, setSorting] = React.useState<SortingState>([]);
   const [isSearch, setIsSearch] = useState(true);
+  const isLanding = variant === "landing";
+
+  React.useEffect(() => {
+    setSearchResults(data);
+    setFilteredData(data);
+    setIsSearch(true);
+  }, [data]);
+
   // console.log(isSearch);
   const table = useReactTable({
     data: isSearch ? searchResults : filteredData,
@@ -81,58 +93,74 @@ export default function DataTable<TData, TValue>({
   });
   // console.log(searchResults);
   return (
-    <div className="coantainer">
+    <div className={cn("w-full min-w-0", isLanding ? "dashboard-data-table space-y-3" : "coantainer")}>
       {/* <BigContainer> */}
-      <div className="flex justify-between items-center gap-8">
-        <div className="flex-1 w-full">
-          <SearchBar
-            data={data}
-            onSearch={setSearchResults}
-            setIsSearch={setIsSearch}
-          />
+      {showToolbar && (
+        <div className={cn(
+          "flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between",
+          isLanding && "rounded-lg border border-[var(--dash-border-subtle)] bg-[var(--dash-surface)]/70 p-3"
+        )}>
+          <div className="w-full min-w-0 flex-1">
+            <SearchBar
+              data={data}
+              onSearch={setSearchResults}
+              setIsSearch={setIsSearch}
+              placeholder={searchPlaceholder}
+              variant={variant}
+            />
+          </div>
+          <div className="flex shrink-0 flex-wrap items-center gap-2">
+            <DateRangeFilter
+              data={data}
+              onFilter={setFilteredData}
+              setIsSearch={setIsSearch}
+            />
+            <DateFilters
+              data={data}
+              onFilter={setFilteredData}
+              setIsSearch={setIsSearch}
+            />
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className={cn("h-8 gap-1", isLanding && "dashboard-button-secondary rounded-lg")}
+                >
+                  <ListFilter className="h-3.5 w-3.5" />
+                  <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">
+                    Filter
+                  </span>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuLabel>Filter by</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuCheckboxItem checked>
+                  Active
+                </DropdownMenuCheckboxItem>
+                <DropdownMenuCheckboxItem>Draft</DropdownMenuCheckboxItem>
+                <DropdownMenuCheckboxItem>Archived</DropdownMenuCheckboxItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+            <DataTableViewOptions table={table} />
+          </div>
         </div>
-        <div className="flex items-center gap-2 ">
-          <DateRangeFilter
-            data={data}
-            onFilter={setFilteredData}
-            setIsSearch={setIsSearch}
-          />
-          <DateFilters
-            data={data}
-            onFilter={setFilteredData}
-            setIsSearch={setIsSearch}
-          />
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm" className="h-8 gap-1">
-                <ListFilter className="h-3.5 w-3.5" />
-                <span className="sr-only sm:not-sr-only sm:whitespace-nowrap">
-                  Filter
-                </span>
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuLabel>Filter by</DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuCheckboxItem checked>
-                Active
-              </DropdownMenuCheckboxItem>
-              <DropdownMenuCheckboxItem>Draft</DropdownMenuCheckboxItem>
-              <DropdownMenuCheckboxItem>Archived</DropdownMenuCheckboxItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-          <DataTableViewOptions table={table} />
-        </div>
-      </div>
+      )}
 
-      <div className="rounded-md border">
+      <div className={cn("min-w-0 rounded-md border", isLanding && "dashboard-table-shell border-0")}>
+        <div className="w-full overflow-x-auto">
         <Table>
           <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id}>
                 {headerGroup.headers.map((header) => {
                   return (
-                    <TableHead key={header.id} colSpan={header.colSpan}>
+                    <TableHead
+                      key={header.id}
+                      colSpan={header.colSpan}
+                      className={cn(isLanding && "px-3")}
+                    >
                       {header.isPlaceholder
                         ? null
                         : flexRender(
@@ -149,14 +177,16 @@ export default function DataTable<TData, TValue>({
             {table.getRowModel().rows?.length ? (
               table.getRowModel().rows.map((row) => (
                 <TableRow
-                  className="hover:bg-indigo-400 rounded-lg "
+                  className={cn(
+                    isLanding
+                      ? "hover:bg-[rgba(47,125,246,0.085)] data-[state=selected]:bg-[var(--dash-brand-soft)]"
+                      : "hover:bg-indigo-400 rounded-lg"
+                  )}
                   key={row.id}
-                  data-state={
-                    row.getIsSelected() && "selected" ? "hover:bg-sky-800 " : ""
-                  }
+                  data-state={row.getIsSelected() ? "selected" : undefined}
                 >
                   {row.getVisibleCells().map((cell) => (
-                    <TableCell key={cell.id}>
+                    <TableCell key={cell.id} className={cn(isLanding && "px-3 py-3")}>
                       {cell.getIsAggregated()
                         ? flexRender(
                           cell.column.columnDef.aggregatedCell,
@@ -174,7 +204,7 @@ export default function DataTable<TData, TValue>({
               <TableRow>
                 <TableCell
                   colSpan={columns.length}
-                  className="h-24 text-center"
+                  className={cn("h-24 text-center", isLanding && "text-[var(--dash-text-soft)]")}
                 >
                   No results.
                 </TableCell>
@@ -203,6 +233,7 @@ export default function DataTable<TData, TValue>({
             })}
           </TableFooter>
         </Table>
+        </div>
       </div>
       <DataTablePagination table={table} />
     </div>

@@ -1,42 +1,48 @@
 import { auth } from "@/auth"
-import { redirect } from "next/navigation"
-import { db } from "@/prisma/db"
+import { localizedRedirect } from "@/i18n/server-routing"
+
+async function redirectTo(path: string): Promise<never> {
+  await localizedRedirect(path)
+  throw new Error(`Redirected to ${path}`)
+}
 
 // Server-side authentication helper for NextAuth v5
 export async function getAuthenticatedUser() {
   const session = await auth()
+  const user = session?.user
 
-  if (!session?.user) {
-    redirect("/login")
+  if (!user) {
+    return redirectTo("/login")
   }
 
-  if (!session.user.organizationId) {
-    redirect("/register")
+  if (!user.organizationId) {
+    return redirectTo("/register")
   }
 
   return {
-    id: session.user.id,
-    email: session.user.email!,
-    name: session.user.name,
-    firstName: session.user.firstName,
-    lastName: session.user.lastName,
-    phone: session.user.phone,
-    organizationId: session.user.organizationId,
-    organizationName: session.user.organizationName,
-    roles: session.user.roles || [],
-    permissions: session.user.permissions || []
+    id: user.id,
+    email: user.email!,
+    name: user.name,
+    firstName: user.firstName,
+    lastName: user.lastName,
+    phone: user.phone,
+    organizationId: user.organizationId,
+    organizationName: user.organizationName,
+    roles: user.roles || [],
+    permissions: user.permissions || []
   }
 }
 
 // Check if user has permission
 export async function checkPermission(permission: string) {
   const session = await auth()
+  const user = session?.user
 
-  if (!session?.user) {
-    redirect("/login")
+  if (!user) {
+    return redirectTo("/login")
   }
 
-  const userPermissions = session.user.permissions || []
+  const userPermissions = user.permissions || []
   const hasPermission = userPermissions.includes('*') || userPermissions.includes(permission)
 
   if (!hasPermission) {

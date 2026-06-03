@@ -2,7 +2,6 @@
 
 import { db } from "@/prisma/db"
 import type {
-  ItemSupplierUpdateData,
   UpdateItemSupplierDTO,
   UpdateItemSupplierResponse,
 } from "@/types/itemSuppliers"
@@ -32,11 +31,11 @@ export const updateItemSupplier = async (
     console.log('Updating ItemSupplier with:', { itemId: data.itemId, supplierId: data.supplierId })
 
     // Prepare update data
-    const updateData: ItemSupplierUpdateData = {
+    const updateData: Prisma.ItemSupplierUpdateInput = {
       isPreferred: data.isPreferred,
       supplierSku: data.supplierSku ?? null,
-      leadTime: data.leadTime ?? null,
-      minOrderQty: data.minOrderQty ?? null,
+      leadTimeDays: data.leadTime ?? null,
+      minOrderQuantity: data.minOrderQty ?? null,
       unitCost: data.unitCost ?? null,
       lastPurchaseDate: data.lastPurchaseDate ?? null,
       notes: data.notes ?? null,
@@ -61,7 +60,7 @@ export const updateItemSupplier = async (
       console.log('Found existing ItemSupplier:', existing.id)
 
       // If setting this as preferred, unset others for this item
-      if (updateData.isPreferred) {
+      if (data.isPreferred === true) {
         const updateResult = await tx.itemSupplier.updateMany({
           where: {
             itemId: data.itemId,
@@ -97,7 +96,9 @@ export const updateItemSupplier = async (
           item: {
             select: {
               id: true,
-              name: true,
+              sku: true,
+              nameEn: true,
+              nameFr: true,
             },
           },
         },
@@ -131,7 +132,18 @@ export const updateItemSupplier = async (
 
     return {
       success: true,
-      data: result,
+      data: {
+        ...result,
+        leadTime: result.leadTimeDays,
+        minOrderQty: result.minOrderQuantity ? Number(result.minOrderQuantity) : null,
+        unitCost: result.unitCost ? Number(result.unitCost) : null,
+        item: result.item
+          ? {
+              ...result.item,
+              name: result.item.nameEn ?? result.item.nameFr ?? "",
+            }
+          : undefined,
+      },
     }
   } catch (error) {
     console.error("Failed to update Item Supplier:", error)

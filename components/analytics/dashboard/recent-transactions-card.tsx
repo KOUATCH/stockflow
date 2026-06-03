@@ -2,7 +2,7 @@
 
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
-import { CreditCard, Banknote, Smartphone } from "lucide-react"
+import { CreditCard, Banknote, Smartphone, Activity } from "lucide-react"
 
 const transactions = [
   { id: "#1247", amount: 24.5, method: "card", time: "2 min ago", status: "completed" },
@@ -27,25 +27,34 @@ const getPaymentIcon = (method: string) => {
 
 export function RecentTransactionsCard() {
   return (
-    <Card className="glass-effect border-0">
-      <CardHeader className="pb-4">
-        <CardTitle className="text-lg font-bold font-[family-name:var(--font-montserrat)]">
-          Recent Transactions
-        </CardTitle>
-      </CardHeader>
-      <CardContent className="space-y-3">
+    <div className="bg-white/60 dark:bg-slate-800/60 backdrop-blur-sm rounded-xl border border-slate-200/60 dark:border-slate-700/60 p-6 hover:bg-white/80 dark:hover:bg-slate-800/80 transition-all">
+      <div className="flex items-center justify-between mb-6">
+        <div className="flex items-center gap-3">
+          <div className="p-2 rounded-lg bg-gradient-to-br from-blue-100 to-cyan-100 dark:from-blue-900/30 dark:to-cyan-900/30">
+            <Activity className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+          </div>
+          <div>
+            <h3 className="text-base font-bold text-slate-900 dark:text-white">Recent Transactions</h3>
+            <p className="text-sm text-slate-600 dark:text-slate-400">Latest payment activity</p>
+          </div>
+        </div>
+        <Badge variant="secondary" className="bg-slate-100 dark:bg-slate-800">
+          {transactions.length} recent
+        </Badge>
+      </div>
+      <div className="space-y-3">
         {transactions.map((transaction, index) => {
           const Icon = getPaymentIcon(transaction.method)
 
           return (
-            <div key={index} className="flex items-center justify-between p-3 rounded-lg bg-muted/30">
+            <div key={index} className="flex items-center justify-between p-3 rounded-lg bg-slate-50/60 dark:bg-slate-700/60">
               <div className="flex items-center space-x-3">
-                <div className="p-2 bg-primary/10 rounded-lg">
-                  <Icon className="h-4 w-4 text-primary" />
+                <div className="p-2 bg-slate-100 dark:bg-slate-700 rounded-lg">
+                  <Icon className="h-4 w-4 text-slate-600 dark:text-slate-400" />
                 </div>
                 <div>
-                  <p className="font-medium text-sm">{transaction.id}</p>
-                  <p className="text-xs text-muted-foreground">{transaction.time}</p>
+                  <p className="font-medium text-sm text-slate-900 dark:text-white">{transaction.id}</p>
+                  <p className="text-xs text-slate-600 dark:text-slate-400">{transaction.time}</p>
                 </div>
               </div>
               <div className="text-right">
@@ -57,7 +66,7 @@ export function RecentTransactionsCard() {
             </div>
           )
         })}
-      </CardContent>
-    </Card>
+      </div>
+    </div>
   )
 }

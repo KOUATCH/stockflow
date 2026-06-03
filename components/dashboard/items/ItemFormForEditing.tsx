@@ -37,8 +37,10 @@ import { z } from "zod"
 import { useNotifications } from "@/components/notifications/NotificationProvider"
 // -------- Schemas (align to Prisma Item model) --------
 const basicInfoSchema = z.object({
-  name: z.string().min(1, "Name is required"),
-  description: z.string().optional(),
+  nameEn: z.string().min(1, "English name is required"),
+  nameFr: z.string().optional(),
+  descriptionEn: z.string().optional(),
+  descriptionFr: z.string().optional(),
   imageUrls: z.string().optional(),
   organizationId: z.string(),
   id: z.string(),
@@ -97,7 +99,6 @@ const trackingSchema = z.object({
   trackExpiry: z.boolean().default(false),
   organizationId: z.string(),
   id: z.string(),
-  name: z.string(),
   slug: z.string().optional(),
 })
 
@@ -182,8 +183,10 @@ export default function ItemFormForEditing({
   const basicInfoForm = useForm<BasicInfoFormValues>({
     resolver: zodResolver(basicInfoSchema),
     defaultValues: {
-      name: "",
-      description: "",
+      nameEn: "",
+      nameFr: "",
+      descriptionEn: "",
+      descriptionFr: "",
       imageUrls: "",
       thumbnail: "",
       organizationId: "", // Add this
@@ -268,8 +271,10 @@ export default function ItemFormForEditing({
     if (!open || !itemData) return
 
     basicInfoForm.reset({
-      name: getItemValue("name", ""),
-      description: getItemValue("description", ""),
+      nameEn: getItemValue("nameEn", ""),
+      nameFr: getItemValue("nameFr", ""),
+      descriptionEn: getItemValue("descriptionEn", ""),
+      descriptionFr: getItemValue("descriptionFr", ""),
       imageUrls: String(getItemValue("imageUrls", "")),
       thumbnail: getItemValue("thumbnail", ""),
       organizationId: itemData.organizationId || "", // Add this
@@ -349,7 +354,7 @@ export default function ItemFormForEditing({
     const operationId = operationStart("Updating Basic Information")
     try {
       await updateItemMutation.mutateAsync({ id: itemData!.id, data })
-      formSuccess("Basic Information Updated", `Item "${data.name}" basic information has been successfully updated`)
+      formSuccess("Basic Information Updated", `Item "${data.nameEn}" basic information has been successfully updated`)
       onSuccess?.()
     } catch (err: any) {
       formError("Update Basic Information", "Failed to update basic information", err?.message || "An unexpected error occurred")
@@ -463,7 +468,6 @@ export default function ItemFormForEditing({
         trackExpiry: data.trackExpiry,
         organizationId: data.organizationId,
         id: data.id,
-        name: data.name,
         slug: data.slug ?? "",
       }
       await updateItemMutation.mutateAsync({ id: itemData!.id, data: updateData })
@@ -494,7 +498,7 @@ export default function ItemFormForEditing({
       <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-2xl">
-            Edit Item: {String(getItemValue("name", "Unknown Item"))}
+            Edit Item: {String(getItemValue("nameEn", "Unknown Item"))}
           </DialogTitle>
         </DialogHeader>
         <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
@@ -532,10 +536,10 @@ export default function ItemFormForEditing({
                       <input type="hidden" {...basicInfoForm.register("id")} />
                       <FormField
                         control={basicInfoForm.control}
-                        name="name"
+                        name="nameEn"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Item Name *</FormLabel>
+                            <FormLabel>English Item Name *</FormLabel>
                             <FormControl>
                               <Input placeholder="Enter item name" {...field} />
                             </FormControl>
@@ -546,12 +550,40 @@ export default function ItemFormForEditing({
 
                       <FormField
                         control={basicInfoForm.control}
-                        name="description"
+                        name="nameFr"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Description</FormLabel>
+                            <FormLabel>French Item Name</FormLabel>
+                            <FormControl>
+                              <Input placeholder="Enter French item name" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={basicInfoForm.control}
+                        name="descriptionEn"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>English Description</FormLabel>
                             <FormControl>
                               <Textarea placeholder="Enter item description" className="min-h-[100px]" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={basicInfoForm.control}
+                        name="descriptionFr"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>French Description</FormLabel>
+                            <FormControl>
+                              <Textarea placeholder="Enter French item description" className="min-h-[100px]" {...field} />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
@@ -958,7 +990,7 @@ export default function ItemFormForEditing({
                             <FormControl>
                               <Input placeholder="Manufacturer Part Number" {...field} />
                             </FormControl>
-                            <FormDescription>Manufacturer's part number</FormDescription>
+                            <FormDescription>Manufacturer&apos;s part number</FormDescription>
                             <FormMessage />
                           </FormItem>
                         )}

@@ -1,8 +1,7 @@
-'use server'
+"use server"
 
-import { PrismaClient } from '@prisma/client'
-
-const prisma = new PrismaClient()
+import { db } from "@/prisma/db"
+import type { Prisma } from "@prisma/client"
 
 export interface ItemWithInventory {
   id: string
@@ -13,50 +12,21 @@ export interface ItemWithInventory {
   description: string | null
   imageUrls: string
   thumbnail: string | null
-  
-  // Physical properties
   dimensions: string | null
   weight: number | null
-    
-  // Pricing
   costPrice: number
   sellingPrice: number
-  
-  // Inventory settings
   trackInventory: boolean
   minStockLevel: number
   maxStockLevel: number | null
   reorderLevel: number
   reorderQuantity: number | null
-  
-  // Status
   isActive: boolean
   isDiscontinued: boolean
-  
-  // Relationships
-  category: {
-    id: string
-    title: string
-    slug: string
-  } | null
-  brand: {
-    id: string
-    brandName: string
-    slug: string
-  } | null
-  unit: {
-    id: string
-    name: string
-    symbol: string
-  } | null
-  taxRate: {
-    id: string
-    taxRateName: string
-    rate: number
-    taxType: string
-  } | null
-  
-  // Inventory level for the specific location
+  category: { id: string; title: string; slug: string } | null
+  brand: { id: string; brandName: string; slug: string } | null
+  unit: { id: string; name: string; symbol: string } | null
+  taxRate: { id: string; taxRateName: string; rate: number; taxType: string } | null
   inventoryLevel: {
     id: string
     quantityOnHand: number
@@ -67,15 +37,9 @@ export interface ItemWithInventory {
     reorderPoint: number
     averageCost: number
     totalValue: number
-    location: {
-      id: string
-      name: string
-      type: string
-    }
-    // lastCountDate: Date | null
+    location: { id: string; name: string; type: string }
     lastTransactionAt: Date | null
   } | null
-  
   createdAt: Date
   updatedAt: Date
 }
@@ -83,24 +47,107 @@ export interface ItemWithInventory {
 export interface FetchItemsParams {
   locationId: string
   organizationId: string
-  // Optional filters
   categoryId?: string
   brandId?: string
   isActive?: boolean
   trackInventory?: boolean
   search?: string
-  // Pagination
   skip?: number
   take?: number
-  // Sorting
-  orderBy?: 'name' | 'sku' | 'createdAt' | 'updatedAt' | 'quantityOnHand'
-  orderDirection?: 'asc' | 'desc'
+  orderBy?: "name" | "sku" | "createdAt" | "updatedAt" | "quantityOnHand"
+  orderDirection?: "asc" | "desc"
 }
 
 export interface FetchItemsResponse {
   items: ItemWithInventory[]
   totalCount: number
   hasMore: boolean
+}
+
+const itemInventoryInclude = (locationId: string) =>
+  ({
+    category: { select: { id: true, titleEn: true, slug: true } },
+    brand: { select: { id: true, nameEn: true, slug: true } },
+    unit: { select: { id: true, nameEn: true, symbol: true } },
+    taxRate: { select: { id: true, nameEn: true, rate: true, type: true } },
+    inventoryLevels: {
+      where: { locationId },
+      select: {
+        id: true,
+        quantityOnHand: true,
+        quantityReserved: true,
+        quantityAvailable: true,
+        quantityInTransit: true,
+        quantityOnOrder: true,
+        reorderPoint: true,
+        averageCost: true,
+        totalValue: true,
+        lastTransactionAt: true,
+        location: { select: { id: true, name: true, type: true } },
+      },
+    },
+  }) satisfies Prisma.ItemInclude
+
+function toNumber(value: unknown): number {
+  return Number(value ?? 0)
+}
+
+function mapItemWithInventory(item: Prisma.ItemGetPayload<{ include: ReturnType<typeof itemInventoryInclude> }>): ItemWithInventory {
+  const inventoryLevel = item.inventoryLevels[0] ?? null
+
+  return {
+    id: item.id,
+    name: item.nameEn,
+    slug: item.slug,
+    sku: item.sku,
+    barcode: item.barcode,
+    description: item.descriptionEn,
+    imageUrls: item.imageUrls.join(","),
+    thumbnail: item.thumbnail,
+    dimensions: item.dimensions,
+    weight: item.weight === null ? null : toNumber(item.weight),
+    costPrice: toNumber(item.costPrice),
+    sellingPrice: toNumber(item.sellingPrice),
+    trackInventory: item.trackInventory,
+    minStockLevel: toNumber(item.minStockLevel),
+    maxStockLevel: item.maxStockLevel === null ? null : toNumber(item.maxStockLevel),
+    reorderLevel: toNumber(item.reorderLevel),
+    reorderQuantity: item.reorderQuantity === null ? null : toNumber(item.reorderQuantity),
+    isActive: item.isActive,
+    isDiscontinued: item.isDiscontinued,
+    category: item.category ? { id: item.category.id, title: item.category.titleEn, slug: item.category.slug } : null,
+    brand: item.brand ? { id: item.brand.id, brandName: item.brand.nameEn, slug: item.brand.slug } : null,
+    unit: item.unit ? { id: item.unit.id, name: item.unit.nameEn, symbol: item.unit.symbol } : null,
+    taxRate: item.taxRate
+      ? {
+          id: item.taxRate.id,
+          taxRateName: item.taxRate.nameEn,
+          rate: toNumber(item.taxRate.rate),
+          taxType: item.taxRate.type,
+        }
+      : null,
+    inventoryLevel: inventoryLevel
+      ? {
+          id: inventoryLevel.id,
+          quantityOnHand: toNumber(inventoryLevel.quantityOnHand),
+          quantityReserved: toNumber(inventoryLevel.quantityReserved),
+          quantityAvailable: toNumber(inventoryLevel.quantityAvailable),
+          quantityInTransit: toNumber(inventoryLevel.quantityInTransit),
+          quantityOnOrder: toNumber(inventoryLevel.quantityOnOrder),
+          reorderPoint: toNumber(inventoryLevel.reorderPoint),
+          averageCost: toNumber(inventoryLevel.averageCost),
+          totalValue: toNumber(inventoryLevel.totalValue),
+          location: {
+            id: inventoryLevel.location.id,
+            name: inventoryLevel.location.name,
+            type: inventoryLevel.location.type,
+          },
+          lastTransactionAt: inventoryLevel.lastTransactionAt,
+        }
+      : null,
+    createdAt: item.createdAt,
+    updatedAt: item.updatedAt,
+  }
 }
 
 export async function fetchItemsWithInventoryLevels({
@@ -113,279 +160,66 @@ export async function fetchItemsWithInventoryLevels({
   search,
   skip = 0,
   take = 50,
-  orderBy = 'name',
-  orderDirection = 'asc'
+  orderBy = "name",
+  orderDirection = "asc",
 }: FetchItemsParams): Promise<FetchItemsResponse> {
-  try {
-    // Validate required parameters
-    if (!locationId || !organizationId) {
-      throw new Error('locationId and organizationId are required')
-    }
+  if (!locationId || !organizationId) {
+    throw new Error("locationId and organizationId are required")
+  }
 
-    // Build the where clause
-    const whereClause: any = {
-      organizationId,
-      isActive,
-      ...(categoryId && { categoryId }),
-      ...(brandId && { brandId }),
-      ...(trackInventory !== undefined && { trackInventory }),
-      ...(search && {
-        OR: [
-          { name: { contains: search, mode: 'insensitive' } },
-          { sku: { contains: search, mode: 'insensitive' } },
-          { barcode: { contains: search, mode: 'insensitive' } },
-          { description: { contains: search, mode: 'insensitive' } }
-        ]
-      })
-    }
-
-    // Build the orderBy clause
-    let orderByClause: any = {}
-    
-    if (orderBy === 'quantityOnHand') {
-      // Special handling for inventory level ordering
-      orderByClause = {
-        inventoryLevels: {
-          _count: orderDirection
+  const where: Prisma.ItemWhereInput = {
+    organizationId,
+    isActive,
+    deletedAt: null,
+    ...(categoryId ? { categoryId } : {}),
+    ...(brandId ? { brandId } : {}),
+    ...(trackInventory !== undefined ? { trackInventory } : {}),
+    ...(search
+      ? {
+          OR: [
+            { nameEn: { contains: search, mode: "insensitive" } },
+            { nameFr: { contains: search, mode: "insensitive" } },
+            { sku: { contains: search, mode: "insensitive" } },
+            { barcode: { contains: search, mode: "insensitive" } },
+            { descriptionEn: { contains: search, mode: "insensitive" } },
+            { descriptionFr: { contains: search, mode: "insensitive" } },
+          ],
         }
-      }
-    } else {
-      orderByClause = {
-        [orderBy]: orderDirection
-      }
-    }
+      : {}),
+  }
 
-    // Execute the query with count
-    const [items, totalCount] = await Promise.all([
-      prisma.item.findMany({
-        where: whereClause,
-        include: {
-          category: {
-            select: {
-              id: true,
-              title: true,
-              slug: true
-            }
-          },
-          brand: {
-            select: {
-              id: true,
-              brandName: true,
-              slug: true
-            }
-          },
-          unit: {
-            select: {
-              id: true,
-              name: true,
-              symbol: true,
-              type: true
-            }
-          },
-          taxRate: {
-            select: {
-              id: true,
-              taxRateName: true,
-              rate: true,
-              taxType: true
-            }
-          },
-          inventoryLevels: {
-            where: {
-              locationId
-            },
-            select: {
-              id: true,
-              quantityOnHand: true,
-              quantityReserved: true,
-              quantityAvailable: true,
-              quantityInTransit: true,
-              quantityOnOrder: true,
-              reorderPoint: true,
-              averageCost: true,
-              totalValue: true,
-              lastCountDate: true,
-              lastTransactionAt: true,
-              locationId: true,
-              location: {
-                select: {
-                  id: true,
-                  name: true,
-                  type: true
-                }
-              }
-            }
-          }
-        },
-        orderBy: orderByClause,
-        skip,
-        take
-      }),
-      prisma.item.count({
-        where: whereClause
-      })
-    ])
+  const orderByClause: Prisma.ItemOrderByWithRelationInput =
+    orderBy === "quantityOnHand"
+      ? { inventoryLevels: { _count: orderDirection } }
+      : { [orderBy === "name" ? "nameEn" : orderBy]: orderDirection }
 
-    // Transform the data to match our interface
-    const transformedItems: ItemWithInventory[] = items.map(item => ({
-      id: item.id,
-      name: item.name,
-      slug: item.slug,
-      sku: item.sku,
-      barcode: item.barcode,
-      description: item.description,
-      imageUrls: item.imageUrls,
-      thumbnail: item.thumbnail,
-      dimensions: item.dimensions,
-      weight: item.weight,
-      color: item.color,
-      size: item.size,
-      costPrice: item.costPrice,
-      sellingPrice: item.sellingPrice,
-      msrp: item.msrp,
-      trackInventory: item.trackInventory,
-      trackSerialNumbers: item.trackSerialNumbers,
-      trackBatches: item.trackBatches,
-      trackExpiry: item.trackExpiry,
-      minStockLevel: item.minStockLevel,
-      maxStockLevel: item.maxStockLevel,
-      reorderLevel: item.reorderLevel,
-      reorderQuantity: item.reorderQuantity,
-      isActive: item.isActive,
-      isDiscontinued: item.isDiscontinued,
-      category: item.category,
-      brand: item.brand,
-      unit: item.unit,
-      taxRate: item.taxRate,
-      inventoryLevel: item.inventoryLevels.length > 0 ? item.inventoryLevels[0] : null,
-      createdAt: item.createdAt,
-      updatedAt: item.updatedAt
-    }))
+  const [items, totalCount] = await Promise.all([
+    db.item.findMany({
+      where,
+      include: itemInventoryInclude(locationId),
+      orderBy: orderByClause,
+      skip,
+      take,
+    }),
+    db.item.count({ where }),
+  ])
 
-    const hasMore = skip + take < totalCount
-
-    return {
-      items: transformedItems,
-      totalCount,
-      hasMore
-    }
-
-  } catch (error) {
-    console.error('Error fetching items with inventory levels:', error)
-    throw new Error('Failed to fetch items with inventory levels')
-  } finally {
-    await prisma.$disconnect()
+  return {
+    items: items.map(mapItemWithInventory),
+    totalCount,
+    hasMore: skip + take < totalCount,
   }
 }
 
-// Additional helper function to fetch a single item with inventory
 export async function fetchItemWithInventoryLevel(
   itemId: string,
   locationId: string,
-  organizationId: string
+  organizationId: string,
 ): Promise<ItemWithInventory | null> {
-  try {
-    const item = await prisma.item.findFirst({
-      where: {
-        id: itemId,
-        organizationId
-      },
-      include: {
-        category: {
-          select: {
-            id: true,
-            title: true,
-            slug: true
-          }
-        },
-        brand: {
-          select: {
-            id: true,
-            brandName: true,
-            slug: true
-          }
-        },
-        unit: {
-          select: {
-            id: true,
-            name: true,
-            symbol: true,
-            type: true
-          }
-        },
-        taxRate: {
-          select: {
-            id: true,
-            taxRateName: true,
-            rate: true,
-            taxType: true
-          }
-        },
-        inventoryLevels: {
-          where: {
-            locationId
-          },
-          select: {
-            id: true,
-            quantityOnHand: true,
-            quantityReserved: true,
-            quantityAvailable: true,
-            quantityInTransit: true,
-            quantityOnOrder: true,
-            reorderPoint: true,
-            averageCost: true,
-            totalValue: true,
-            lastCountDate: true,
-            lastTransactionAt: true,
-            location: {
-              select: {
-                id: true,
-                name: true,
-                type: true
-              }
-            }
-          }
-        }
-      }
-    })
+  const item = await db.item.findFirst({
+    where: { id: itemId, organizationId, deletedAt: null },
+    include: itemInventoryInclude(locationId),
+  })
 
-    if (!item) {
-      return null
-    }
-
-    return {
-      id: item.id,
-      name: item.name,
-      slug: item.slug,
-      sku: item.sku,
-      barcode: item.barcode,
-      description: item.description,
-      imageUrls: item.imageUrls,
-      thumbnail: item.thumbnail,
-      dimensions: item.dimensions,
-      weight: item.weight,
-      costPrice: item.costPrice,
-      sellingPrice: item.sellingPrice,
-      trackInventory: item.trackInventory,
-      minStockLevel: item.minStockLevel,
-      maxStockLevel: item.maxStockLevel,
-      reorderLevel: item.reorderLevel,
-      reorderQuantity: item.reorderQuantity,
-      isActive: item.isActive,
-      isDiscontinued: item.isDiscontinued,
-      category: item.category,
-      brand: item.brand,
-      unit: item.unit,
-      taxRate: item.taxRate,
-      inventoryLevel: item.inventoryLevels.length > 0 ? item.inventoryLevels[0] : null,
-      createdAt: item.createdAt,
-      updatedAt: item.updatedAt
-    }
-
-  } catch (error) {
-    console.error('Error fetching item with inventory level:', error)
-    throw new Error('Failed to fetch item with inventory level')
-  } finally {
-    await prisma.$disconnect()
-  }
+  return item ? mapItemWithInventory(item) : null
 }

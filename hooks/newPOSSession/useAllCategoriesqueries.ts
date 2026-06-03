@@ -1,8 +1,7 @@
 "use client"
 
+import { notify } from "@/lib/notifications/notify"
 import { useQuery } from "@tanstack/react-query"
-import { toast } from "sonner"
-
 // Mock category data
 const mockCategories = [
   {
@@ -40,7 +39,7 @@ export const useOrgCategories = () => {
     retry: 2,
     onError: (error: any) => {
       console.error("Failed to fetch categories:", error)
-      toast.error("Failed to load categories")
+      notify.error("Failed to load categories")
     },
   })
 }

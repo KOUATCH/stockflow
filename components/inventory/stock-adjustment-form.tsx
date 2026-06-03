@@ -1,5 +1,6 @@
 'use client'
 
+import { notify } from "@/lib/notifications/notify"
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -9,7 +10,6 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { useToast } from '@/hooks/use-toast';
 import { adjustStock } from '@/actions/inventory/adjust-stock';
 import { StockAdjustmentData } from '@/types/inventory';
 
@@ -19,7 +19,6 @@ interface StockAdjustmentFormProps {
 
 export function StockAdjustmentForm({ onSuccess }: StockAdjustmentFormProps) {
   const [loading, setLoading] = useState(false);
-  const { toast } = useToast();
   const { register, handleSubmit, reset, setValue, watch } = useForm<StockAdjustmentData>();
 
   const onSubmit = async (data: StockAdjustmentData) => {
@@ -28,21 +27,21 @@ export function StockAdjustmentForm({ onSuccess }: StockAdjustmentFormProps) {
       const result = await adjustStock([data]);
       
       if (result.success) {
-        toast({
+        notify({
           title: "Stock Adjusted",
           description: "Inventory levels have been updated successfully.",
         });
         reset();
         onSuccess();
       } else {
-        toast({
+        notify({
           title: "Error",
           description: result.error || "Failed to adjust stock",
           variant: "destructive",
         });
       }
     } catch (error) {
-      toast({
+      notify({
         title: "Error",
         description: "An unexpected error occurred",
         variant: "destructive",

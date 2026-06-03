@@ -9,6 +9,8 @@ import {
     SheetTrigger,
 } from "@/components/ui/sheet";
 import { getInitials } from "@/lib/generateInitials";
+import { getLocaleFromPathname, localizePath } from "@/i18n/routing";
+import { DEFAULT_LOCALE } from "@/types/bilingual";
 import {
     Headset,
     LogOut,
@@ -20,16 +22,19 @@ import {
     UserRound,
 } from "lucide-react";
 import { signOut } from "@/lib/auth-client";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 
 export function AvatarMenuButton({ session }: { session: any }) {
   const user = session.user;
   const initials = getInitials(user.name ?? "");
   const router = useRouter();
+  const pathname = usePathname();
+  const locale = getLocaleFromPathname(pathname) ?? DEFAULT_LOCALE;
+  const localizedHref = (href: string) => localizePath(href, locale);
   async function handleLogout() {
     try {
       await signOut();
-      router.push("/login");
+      router.push(localizedHref("/login"));
     } catch (error) {
       console.log(error);
     }

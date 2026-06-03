@@ -3,7 +3,7 @@
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Badge } from "@/components/ui/badge"
 import { PiggyBank, TrendingUp, TrendingDown } from "lucide-react"
-import { ComposedChart, Bar, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts'
+import { ComposedChart, Bar, Cell, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts'
 
 interface CashFlowChartProps {
   data: Array<{ period: string; value: number }>
@@ -129,10 +129,16 @@ export function CashFlowChart({ data }: CashFlowChartProps) {
               <Bar
                 yAxisId="change"
                 dataKey="change"
-                fill={(entry: any) => entry.isPositive ? '#10b981' : '#ef4444'}
                 opacity={0.7}
                 radius={[2, 2, 0, 0]}
-              />
+              >
+                {cashFlowData.map((entry) => (
+                  <Cell
+                    key={`cash-flow-change-${entry.period}`}
+                    fill={entry.isPositive ? '#10b981' : '#ef4444'}
+                  />
+                ))}
+              </Bar>
             </ComposedChart>
           </ResponsiveContainer>
         </div>

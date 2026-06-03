@@ -1,6 +1,6 @@
 "use client"
 
-import { getOrgSuppliers } from "@/services/supplierAPI"
+import { getOrgSuppliersClientSafe } from "@/actions/suppliers/clientSafeSuppliersActions"
 import { useQuery } from "@tanstack/react-query"
 
 export interface SupplierDTO {
@@ -29,7 +29,7 @@ export const useGetOrgSuppliers = async (orgId: string): Promise<SupplierRespons
   if (!orgId) {
     throw new Error("Organization ID is required")
   }
-const orgSuppliers = await getOrgSuppliers(orgId)
+const orgSuppliers = await getOrgSuppliersClientSafe(orgId)
   if (!orgSuppliers.success) {
     throw new Error(orgSuppliers.error || "Failed to fetch suppliers")
   }
@@ -45,7 +45,7 @@ const orgSuppliers = await getOrgSuppliers(orgId)
 export const useOrgSuppliers = (organizationId: string, options?: { enabled?: boolean }) => {
   return useQuery({
     queryKey: ["orgSuppliers", organizationId],
-    queryFn: () => getOrgSuppliers(organizationId), 
+    queryFn: () => getOrgSuppliersClientSafe(organizationId),
     staleTime: 5 * 60 * 1000, // 5 minutes
     enabled: !!organizationId && (options?.enabled ?? true),
     retry: 3,

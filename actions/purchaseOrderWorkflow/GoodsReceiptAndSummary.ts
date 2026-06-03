@@ -1,93 +1,23 @@
-'use server'
+"use server"
 
-import { db } from '@/prisma/db'
-import { PurchaseOrderStatus as POStatus, Prisma } from '@prisma/client'
+import { requireOrg } from "@/services/_shared/require-org"
+import {
+  getGoodsReceipts,
+  getSummary,
+} from "@/services/purchase-order/purchase-order.service"
 
-/**
- * Runtime type for goods receipts with lines, item, receivedBy, and location.
- */
-export type GoodsReceiptWithRelations = Prisma.GoodsReceiptGetPayload<{
-  include: {
-    lines: {
-      include: {
-        item: {
-          select: {
-            id: true
-            name: true
-            sku: true
-          }
-        }
-      }
+type GoodsReceiptRow = Awaited<ReturnType<typeof getGoodsReceipts>>[number]
+
+export type GoodsReceiptWithRelations = Omit<GoodsReceiptRow, "lines" | "receivedBy"> & {
+  lines: Array<
+    Omit<GoodsReceiptRow["lines"][number], "item" | "receivedQuantity" | "unitCost" | "lineTotal"> & {
+      receivedQuantity: number
+      unitCost: number
+      lineTotal: number
+      item: GoodsReceiptRow["lines"][number]["item"] & { name: string }
     }
-    receivedBy: {
-      select: {
-        id: true
-        name: true
-        email: true
-      }
-    }
-    location: {
-      select: {
-        id: true
-        name: true
-        address: true
-      }
-    }
-  }
-}>
-
-/**
- * Fetches goods receipts for a purchase order.
- */
-export async function getGoodsReceiptsForPurchaseOrder(
-  purchaseOrderId: string,
-  organizationId: string
-): Promise<GoodsReceiptWithRelations[]> {
-  try {
-    if (!purchaseOrderId) throw new Error('Purchase order ID is required')
-    if (!organizationId) throw new Error('Organization ID is required')
-
-    const receipts = await db.goodsReceipt.findMany({
-      where: {
-        purchaseOrderId,
-        organizationId,
-      },
-      include: {
-        lines: {
-          include: {
-            item: {
-              select: {
-                id: true,
-                name: true,
-                sku: true,
-              },
-            },
-          },
-        },
-        receivedBy: {
-          select: {
-            id: true,
-            name: true,
-            email: true,
-          },
-        },
-        location: {
-          select: {
-            id: true,
-            name: true,
-            address: true,
-          },
-        },
-      },
-      // Prefer receiptDate for ordering; createdAt is also valid
-      orderBy: { receiptDate: 'desc' },
-    })
-
-    return receipts
-  } catch (error) {
-    console.error('Error fetching goods receipts:', error)
-    throw new Error('Failed to fetch goods receipts')
-  }
+  >
+  receivedBy: (NonNullable<GoodsReceiptRow["receivedBy"]> & { name: string }) | null
 }
 
 export type PurchaseOrderSummary = {
@@ -99,76 +29,77 @@ export type PurchaseOrderSummary = {
     partiallyReceived: number
     received: number
     cancelled: number
-    closed: number // mapped from COMPLETED
+    closed: number
   }
   totalValue: number
   overdueOrders: number
 }
 
-/**
- * Computes a summary of purchase orders for an organization.
- * - Uses the Prisma enum statuses
- * - "closed" is mapped from COMPLETED
- * - "overdue" means expectedDeliveryDate < now AND status not in [RECEIVED, COMPLETED, CANCELLED]
- */
-export async function getPurchaseOrdersSummary(organizationId: string): Promise<PurchaseOrderSummary> {
-  try {
-    if (!organizationId) throw new Error('Organization ID is required')
+function userDisplayName(user: { firstName?: string | null; lastName?: string | null; email?: string | null } | null) {
+  if (!user) return ""
+  return [user.firstName, user.lastName].filter(Boolean).join(" ").trim() || user.email || ""
+}
 
-    const now = new Date()
+function toNumber(value: unknown): number {
+  if (value == null) return 0
+  if (typeof value === "number") return value
+  if (typeof value === "string") return Number(value) || 0
+  if (typeof value === "object" && "toString" in value) return Number(value.toString()) || 0
+  return 0
+}
 
-    const [
-      totalOrders,
-      draftOrders,
-      submittedOrders,
-      approvedOrders,
-      partiallyReceivedOrders,
-      receivedOrders,
-      cancelledOrders,
-      completedOrders,
-      totalValueAgg,
-      overdueOrders,
-    ] = await Promise.all([
-      db.purchaseOrder.count({ where: { organizationId } }),
-      db.purchaseOrder.count({ where: { organizationId, status: POStatus.DRAFT } }),
-      db.purchaseOrder.count({ where: { organizationId, status: POStatus.SUBMITTED } }),
-      db.purchaseOrder.count({ where: { organizationId, status: POStatus.APPROVED } }),
-      db.purchaseOrder.count({ where: { organizationId, status: POStatus.PARTIALLY_RECEIVED } }),
-      db.purchaseOrder.count({ where: { organizationId, status: POStatus.RECEIVED } }),
-      db.purchaseOrder.count({ where: { organizationId, status: POStatus.CANCELLED } }),
-      db.purchaseOrder.count({ where: { organizationId, status: POStatus.COMPLETED } }),
-      db.purchaseOrder.aggregate({
-        where: { organizationId },
-        _sum: { total: true },
-      }),
-      db.purchaseOrder.count({
-        where: {
-          organizationId,
-          expectedDeliveryDate: { lt: now },
-          // Exclude delivered/completed/cancelled
-          status: { notIn: [POStatus.RECEIVED, POStatus.COMPLETED, POStatus.CANCELLED] },
-        },
-      }),
-    ])
+async function scopedOrg(organizationId: string) {
+  const { orgId } = await requireOrg()
+  if (organizationId !== orgId) {
+    throw new Error("You do not have access to this organization")
+  }
+  return orgId
+}
 
-    const totalValue = totalValueAgg?._sum?.total ?? 0
+export async function getGoodsReceiptsForPurchaseOrder(
+  purchaseOrderId: string,
+  organizationId: string,
+): Promise<GoodsReceiptWithRelations[]> {
+  if (!purchaseOrderId) throw new Error("Purchase order ID is required")
+  const orgId = await scopedOrg(organizationId)
+  const receipts = await getGoodsReceipts(purchaseOrderId, orgId)
 
-    return {
-      totalOrders,
-      statusBreakdown: {
-        draft: draftOrders,
-        submitted: submittedOrders,
-        approved: approvedOrders,
-        partiallyReceived: partiallyReceivedOrders,
-        received: receivedOrders,
-        cancelled: cancelledOrders,
-        closed: completedOrders, // map COMPLETED -> closed
+  return receipts.map((receipt) => ({
+    ...receipt,
+    receivedBy: receipt.receivedBy
+      ? {
+          ...receipt.receivedBy,
+          name: userDisplayName(receipt.receivedBy),
+        }
+      : null,
+    lines: receipt.lines.map((line) => ({
+      ...line,
+      receivedQuantity: toNumber(line.receivedQuantity),
+      unitCost: toNumber(line.unitCost),
+      lineTotal: toNumber(line.lineTotal),
+      item: {
+        ...line.item,
+        name: line.item.nameEn || line.item.nameFr || line.item.sku,
       },
-      totalValue,
-      overdueOrders,
-    }
-  } catch (error) {
-    console.error('Error fetching purchase orders summary:', error)
-    throw new Error('Failed to fetch purchase orders summary')
+    })),
+  }))
+}
+
+export async function getPurchaseOrdersSummary(organizationId: string): Promise<PurchaseOrderSummary> {
+  const orgId = await scopedOrg(organizationId)
+  const summary = await getSummary(orgId)
+  return {
+    totalOrders: summary.totalOrders,
+    statusBreakdown: {
+      draft: summary.statusBreakdown.draft,
+      submitted: summary.statusBreakdown.submitted,
+      approved: summary.statusBreakdown.approved,
+      partiallyReceived: summary.statusBreakdown.partiallyReceived,
+      received: summary.statusBreakdown.received,
+      cancelled: summary.statusBreakdown.cancelled,
+      closed: summary.statusBreakdown.completed,
+    },
+    totalValue: Number(summary.totalValue),
+    overdueOrders: summary.overdueOrders,
   }
 }

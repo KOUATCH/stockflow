@@ -1,6 +1,6 @@
 'use client'
 
-import { createPurchaseOrder } from '@/actions/purchaseOrders/createPurchaseOrder'
+import { createPurchaseOrder } from '@/actions/purchaseOrderWorkflow/purchaseOrderSystemAction'
 import type {
   CreatePurchaseOrderPayload
 } from '@/types/purchase-orders-system-types'
@@ -16,6 +16,7 @@ export function useCreatePurchaseOrderHook() {
   const qc = useQueryClient()
 
   return useMutation({
+    meta: { operation: 'create', entity: 'Purchase Order' },
     mutationFn: async (payload: CreatePurchaseOrderPayload) => {
       const res = await createPurchaseOrder(payload)
       if (!res?.success) {

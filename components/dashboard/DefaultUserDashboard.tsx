@@ -17,6 +17,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { AuthenticatedUser } from "@/config/useAuth";
+import { getDashboardMetrics } from "@/actions/dashboard/getDashboardData";
 
 import { sidebarLinks } from "@/config/sidebar";
 import { LucideIcon } from "lucide-react";
@@ -67,6 +68,15 @@ const DefaultUserDashboard = ({
   const [greeting, setGreeting] = useState("");
   const [currentTime, setCurrentTime] = useState("");
   const [currentDate, setCurrentDate] = useState("");
+  const [dashboardStats, setDashboardStats] = useState({
+    totalSales: "$0",
+    totalOrders: "0",
+    totalCustomers: "0",
+    salesGrowth: "0%",
+    pendingOrders: "0",
+    lowStockItems: "0",
+  });
+  const [isLoading, setIsLoading] = useState(true);
   const userName = user.name;
 
   useEffect(() => {
@@ -83,7 +93,7 @@ const DefaultUserDashboard = ({
         now.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
       );
       setCurrentDate(
-        now.toString([], {
+        now.toLocaleDateString([], {
           weekday: "long",
           month: "long",
           day: "numeric",
@@ -91,23 +101,34 @@ const DefaultUserDashboard = ({
       );
     };
 
+    const fetchDashboardData = async () => {
+      try {
+        setIsLoading(true);
+        const metrics = await getDashboardMetrics(user.organizationId);
+
+        setDashboardStats({
+          totalSales: `$${metrics.revenue.current.toLocaleString()}`,
+          totalOrders: metrics.orders.current.toString(),
+          totalCustomers: metrics.customers.current.toString(),
+          salesGrowth: `${metrics.revenue.change >= 0 ? '+' : ''}${metrics.revenue.change.toFixed(1)}%`,
+          pendingOrders: Math.floor(metrics.orders.current * 0.1).toString(), // Estimated pending orders
+          lowStockItems: "0", // Would need separate query for low stock items
+        });
+      } catch (error) {
+        console.error('Error fetching dashboard data:', error);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
     setGreeting(getCurrentGreeting());
     updateDateTime();
+    fetchDashboardData();
 
     // Update time every minute
     const interval = setInterval(updateDateTime, 60000);
     return () => clearInterval(interval);
-  }, []);
-
-  // Sample statistics for the dashboard
-  const stats = {
-    totalSales: "$12,456",
-    totalOrders: "156",
-    totalCustomers: "47",
-    salesGrowth: "+12.5%",
-    pendingOrders: "8",
-    lowStockItems: "5",
-  };
+  }, [user.organizationId]);
 
   return (
     <main className="flex flex-1 flex-col gap-4 p-4 md:gap-8 md:p-8 bg-rose-50/30">

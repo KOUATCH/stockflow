@@ -1,30 +1,33 @@
-import { locationAPI } from "@/services/locationAPI"
-import { LocationDTO } from "@/types/location"
+import { notify } from "@/lib/notifications/notify"
+import { createLocation, CreateLocationData } from "@/actions/locations/locationActions"
 import { LocationKeys } from "@/types/queryKeys"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
-import { toast } from "sonner"
-
 export function useCreateALocation() {
   const queryClient = useQueryClient()
 
   return useMutation({
-    mutationFn: async (data: LocationDTO) => {
-      return await locationAPI.createNewLocation(data)
+    meta: { operation: 'create', entity: 'Location' , suppressSuccessNotification: true, suppressErrorNotification: true },
+    mutationFn: async (data: CreateLocationData) => {
+      const result = await createLocation(data)
+      if (!result.success) {
+        throw new Error(result.error)
+      }
+      return result.data
     },
-    onSuccess: (newItem) => {
-      toast.success("Item created successfully")
+    onSuccess: (newLocation) => {
+      notify.success("Location created successfully")
 
-      // Invalidate and refetch items list
+      // Invalidate and refetch location queries
       queryClient.invalidateQueries({ queryKey: LocationKeys.lists() })
 
-      if (newItem?.organizationId) {
+      if (newLocation?.organizationId) {
         queryClient.invalidateQueries({
-          queryKey: LocationKeys.orgLocations(newItem.organizationId),
+          queryKey: LocationKeys.orgLocations(newLocation.organizationId),
         })
       }
     },
     onError: (error: Error) => {
-      toast.error("Failed to create item", {
+      notify.error("Failed to create location", {
         description: error.message || "Unknown error occurred",
       })
     },

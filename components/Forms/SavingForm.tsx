@@ -1,21 +1,23 @@
 "use client";
 
+import { notify } from "@/lib/notifications/notify"
 import { Card, CardContent } from "@/components/ui/card";
 
 import { SavingProps } from "@/types/types";
 import { Saving } from "@prisma/client";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
-import { toast } from "sonner";
 import TextInput from "../FormInputs/TextInput";
 import FormFooter from "./FormFooter";
 import FormHeader from "./FormHeader";
 ;
 
 import createSaving from "@/actions/savings/createSaving";
+import { getLocaleFromPathname, localizePath } from "@/i18n/routing";
 import { convertDateToIso } from "@/lib/convertDateToIso";
 import { convertIsoToDateString } from "@/lib/convertISODateToNorma";
+import { DEFAULT_LOCALE } from "@/types/bilingual";
 import FormSelectInput from "../FormInputs/FormSelectInput";
 
 export type SelectOptionProps = {
@@ -98,6 +100,9 @@ export default function SavingForm({
     },
   });
   const router = useRouter();
+  const pathname = usePathname();
+  const locale = getLocaleFromPathname(pathname) ?? DEFAULT_LOCALE;
+  const localizedHref = (href: string) => localizePath(href, locale);
 
   const [loading, setLoading] = useState(false);
   const initialUserId = initialData?.userId;
@@ -120,7 +125,7 @@ export default function SavingForm({
         // await updateCategoryById(editingId, data);
         setLoading(false);
         // Toast
-        toast.success("Updated Successfully!");
+        notify.success("Updated Successfully!");
         //reset
         reset();
         //route
@@ -130,7 +135,7 @@ export default function SavingForm({
         await createSaving(data);
         setLoading(false);
         // Toast
-        toast.success("Successfully Created!");
+        notify.success("Successfully Created!");
         //reset
         reset();
         //route
@@ -181,7 +186,7 @@ export default function SavingForm({
                     option={selectedUser}
                     setOption={setSelectedUser}
                     toolTipText="Add New Member"
-                    href="/register"
+                    href={localizedHref("/register")}
                   />
                   <TextInput
                     register={register}

@@ -2,7 +2,33 @@
 
 import { db } from "@/prisma/db"
 import type { ItemSupplierUpdateData, UpdateItemSupplierDTO, UpdateItemSupplierResponse } from "@/types/itemSuppliers"
+import { Prisma } from "@prisma/client"
 import { revalidatePath } from "next/cache"
+
+const toItemSupplierUpdateInput = (
+  data: Partial<ItemSupplierUpdateData>
+): Prisma.ItemSupplierUpdateInput => ({
+  isPreferred: data.isPreferred,
+  supplierSku: data.supplierSku ?? null,
+  leadTimeDays: data.leadTime ?? null,
+  minOrderQuantity: data.minOrderQty ?? null,
+  unitCost: data.unitCost ?? null,
+  lastPurchaseDate: data.lastPurchaseDate ?? null,
+  notes: data.notes ?? null,
+})
+
+const mapItemSupplierResult = (itemSupplier: any) => ({
+  ...itemSupplier,
+  leadTime: itemSupplier.leadTimeDays,
+  minOrderQty: itemSupplier.minOrderQuantity ? Number(itemSupplier.minOrderQuantity) : null,
+  unitCost: itemSupplier.unitCost ? Number(itemSupplier.unitCost) : null,
+  item: itemSupplier.item
+    ? {
+        ...itemSupplier.item,
+        name: itemSupplier.item.nameEn ?? itemSupplier.item.nameFr ?? "",
+      }
+    : undefined,
+})
 
 export const updateItemSupplier = async (data: UpdateItemSupplierDTO): Promise<UpdateItemSupplierResponse> => {
   try {
@@ -16,7 +42,7 @@ export const updateItemSupplier = async (data: UpdateItemSupplierDTO): Promise<U
 
     // Prepare update data - only include fields that can be updated
     // Exclude id, itemId, and supplierId as they're used for identification
-    const updateData: ItemSupplierUpdateData = {
+    const updateData = toItemSupplierUpdateInput({
       isPreferred: data.isPreferred,
       supplierSku: data.supplierSku,
       leadTime: data.leadTime ?? null, // Convert undefined to null for Prisma
@@ -24,12 +50,12 @@ export const updateItemSupplier = async (data: UpdateItemSupplierDTO): Promise<U
       unitCost: data.unitCost ?? null, // Convert undefined to null for Prisma
       lastPurchaseDate: data.lastPurchaseDate ?? null, // Convert undefined to null for Prisma
       notes: data.notes,
-    }
+    })
 
     // Execute both operations in a transaction
     const result = await db.$transaction(async (tx) => {
       // If setting this supplier as preferred, first set all other suppliers to not preferred
-      if (updateData.isPreferred) {
+      if (data.isPreferred === true) {
         await tx.itemSupplier.updateMany({
           where: {
             itemId: data.itemId,
@@ -64,7 +90,9 @@ export const updateItemSupplier = async (data: UpdateItemSupplierDTO): Promise<U
           item: {
             select: {
               id: true,
-              name: true,
+              sku: true,
+              nameEn: true,
+              nameFr: true,
             },
           },
         },
@@ -80,7 +108,7 @@ export const updateItemSupplier = async (data: UpdateItemSupplierDTO): Promise<U
 
     return {
       success: true,
-      data: result,
+      data: mapItemSupplierResult(result),
       error: null,
     }
   } catch (error) {
@@ -161,14 +189,7 @@ export const updateItemSupplierById = async (
       // Update the specific supplier
       const updatedItemSupplier = await tx.itemSupplier.update({
         where: { id },
-        data: {
-          ...data,
-          // Ensure undefined values are converted to null for Prisma
-          leadTime: data.leadTime ?? null,
-          minOrderQty: data.minOrderQty ?? null,
-          unitCost: data.unitCost ?? null,
-          lastPurchaseDate: data.lastPurchaseDate ?? null,
-        },
+        data: toItemSupplierUpdateInput(data),
         include: {
           supplier: {
             select: {
@@ -181,7 +202,9 @@ export const updateItemSupplierById = async (
           item: {
             select: {
               id: true,
-              name: true,
+              sku: true,
+              nameEn: true,
+              nameFr: true,
             },
           },
         },
@@ -196,7 +219,7 @@ export const updateItemSupplierById = async (
 
     return {
       success: true,
-      data: result,
+      data: mapItemSupplierResult(result),
       error: null,
     }
   } catch (error) {
@@ -269,13 +292,7 @@ export const updateMultipleItemSuppliers = async (
         // Update the supplier
         const updatedSupplier = await tx.itemSupplier.update({
           where: { id: update.id },
-          data: {
-            ...update.data,
-            leadTime: update.data.leadTime ?? null,
-            minOrderQty: update.data.minOrderQty ?? null,
-            unitCost: update.data.unitCost ?? null,
-            lastPurchaseDate: update.data.lastPurchaseDate ?? null,
-          },
+          data: toItemSupplierUpdateInput(update.data),
           include: {
             supplier: {
               select: {
@@ -288,7 +305,9 @@ export const updateMultipleItemSuppliers = async (
             item: {
               select: {
                 id: true,
-                name: true,
+                sku: true,
+                nameEn: true,
+                nameFr: true,
               },
             },
           },
@@ -309,7 +328,7 @@ export const updateMultipleItemSuppliers = async (
 
     return {
       success: true,
-      data: results,
+      data: results.map(mapItemSupplierResult),
       error: null,
     }
   } catch (error) {

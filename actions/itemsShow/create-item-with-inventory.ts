@@ -1,44 +1,54 @@
 'use server'
-
+import { inventoryAction } from "@/lib/error-handling";
+import type { ServerActionResult } from "@/lib/error-handling/types";
 import { revalidatePath } from "next/cache";
 import { db } from "@/prisma/db";
 import { TransactionType, ItemCreateWithInventoryDTO } from "@/types/inventory";
+import { getAuthenticatedUser } from "@/config/useAuth";
 
 const DEFAULT_IMAGE_URL = "https://14J7oh8kso.ufs.sh/f/HLxTbDBCDLwfAXaapcezIN7vwylKf1PXSCqAuseUG0gx8mhd";
 
-export async function createItemWithInventory(data: ItemCreateWithInventoryDTO & { organizationId: string, userId: string }) {
+export const createItemWithInventory = inventoryAction(
+  async (data: ItemCreateWithInventoryDTO & { organizationId?: string, userId?: string }): Promise<ServerActionResult<any>> => {
+    const user = await getAuthenticatedUser();
+    const organizationId = data.organizationId ?? user?.organizationId;
 
-  const {
-    locationId,
-    initialQuantity = 0,
-    unitCost,
-    batchNumber,
-    expiryDate,
-    notes,
-    ...itemData
-  } = data;
+    if (!organizationId) {
+      throw new Error("Organization not found");
+    }
 
-  // Generate missing fields
-  const sku = itemData.sku || `SKU-${Date.now()}`;
-  const slug = itemData.slug || itemData.name.toLowerCase().replace(/\s+/g, '-');
+    const {
+      locationId,
+      initialQuantity = 0,
+      unitCost,
+      batchNumber,
+      expiryDate,
+      notes,
+      organizationId: _organizationId,
+      userId: _userId,
+      ...itemData
+    } = data;
 
-  const formattedItemData = {
-    ...itemData,
-    sku,
-    slug,
-    organizationId: data.organizationId,
-    costPrice: Number(itemData.costPrice ?? 0),
-    sellingPrice: Number(itemData.sellingPrice ?? 0),
-    imageUrls: Array.isArray(itemData.imageUrls) ? itemData.imageUrls[0] || DEFAULT_IMAGE_URL : DEFAULT_IMAGE_URL,
-  };
+    // Generate missing fields
+    const sku = itemData.sku || `SKU-${Date.now()}`;
+    const slug = itemData.slug || itemData.nameEn.toLowerCase().replace(/\s+/g, '-');
 
-  try {
+    const formattedItemData = {
+      ...itemData,
+      sku,
+      slug,
+      organizationId,
+      costPrice: Number(itemData.costPrice ?? 0),
+      sellingPrice: Number(itemData.sellingPrice ?? 0),
+      imageUrls: itemData.imageUrls ? [itemData.imageUrls] : [DEFAULT_IMAGE_URL],
+    };
+
     const result = await db.$transaction(async (tx) => {
       // Check if item already exists
       const existingItem = await tx.item.findUnique({
         where: {
           organizationId_sku: {
-            organizationId: data.organizationId,
+            organizationId,
             sku: sku,
           },
         },
@@ -75,11 +85,11 @@ export async function createItemWithInventory(data: ItemCreateWithInventoryDTO &
               quantity: initialQuantity,
               unitCost: unitCost || formattedItemData.costPrice,
               totalCost: (unitCost || formattedItemData.costPrice) * initialQuantity,
-              notes: notes || `Initial stock for ${newItem.name}`,
+              notes: notes || `Initial stock for ${newItem.nameEn}`,
               itemId: newItem.id,
               locationId,
-              organizationId: data.organizationId,
-              createdById: data.userId,
+            organizationId,
+            createdById: data.userId ?? user?.id,
               batchNumber,
               expiryDate,
               serialNumbers: [],
@@ -89,34 +99,32 @@ export async function createItemWithInventory(data: ItemCreateWithInventoryDTO &
         }
 
         return {
-          success: true,
-          data: {
-            item: newItem,
-            inventoryLevel,
-          },
-          error: null,
+          item: newItem,
+          inventoryLevel,
         };
       }
 
       return {
-        success: true,
-        data: {
-          item: newItem,
-          inventoryLevel: null,
-        },
-        error: null,
+        item: newItem,
+        inventoryLevel: null,
       };
     });
 
     revalidatePath("/inventory/items");
     revalidatePath("/inventory/levels");
-    return result;
-  } catch (error) {
-    console.error("Error creating item with inventory:", error);
+
     return {
-      success: false,
-      error: error instanceof Error ? error.message : "Unknown error",
-      data: null,
+      success: true,
+      data: result,
     };
+  },
+  {
+    actionName: 'createItemWithInventory',
+    component: 'InventoryManagement',
+    businessContext: {
+      domain: 'inventory',
+      operation: 'create',
+      resourceType: 'item'
+    }
   }
-}
+)

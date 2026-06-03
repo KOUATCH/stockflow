@@ -1,4 +1,6 @@
 "use client";
+
+import { notify } from "@/lib/notifications/notify"
 import { updateBlogContent, updateMetaData } from "@/actions/blogs";
 import ImageInput from "@/components/FormInputs/ImageInput";
 import TextArea from "@/components/FormInputs/TextAreaInput";
@@ -17,7 +19,6 @@ import { Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
-import { toast } from "sonner";
 import VEditor from "./editor";
 ;
 export type MetaPros = {
@@ -56,7 +57,7 @@ export default function BlogEditForm({
       data.thumbnail = imageUrl;
       await updateMetaData(editingId, data);
       setLoading(false);
-      toast.success("Updated Successfully!");
+      notify.success("Updated Successfully!");
       reset();
       setImageUrl("/placeholder.png");
       setLoading(false);
@@ -70,7 +71,7 @@ export default function BlogEditForm({
     try {
       await updateBlogContent(editingId, content);
       setLoading(false);
-      toast.success("Updated successfully");
+      notify.success("Updated successfully");
     } catch (error) {
       console.log(error);
     }

@@ -1,5 +1,6 @@
 "use client"
 
+import { notify } from "@/lib/notifications/notify"
 import type React from "react"
 
 import { registerUser } from "@/actions/auth"; // Updated import path
@@ -11,8 +12,9 @@ import { Label } from "@/components/ui/label"
 import { Progress } from "@/components/ui/progress"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { TooltipProvider } from "@/components/ui/tooltip"
-import { useToast } from "@/hooks/use-toast"; // Using standard toast instead of custom notifications
+import { getLocaleFromPathname, localizePath } from "@/i18n/routing"
 import { cn } from "@/lib/utils"
+import { DEFAULT_LOCALE } from "@/types/bilingual"
 import type { RegisterUserProps } from "@/types/types"
 import {
   Activity,
@@ -38,7 +40,7 @@ import {
   Users,
 } from "lucide-react"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 import { useCallback, useState } from "react"
 import { Controller, useForm } from "react-hook-form"
 
@@ -115,7 +117,9 @@ export default function RegisterForm() {
   } = useForm<RegisterUserProps>()
 
   const router = useRouter()
-  const { toast } = useToast() // Using standard toast
+  const pathname = usePathname()
+  const locale = getLocaleFromPathname(pathname) ?? DEFAULT_LOCALE
+  const localizedHref = (href: string) => localizePath(href, locale)
 
   const password = watch("password")
 
@@ -156,19 +160,19 @@ export default function RegisterForm() {
 
     if (isValid && !completedSteps.has(currentStep)) {
       setCompletedSteps((prev) => new Set([...prev, currentStep]))
-      toast({
+      notify({
         title: "Step Completed! ✨",
         description: `${FORM_STEPS.find((s) => s.id === currentStep)?.title} completed successfully!`,
       })
     }
 
     return isValid
-  }, [currentStep, trigger, completedSteps, toast])
+  }, [currentStep, trigger, completedSteps])
 
   const handleNext = useCallback(async () => {
     const isValid = await validateCurrentStep()
     if (!isValid) {
-      toast({
+      notify({
         variant: "destructive",
         title: "Complete This Step",
         description: "Please fill in all required fields to continue.",
@@ -184,7 +188,7 @@ export default function RegisterForm() {
       }
       setIsAnimating(false)
     }, 300)
-  }, [currentStep, validateCurrentStep, toast])
+  }, [currentStep, validateCurrentStep])
 
   const handlePrevious = useCallback(() => {
     setIsAnimating(true)
@@ -219,7 +223,7 @@ export default function RegisterForm() {
             setIsAnimating(false)
           }, 300)
         } else {
-          toast({
+          notify({
             variant: "destructive",
             title: "Complete Current Step",
             description: "Please complete the current step before moving forward.",
@@ -227,7 +231,7 @@ export default function RegisterForm() {
         }
       }
     },
-    [currentStep, completedSteps, validateCurrentStep, toast],
+    [currentStep, completedSteps, validateCurrentStep],
   )
 
   const progress = calculateProgress()
@@ -241,15 +245,15 @@ export default function RegisterForm() {
 
       if (result.success) {
         setLoading(false)
-        toast({
+        notify({
           title: "Account Created! 🎉",
           description: "Welcome to StockFlow! You can now log in with your credentials.",
         })
         reset()
-        router.push("/login")
+        router.push(localizedHref("/login"))
       } else {
         setLoading(false)
-        toast({
+        notify({
           variant: "destructive",
           title: "Registration Failed",
           description: result.error || "Unable to create account.",
@@ -257,7 +261,7 @@ export default function RegisterForm() {
       }
     } catch (error) {
       setLoading(false)
-      toast({
+      notify({
         variant: "destructive",
         title: "Network Error",
         description: "Unable to create account. Please try again.",
@@ -799,20 +803,20 @@ export default function RegisterForm() {
                               <label htmlFor="terms" className="text-slate-700 leading-relaxed text-sm">
                                 <span className="font-semibold">I agree to the </span>
                                 <Link
-                                  href="/terms"
+                                  href={localizedHref("/terms")}
                                   className="text-emerald-600 hover:text-emerald-700 font-semibold underline"
                                 >
                                   Terms of Service
                                 </Link>
                                 <span className="font-semibold"> and </span>
                                 <Link
-                                  href="/privacy"
+                                  href={localizedHref("/privacy")}
                                   className="text-emerald-600 hover:text-emerald-700 font-semibold underline"
                                 >
                                   Privacy Policy
                                 </Link>
                                 <div className="text-xs text-slate-600 mt-1">
-                                  By creating an account, you agree to our terms and acknowledge that you've read our
+                                  By creating an account, you agree to our terms and acknowledge that you have read our
                                   privacy policy.
                                 </div>
                               </label>
@@ -922,7 +926,7 @@ export default function RegisterForm() {
                   Already have an account?
                 </p>
                 <Link
-                  href="/login"
+                  href={localizedHref("/login")}
                   className="text-emerald-600 hover:text-emerald-700 font-bold text-base transition-colors hover:underline"
                 >
                   Sign In Here

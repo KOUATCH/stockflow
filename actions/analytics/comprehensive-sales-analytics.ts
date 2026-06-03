@@ -1,7 +1,9 @@
 "use server"
 
 import { db } from "@/prisma/db"
-import { endOfDay, startOfDay, startOfMonth, startOfWeek, subDays, subMonths, subWeeks } from "date-fns"
+import { endOfDay, startOfDay, startOfMonth, startOfWeek, subDays } from "date-fns"
+import { salesAction } from "@/lib/error-handling"
+import type { ServerActionResult } from "@/lib/error-handling/types"
 
 export interface ComprehensiveSalesMetrics {
   revenue: {
@@ -143,14 +145,15 @@ export interface ComprehensiveSalesMetrics {
   }>
 }
 
-export async function getComprehensiveSalesAnalytics(
-  organizationId: string,
-  locationId: string,
-  startDate: Date,
-  endDate: Date,
-  comparison: "previous_period" | "previous_year" | "custom" = "previous_period"
-): Promise<ComprehensiveSalesMetrics> {
-  try {
+export const getComprehensiveSalesAnalytics = salesAction(
+  async (params: {
+    organizationId: string,
+    locationId: string,
+    startDate: Date,
+    endDate: Date,
+    comparison?: "previous_period" | "previous_year" | "custom"
+  }): Promise<ServerActionResult<ComprehensiveSalesMetrics>> => {
+    const { organizationId, locationId, startDate, endDate, comparison = "previous_period" } = params
     const start = startOfDay(startDate)
     const end = endOfDay(endDate)
 
@@ -189,25 +192,35 @@ export async function getComprehensiveSalesAnalytics(
     const trends = generateTrends(currentSales, comparisonSales)
 
     return {
-      revenue,
-      transactions,
-      customers,
-      products,
-      staff,
-      payments,
-      geography,
-      timing,
-      promotions,
-      loyalty,
-      kpis,
-      alerts,
-      trends
+      success: true,
+      data: {
+        revenue,
+        transactions,
+        customers,
+        products,
+        staff,
+        payments,
+        geography,
+        timing,
+        promotions,
+        loyalty,
+        kpis,
+        alerts,
+        trends
+      }
     }
-  } catch (error) {
-    console.error("Error getting comprehensive sales analytics:", error)
-    throw new Error("Failed to get comprehensive sales analytics")
+  },
+  {
+    actionName: 'getComprehensiveSalesAnalytics',
+    component: 'SalesAnalyticsDashboard',
+    businessContext: {
+      domain: 'sales',
+      operation: 'read',
+      resourceType: 'salesAnalytics',
+      criticalOperation: false
+    }
   }
-}
+)
 
 async function fetchSalesData(organizationId: string, locationId: string, start: Date, end: Date) {
   return await db.salesOrder.findMany({
@@ -223,9 +236,9 @@ async function fetchSalesData(organizationId: string, locationId: string, start:
           item: {
             select: {
               id: true,
-              name: true,
+              nameEn: true,
               sku: true,
-              category: { select: { title: true } },
+              category: { select: { titleEn: true } },
               costPrice: true,
               sellingPrice: true
             }
@@ -236,10 +249,7 @@ async function fetchSalesData(organizationId: string, locationId: string, start:
       customer: {
         select: {
           id: true,
-          firstName: true,
-          lastName: true,
-          isVIP: true,
-          loyaltyPoints: true,
+          name: true,
           createdAt: true
         }
       },
@@ -253,7 +263,6 @@ async function fetchSalesData(organizationId: string, locationId: string, start:
       createdBy: {
         select: {
           id: true,
-          name: true,
           firstName: true,
           lastName: true
         }
@@ -407,10 +416,10 @@ function calculateProductMetrics(sales: any[], inventory: any[]) {
   sales.forEach(sale => {
     sale.lines.forEach((line: any) => {
       if (line.item) {
-        categories.add(line.item.category?.title || 'Uncategorized')
+        categories.add(line.item.category?.titleEn || 'Uncategorized')
         const key = line.item.id
         const existing = productSales.get(key) || {
-          name: line.item.name,
+          name: line.item.nameEn,
           sales: 0,
           quantity: 0,
           revenue: 0
@@ -463,7 +472,7 @@ function calculateStaffMetrics(staff: any[], sales: any[]) {
       }, 0)
 
       return {
-        name: user.name || `${user.firstName || ''} ${user.lastName || ''}`.trim(),
+        name: `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email || "Staff member",
         sales: userTotal,
         transactions: userTransactions,
         hours: userHours
@@ -715,29 +724,43 @@ function generateTrends(currentSales: any[], comparisonSales: any[]) {
   return trends
 }
 
-export async function getSalesAspectsCarousel(
-  organizationId: string,
-  locationId: string = "all",
-  period: string = "today"
-): Promise<any> {
-  const now = new Date()
-  let startDate: Date
-  let endDate: Date = now
+export const getSalesAspectsCarousel = salesAction(
+  async (params: {
+    organizationId: string,
+    locationId?: string,
+    period?: string
+  }): Promise<ServerActionResult<any>> => {
+    const { organizationId, locationId = "all", period = "today" } = params
+    const now = new Date()
+    let startDate: Date
+    let endDate: Date = now
 
-  switch (period) {
-    case "yesterday":
-      startDate = subDays(now, 1)
-      endDate = subDays(now, 1)
-      break
-    case "week":
-      startDate = startOfWeek(now)
-      break
-    case "month":
-      startDate = startOfMonth(now)
-      break
-    default:
-      startDate = startOfDay(now)
+    switch (period) {
+      case "yesterday":
+        startDate = subDays(now, 1)
+        endDate = subDays(now, 1)
+        break
+      case "week":
+        startDate = startOfWeek(now)
+        break
+      case "month":
+        startDate = startOfMonth(now)
+        break
+      default:
+        startDate = startOfDay(now)
+    }
+
+    const result = await getComprehensiveSalesAnalytics({ organizationId, locationId, startDate, endDate })
+    return result
+  },
+  {
+    actionName: 'getSalesAspectsCarousel',
+    component: 'SalesCarousel',
+    businessContext: {
+      domain: 'sales',
+      operation: 'read',
+      resourceType: 'salesAspects',
+      criticalOperation: false
+    }
   }
-
-  return await getComprehensiveSalesAnalytics(organizationId, locationId, startDate, endDate)
-}
+)

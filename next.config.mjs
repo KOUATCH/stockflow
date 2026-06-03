@@ -1,44 +1,51 @@
+import createNextIntlPlugin from 'next-intl/plugin';
+
+const withNextIntl = createNextIntlPlugin('./i18n/request.ts');
+
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  serverExternalPackages: ['bcrypt'],
+  serverExternalPackages: ['argon2'],
   experimental: {
     // Reduce memory usage and improve caching
     optimizePackageImports: ['@/components', '@/lib'],
+    // Disable worker threads to fix Jest worker issues
+    workerThreads: false,
+    webpackBuildWorker: false,
   },
-  webpack: (config, { isServer, dev }) => {
-    // Completely exclude bcrypt from client-side bundling
+  // Keep production output self-contained for deployment.
+  output: 'standalone',
+  poweredByHeader: false,
+  devIndicators: false,
+  webpack: (config, { isServer, dev, webpack }) => {
+    // Exclude server-only password hashing from client-side bundling
     if (!isServer) {
       config.resolve.fallback = {
         ...config.resolve.fallback,
-        'bcrypt': false,
-        'node:crypto': false,
-        'node:util': false,
-        'node:fs': false,
-        'node:path': false,
+        'argon2': false,
         'crypto': false,
         'fs': false,
         'path': false,
         'util': false,
       };
     } else {
-      // Server-side externals for native modules
-      config.externals.push('bcrypt');
+      config.externals.push('argon2');
     }
 
-    // Reduce file watching overhead on Windows
-    if (dev) {
-      config.watchOptions = {
-        ignored: [
-          '**/node_modules',
-          '**/.git',
-          '**/.next',
-          '**/DumpStack.log.tmp',
-          '**/pagefile.sys',
-        ],
-        poll: 1000, // Use polling for Windows file system compatibility
-        aggregateTimeout: 300,
-      };
-    }
+    // Handle HTML files and other problematic file types
+    config.module.rules.push({
+      test: /\.html$/,
+      type: 'asset/resource',
+      generator: {
+        filename: 'static/[hash][ext][query]',
+      },
+    });
+
+    // Ignore problematic packages
+    config.plugins.push(
+      new webpack.IgnorePlugin({
+        resourceRegExp: /^(@mapbox\/node-pre-gyp|canvas|sharp)$/,
+      })
+    );
 
     return config;
   },
@@ -68,6 +75,12 @@ const nextConfig = {
         port: '',
         pathname: '/**',
       },
+      {
+        protocol: 'https',
+        hostname: 'via.placeholder.com',
+        port: '',
+        pathname: '/**',
+      },
     ],
   },
   async headers() {
@@ -86,7 +99,7 @@ const nextConfig = {
           },
           {
             key: 'X-XSS-Protection',
-            value: '1; mode=block'
+            value: '0'
           },
           {
             key: 'Referrer-Policy',
@@ -95,6 +108,18 @@ const nextConfig = {
           {
             key: 'Permissions-Policy',
             value: 'camera=(), microphone=(), geolocation=(), interest-cohort=()'
+          },
+          {
+            key: 'Cross-Origin-Opener-Policy',
+            value: 'same-origin'
+          },
+          {
+            key: 'Cross-Origin-Resource-Policy',
+            value: 'same-origin'
+          },
+          {
+            key: 'Origin-Agent-Cluster',
+            value: '?1'
           }
         ]
       }
@@ -129,4 +154,4 @@ const nextConfig = {
   }
 };
 
-export default nextConfig;
+export default withNextIntl(nextConfig);

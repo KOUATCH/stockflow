@@ -235,6 +235,7 @@ const BrandFormForEditing = ({ title, organizationId, editingId, initialData }: 
           id: `brand_${Date.now()}_${Math.floor(Math.random() * 1000)}`, // More predictable ID generation
           ...rest,
           brandName: data.brandName,
+          nameEn: data.brandName,
           slug: generateSlug(data.brandName),
           organizationId: organizationId || "",
           createdAt: new Date(),
@@ -264,6 +265,7 @@ const BrandFormForEditing = ({ title, organizationId, editingId, initialData }: 
           ...data,
           id: itemToEdit.id,
           brandName: data.brandName,
+          nameEn: data.brandName,
           slug: data.slug ?? data.brandName.toLowerCase().replace(/\s+/g, "-"),
           createdAt: data.createdAt ?? new Date(itemToEdit.createdAt ?? Date.now()),
           organizationId: organizationId || "",

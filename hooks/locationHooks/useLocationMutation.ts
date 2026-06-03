@@ -1,7 +1,7 @@
+import { notify } from "@/lib/notifications/notify"
 import { Location } from "@/types/location";
 import { LocationKeys } from "@/types/queryKeys";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { toast } from "sonner";
 // import { LocationKeys } from "../useAllLocationQueries";
 type LocationMutationContext = {
   previousLocationDetail?: Location;
@@ -40,7 +40,7 @@ function useLocationMutation<T>(
     },
 
     onError: (error: Error, variables, context) => {
-      toast.error(errorMessage, {
+      notify.error(errorMessage, {
         description: error.message || "Unknown error occurred",
       })
 
@@ -54,7 +54,7 @@ function useLocationMutation<T>(
     },
 
     onSuccess: (updatedLocation, variables) => {
-      toast.success(successMessage)
+      notify.success(successMessage)
 
       if (!updatedLocation) return
 

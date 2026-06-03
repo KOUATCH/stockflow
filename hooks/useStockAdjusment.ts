@@ -1,3 +1,4 @@
+import { notify } from "@/lib/notifications/notify"
 import {
   createStockAdjustment,
   deleteStockAdjustment,
@@ -5,8 +6,6 @@ import {
   getStockAdjustments,
 } from "@/actions/stock/stockAdjusmentActions"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { toast } from "sonner"
-
 export function useStockAdjustments(locationId?: string) {
   return useQuery({
     queryKey: ["stock-adjustments", locationId],
@@ -29,17 +28,18 @@ export function useCreateStockAdjustment() {
   const queryClient = useQueryClient()
 
   return useMutation({
+    meta: { operation: 'create', entity: 'Stock Adjustment' , suppressSuccessNotification: true, suppressErrorNotification: true },
     mutationFn: createStockAdjustment,
     onSuccess: (data) => {
       // Invalidate and refetch adjustments
       queryClient.invalidateQueries({ queryKey: ["stock-adjustments"] })
 
-      toast.success("Stock adjustment created successfully", {
+      notify.success("Stock adjustment created successfully", {
         description: `${data.adjustmentType} ${data.quantity} units for ${data.item?.name || "item"}`,
       })
     },
     onError: (error) => {
-      toast.error("Failed to create stock adjustment", {
+      notify.error("Failed to create stock adjustment", {
         description: error.message,
       })
     },
@@ -50,15 +50,16 @@ export function useDeleteStockAdjustment() {
   const queryClient = useQueryClient()
 
   return useMutation({
+    meta: { operation: 'delete', entity: 'Stock Adjustment' , suppressSuccessNotification: true, suppressErrorNotification: true },
     mutationFn: deleteStockAdjustment,
     onSuccess: () => {
       // Invalidate and refetch adjustments
       queryClient.invalidateQueries({ queryKey: ["stock-adjustments"] })
 
-      toast.success("Stock adjustment deleted successfully")
+      notify.success("Stock adjustment deleted successfully")
     },
     onError: (error) => {
-      toast.error("Failed to delete stock adjustment", {
+      notify.error("Failed to delete stock adjustment", {
         description: error.message,
       })
     },

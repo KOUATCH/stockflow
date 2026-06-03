@@ -1,7 +1,18 @@
 "use server"
 
 import { db } from "@/prisma/db";
+import type { CashDrawerTransactionType } from "@prisma/client";
 import { revalidatePath } from "next/cache";
+
+type DecimalLike = { toNumber?: () => number; toString: () => string } | number | string | null | undefined
+
+function toNumber(value: DecimalLike): number {
+  if (value == null) return 0
+  if (typeof value === "number") return value
+  if (typeof value === "string") return Number(value) || 0
+  if (typeof value.toNumber === "function") return value.toNumber()
+  return Number(value.toString()) || 0
+}
 
 export interface CashDrawerSession {
   id: string
@@ -43,7 +54,7 @@ export interface cashDrawerTransaction {
   drawerId: string
   sessionId: string
   userId: string
-  type: "OPENING_BALANCE" | "CLOSING_BALANCE" | "SALE" | "CASH_IN" | "CASH_OUT"
+  type: CashDrawerTransactionType
   amount: number
   reason?: string
   description?: string
@@ -99,6 +110,7 @@ export async function openPosSession(
         terminalId,
         userId,
         locationId,
+        organizationId,
         status: "ACTIVE",
         openingBalance: openingBalance,
         expectedBalance: openingBalance,
@@ -193,7 +205,8 @@ export async function closePosSession(
       })
     }
 
-    const variance = actualBalance - (session.expectedBalance || 0)
+    const expectedBalance = toNumber(session.expectedBalance)
+    const variance = actualBalance - expectedBalance
 
     // Update session
     await db.pOSSession.update({
@@ -228,7 +241,7 @@ export async function closePosSession(
           amount: actualBalance,
           reason: "Session closing balance",
           notes: notes,
-          balanceBefore: session.expectedBalance || 0,
+          balanceBefore: expectedBalance,
           balanceAfter: actualBalance,
         },
       })
@@ -277,7 +290,7 @@ export async function addCashToDrawer(
       return { success: false, error: "Cash drawer not found" }
     }
 
-    const currentBalance = cashDrawer.currentBalance
+    const currentBalance = toNumber(cashDrawer.currentBalance)
     const newBalance = currentBalance + amount
 
     // Update cash drawer balance
@@ -355,7 +368,7 @@ export async function removeCashFromDrawer(
       return { success: false, error: "Cash drawer not found" }
     }
 
-    const currentBalance = cashDrawer.currentBalance
+    const currentBalance = toNumber(cashDrawer.currentBalance)
     const newBalance = currentBalance - amount
 
     if (newBalance < 0) {
@@ -427,12 +440,6 @@ export async function getCurrentSession(terminalId: string): Promise<CashDrawerS
           },
         },
         cashDrawerTransactions: {
-          select: {
-            id: true,
-            createdAt: true,
-            amount: true,
-            cashDrawerId: true
-          },
           include: {
             cashDrawer: {
               select: {
@@ -448,7 +455,7 @@ export async function getCurrentSession(terminalId: string): Promise<CashDrawerS
       },
     })
 
-    return session as CashDrawerSession | null
+    return session as unknown as CashDrawerSession | null
   } catch (error) {
     console.error("Error getting current session:", error)
     return null
@@ -474,14 +481,23 @@ export async function getcashDrawerTransactions(sessionId: string, limit = 50): 
 
     // Map cashDrawerId to drawerId to match cashDrawerTransaction interface
     return transactions.map((t) => ({
-      ...t,
+      id: t.id,
       drawerId: t.cashDrawerId,
+      sessionId: t.sessionId ?? "",
+      userId: t.userId,
+      type: t.type,
+      amount: toNumber(t.amount),
+      reason: t.reason ?? undefined,
+      description: t.notes ?? undefined,
+      balanceBefore: toNumber(t.balanceBefore),
+      balanceAfter: toNumber(t.balanceAfter),
+      createdAt: t.createdAt,
       // Ensure user fields are not null
       user: {
         firstName: t.user.firstName ?? "",
         lastName: t.user.lastName ?? "",
       },
-    })) as cashDrawerTransaction[]
+    }))
   } catch (error) {
     console.error("Error getting cash drawer transactions:", error)
     return []
@@ -525,24 +541,24 @@ export async function getCashDrawerSummary(sessionId: string): Promise<CashDrawe
 
     const totalSales = transactions
       .filter((t) => t.type === "SALE")
-      .reduce((sum, t) => sum + t.amount, 0)
+      .reduce((sum, t) => sum + toNumber(t.amount), 0)
 
     const totalCashIn = transactions
       .filter((t) => t.type === "CASH_IN")
-      .reduce((sum, t) => sum + t.amount, 0)
+      .reduce((sum, t) => sum + toNumber(t.amount), 0)
 
     const totalCashOut = transactions
       .filter((t) => t.type === "CASH_OUT")
-      .reduce((sum, t) => sum + t.amount, 0)
+      .reduce((sum, t) => sum + toNumber(t.amount), 0)
 
     const lastTransaction = transactions.length > 0
       ? transactions.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())[0].createdAt
       : undefined
 
     return {
-      currentBalance: cashDrawer.currentBalance,
-      expectedBalance: session.expectedBalance ?? 0,
-      variance: cashDrawer.currentBalance - (session.expectedBalance ?? 0),
+      currentBalance: toNumber(cashDrawer.currentBalance),
+      expectedBalance: toNumber(session.expectedBalance),
+      variance: toNumber(cashDrawer.currentBalance) - toNumber(session.expectedBalance),
       totalSales,
       totalCashIn,
       totalCashOut,

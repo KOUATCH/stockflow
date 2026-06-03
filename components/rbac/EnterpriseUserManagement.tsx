@@ -52,19 +52,20 @@ import {
   Award,
   Zap
 } from "lucide-react";
-import { getUsers, createUser, updateUser, toggleUserStatus, deleteUser, inviteUser } from "@/actions/users";
+import { getUsers, updateUser, toggleUserStatus, deleteUser } from "@/actions/users";
+import { sendInvite } from "@/actions/users/sendInvite";
 import { getRoles, assignRoleToUser, removeRoleFromUser } from "@/actions/roles";
 import { PERMISSIONS } from "@/lib/permissions";
 
 interface User {
   id: string;
   name: string;
-  firstName: string;
-  lastName: string;
+  firstName?: string | null;
+  lastName?: string | null;
   email: string;
-  phone?: string;
-  image?: string;
-  jobTitle?: string;
+  phone?: string | null;
+  image?: string | null;
+  jobTitle?: string | null;
   isActive: boolean;
   isVerified: boolean;
   createdAt: Date;
@@ -73,7 +74,7 @@ interface User {
     id: string;
     name: string;
     code: string;
-    description?: string;
+    description?: string | null;
   }[];
 }
 
@@ -81,7 +82,7 @@ interface Role {
   id: string;
   name: string;
   code: string;
-  description?: string;
+  description?: string | null;
   permissions: string[];
   _count: { users: number };
 }
@@ -131,7 +132,7 @@ export function EnterpriseUserManagement() {
   const [filterStatus, setFilterStatus] = useState<'all' | 'active' | 'inactive'>('all');
   const [showPassword, setShowPassword] = useState(false);
 
-  const { formSuccess, formError, success, error } = useNotifications();
+  const { formSuccess, formError, error: notifyError } = useNotifications();
   const { user, hasPermission } = usePermissions();
 
   // Form states
@@ -188,14 +189,14 @@ export function EnterpriseUserManagement() {
       ]);
 
       if (usersResult.success) {
-        setUsers(usersResult.data);
+        setUsers(usersResult.data ?? []);
       }
 
       if (rolesResult.success) {
-        setRoles(rolesResult.data);
+        setRoles(rolesResult.data ?? []);
       }
     } catch (error) {
-      error("Loading Error", "Failed to load user data");
+      notifyError("Loading Error", "Failed to load user data");
     } finally {
       setLoading(false);
     }
@@ -205,21 +206,23 @@ export function EnterpriseUserManagement() {
     if (!user?.organizationId) return;
 
     try {
-      const result = await inviteUser({
-        ...inviteForm,
-        name: `${inviteForm.firstName} ${inviteForm.lastName}`,
-        image: "",
+      const selectedRole = roles.find((role) => role.id === inviteForm.roleId);
+      const result = await sendInvite({
+        email: inviteForm.email,
+        roleId: inviteForm.roleId,
         organizationId: user.organizationId,
         organizationName: user.organizationName || "",
+        name: selectedRole?.name ?? `${inviteForm.firstName} ${inviteForm.lastName}`,
+        roleName: selectedRole?.name,
       });
 
-      if (result.success) {
+      if (result.status === 200) {
         formSuccess("Invite User", `${inviteForm.firstName} ${inviteForm.lastName} has been invited successfully`);
         setShowInviteDialog(false);
         resetInviteForm();
         loadData();
       } else {
-        formError("Invite User", result.error);
+        formError("Invite User", result.error ?? "Failed to invite user");
       }
     } catch (error) {
       formError("Invite User", "Failed to invite user");
@@ -238,7 +241,7 @@ export function EnterpriseUserManagement() {
         resetEditForm();
         loadData();
       } else {
-        formError("Update User", result.error);
+        formError("Update User", result.error ?? "Failed to update user");
       }
     } catch (error) {
       formError("Update User", "Failed to update user");
@@ -250,10 +253,10 @@ export function EnterpriseUserManagement() {
       const result = await toggleUserStatus(userId, isActive);
 
       if (result.success) {
-        formSuccess("Toggle Status", result.message);
+        formSuccess("Toggle Status", result.message ?? "User status updated successfully");
         loadData();
       } else {
-        formError("Toggle Status", result.error);
+        formError("Toggle Status", result.error ?? "Failed to update user status");
       }
     } catch (error) {
       formError("Toggle Status", "Failed to update user status");
@@ -268,7 +271,7 @@ export function EnterpriseUserManagement() {
         formSuccess("Delete User", "User has been deleted successfully");
         loadData();
       } else {
-        formError("Delete User", result.error);
+        formError("Delete User", result.error ?? "Failed to delete user");
       }
     } catch (error) {
       formError("Delete User", "Failed to delete user");
@@ -283,7 +286,7 @@ export function EnterpriseUserManagement() {
         formSuccess("Assign Role", "Role has been assigned successfully");
         loadData();
       } else {
-        formError("Assign Role", result.error);
+        formError("Assign Role", result.error ?? "Failed to assign role");
       }
     } catch (error) {
       formError("Assign Role", "Failed to assign role");
@@ -298,7 +301,7 @@ export function EnterpriseUserManagement() {
         formSuccess("Remove Role", "Role has been removed successfully");
         loadData();
       } else {
-        formError("Remove Role", result.error);
+        formError("Remove Role", result.error ?? "Failed to remove role");
       }
     } catch (error) {
       formError("Remove Role", "Failed to remove role");
@@ -329,8 +332,8 @@ export function EnterpriseUserManagement() {
   const openEditDialog = (user: User) => {
     setSelectedUser(user);
     setEditForm({
-      firstName: user.firstName,
-      lastName: user.lastName,
+      firstName: user.firstName || "",
+      lastName: user.lastName || "",
       phone: user.phone || "",
       jobTitle: user.jobTitle || "",
     });
@@ -386,7 +389,7 @@ export function EnterpriseUserManagement() {
             </p>
           </div>
 
-          <PermissionGate permission={PERMISSIONS.INVITE_USERS}>
+          <PermissionGate permission={PERMISSIONS.CREATE_USERS}>
             <Dialog open={showInviteDialog} onOpenChange={setShowInviteDialog}>
               <DialogTrigger asChild>
                 <Button
@@ -660,7 +663,7 @@ export function EnterpriseUserManagement() {
                         <div className="flex items-center space-x-3">
                           <div className="relative">
                             <Avatar className="h-10 w-10">
-                              <AvatarImage src={user.image} />
+                              <AvatarImage src={user.image ?? undefined} />
                               <AvatarFallback className={`bg-gradient-to-br ${statusGradient} text-white font-semibold`}>
                                 {getUserInitials(user)}
                               </AvatarFallback>

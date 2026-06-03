@@ -1,8 +1,7 @@
 "use client"
 
+import { notify } from "@/lib/notifications/notify"
 import { useQuery } from "@tanstack/react-query"
-import { toast } from "sonner"
-
 // Mock item data with inventory levels
 const mockItemsWithInventory = [
   {
@@ -80,7 +79,7 @@ export const useOrgItemsWithInventoryLevelsLocation = (locationId?: string) => {
     enabled: true,
     onError: (error: any) => {
       console.error("Failed to fetch items with inventory:", error)
-      toast.error("Failed to load inventory items")
+      notify.error("Failed to load inventory items")
     },
   })
 }

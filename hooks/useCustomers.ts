@@ -24,6 +24,7 @@ export function useToggleCustomerStatus() {
   const queryClient = useQueryClient();
 
   return useMutation({
+    meta: { operation: 'toggle', entity: 'Customer Status' },
     mutationFn: ({ id, organizationId, isActive }: { id: string; organizationId: string; isActive: boolean }) =>
       toggleCustomerStatus(id, organizationId, isActive),
     onSuccess: () => {

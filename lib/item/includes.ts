@@ -4,25 +4,30 @@ export const itemStandardInclude = {
   brand: {
     select: {
       id: true,
-      brandName: true,
+      nameEn: true,
+      nameFr: true,
     },
   },
   category: {
     select: {
       id: true,
-      title: true,
+      titleEn: true,
+      titleFr: true,
     },
   },
   unit: {
     select: {
       id: true,
-      name: true,
+      nameEn: true,
+      nameFr: true,
+      symbol: true,
     },
   },
   taxRate: {
     select: {
       id: true,
-      taxRateName: true,
+      nameEn: true,
+      nameFr: true,
       rate: true,
     },
   },
@@ -37,10 +42,10 @@ export const purchaseOrderInclude = {
     select: { id: true, name: true, address: true },
   },
   createdBy: {
-    select: { id: true, name: true, email: true },
+    select: { id: true, firstName: true, lastName: true, email: true },
   },
   approvedBy: {
-    select: { id: true, name: true, email: true },
+    select: { id: true, firstName: true, lastName: true, email: true },
   },
   lines: {
     select: {
@@ -57,7 +62,7 @@ export const purchaseOrderInclude = {
       item: {
         select: {
           id: true,
-          name: true,
+          nameEn: true,
           sku: true,
         },
       },

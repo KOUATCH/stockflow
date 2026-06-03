@@ -47,15 +47,17 @@ export async function sendResetLink(email: string) {
       };
     }
     const token = generateToken();
+    const verificationTokenExpires = new Date(Date.now() + 60 * 60 * 1000);
     const update = await db.user.update({
       where: {
         email,
       },
       data: {
-        token,
+        verificationToken: token,
+        verificationTokenExpires,
       },
     });
-    const userFirstname = user.firstName;
+    const userFirstname = user.firstName ?? "there";
 
     const resetPasswordLink = `${baseUrl}/reset-password?token=${token}&&email=${email}`;
     const { data, error } = await resend.emails.send({

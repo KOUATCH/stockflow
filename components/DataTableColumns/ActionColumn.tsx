@@ -1,4 +1,6 @@
 "use client";
+
+import { notify } from "@/lib/notifications/notify"
 // import { deleteSaving } from "@/actions/savings";
 import { deleteUnit } from "@/actions/units/deleteUnit";
 import { deleteUser } from "@/actions/users/deleteUser";
@@ -15,8 +17,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { Pencil, Trash } from "lucide-react";
 import Link from "next/link";
-import { toast } from "sonner";
-
 type ActionColumnProps = {
   row: any;
   model: any;
@@ -35,28 +35,28 @@ const ActionColumn = ({
     try {
       if (model === "unit") {
         const res = await deleteUnit(id);
-        if (res?.ok) {
+        if (res?.success) {
           window.location.reload();
         }
-        toast.success(`${model} Deleted Successfully`);
+        notify.success(`${model} Deleted Successfully`);
       }
       // else if (model === "saving") {
       //   const res = await deleteSaving(id);
       //   if (res?.ok) {
       //     window.location.reload();
       //   }
-      //   toast.success(`${model} Deleted Successfully`);
+      //   notify.success(`${model} Deleted Successfully`);
       // }
       else if (model === "user") {
         const res = await deleteUser(id);
         if (res.data) {
           window.location.reload();
         }
-        toast.success(`${model} Deleted Successfully`);
+        notify.success(`${model} Deleted Successfully`);
       }
     } catch (error) {
       console.log(error);
-      toast.error("Category Couldn't be deleted");
+      notify.error("Category Couldn't be deleted");
     }
   }
   return (

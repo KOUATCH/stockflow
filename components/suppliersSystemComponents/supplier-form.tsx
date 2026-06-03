@@ -1,5 +1,6 @@
 "use client"
 
+import { notify } from "@/lib/notifications/notify"
 import { useMemo, useState, useTransition } from "react"
 import { Card, CardContent } from "@/components/ui/card"
 import { Input } from "@/components/ui/input"
@@ -7,13 +8,12 @@ import { Button } from "@/components/ui/button"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Switch } from "@/components/ui/switch"
-import { useToast } from "@/hooks/use-toast"
 import { Command, CommandEmpty, CommandGroup, CommandInput, CommandItem, CommandList } from "@/components/ui/command"
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import { ChevronsUpDown, Check, Plus, Trash, LinkIcon } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
-import type { SupplierDTO, SupplierInput, ItemSupplierLink, RecentPOItem } from "@/types/suppliers"
+import type { SupplierDTO, SupplierInput, ItemSupplierLink, RecentPOItem } from "@/types/suppliersSystemTypes"
 
 type CommonProps = { organizationId: string }
 type CreateProps = {
@@ -34,9 +34,8 @@ type EditProps = {
 }
 
 export default function SupplierForm(props: (CreateProps | EditProps) & CommonProps) {
-  const { toast } = useToast()
-  const [isPending, startTransition] = useTransition()
 
+  const [isPending, startTransition] = useTransition()
   const [name, setName] = useState(props.initial?.name || "")
   const [code, setCode] = useState(props.initial?.code || "")
   const [contactPerson, setContactPerson] = useState(props.initial?.contactPerson || "")
@@ -79,9 +78,9 @@ export default function SupplierForm(props: (CreateProps | EditProps) & CommonPr
         } else {
           await (props as EditProps).onSubmit({ ...base, id: (props.initial as SupplierDTO).id })
         }
-        toast({ title: "Saved", description: "Supplier saved successfully." })
+        notify({ title: "Saved", description: "Supplier saved successfully." })
       } catch (e: any) {
-        toast({ title: "Save failed", description: e?.message || "Please try again.", variant: "destructive" })
+        notify({ title: "Save failed", description: e?.message || "Please try again.", variant: "destructive" })
       }
     })
   }
@@ -220,10 +219,9 @@ function ItemSupplierEditor({
   deleteAction?: (id: string) => Promise<any>
   linkRecentAction?: (months: number) => Promise<RecentPOItem[]>
 }) {
-  const { toast } = useToast()
-  const [links, setLinks] = useState<ItemSupplierLink[]>(initialLinks)
   const [isPending, startTransition] = useTransition()
   const [months, setMonths] = useState<string>("6")
+  const [links, setLinks] = useState<ItemSupplierLink[]>(initialLinks)
 
   const addEmpty = () => {
     setLinks((prev) => [
@@ -250,9 +248,9 @@ function ItemSupplierEditor({
         try {
           await deleteAction(row.id)
           setLinks((prev) => prev.filter((x) => x.id !== id))
-          toast({ title: "Removed", description: "Item link removed." })
+          notify({ title: "Removed", description: "Item link removed." })
         } catch (e: any) {
-          toast({ title: "Remove failed", description: e?.message || "Please try again.", variant: "destructive" })
+          notify({ title: "Remove failed", description: e?.message || "Please try again.", variant: "destructive" })
         }
       })
     } else {
@@ -282,9 +280,9 @@ function ItemSupplierEditor({
     startTransition(async () => {
       try {
         await upsertAction(rows)
-        toast({ title: "Saved", description: "Supplier item links updated." })
+        notify({ title: "Saved", description: "Supplier item links updated." })
       } catch (e: any) {
-        toast({ title: "Save failed", description: e?.message || "Please try again.", variant: "destructive" })
+        notify({ title: "Save failed", description: e?.message || "Please try again.", variant: "destructive" })
       }
     })
   }
@@ -315,12 +313,12 @@ function ItemSupplierEditor({
           added = toAdd.length
           return [...prev, ...toAdd]
         })
-        toast({
+        notify({
           title: "Linked from recent POs",
           description: added > 0 ? `Added ${added} items. Review and Save.` : "No new items found to add.",
         })
       } catch (e: any) {
-        toast({ title: "Link failed", description: e?.message || "Please try again.", variant: "destructive" })
+        notify({ title: "Link failed", description: e?.message || "Please try again.", variant: "destructive" })
       }
     })
   }

@@ -1,8 +1,8 @@
 "use client"
 
+import { notify } from "@/lib/notifications/notify"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { useToast } from "@/components/ui/use-toast"
 import { UploadButton } from "@/lib/uploadthing"
 import { ImageIcon, X } from "lucide-react"
 import Image from "next/image"
@@ -34,12 +34,11 @@ const ImageUploadButtonModernOriginal = ({
   onUploadError,
 }: ImageUploadButtonProps) => {
   const [isUploading, setIsUploading] = useState(false)
-  const { toast } = useToast()
 
-  const handleUploadComplete = (res: any[]) => {
+  const handleUploadComplete = (res: any) => {
     if (res && res[0]) {
       setImageUrl(res[0].url)
-      toast({
+      notify({
         title: "Upload successful",
         description: "Your image has been uploaded successfully.",
       })
@@ -50,7 +49,7 @@ const ImageUploadButtonModernOriginal = ({
 
   const handleUploadError = (error: Error) => {
     console.error("Upload error:", error)
-    toast({
+    notify({
       title: "Upload failed",
       description: error.message || "Something went wrong during upload.",
       variant: "destructive",
@@ -61,7 +60,7 @@ const ImageUploadButtonModernOriginal = ({
 
   const handleRemoveImage = () => {
     setImageUrl("")
-    toast({
+    notify({
       title: "Image removed",
       description: "The image has been removed successfully.",
     })

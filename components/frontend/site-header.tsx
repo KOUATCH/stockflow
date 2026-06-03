@@ -37,6 +37,9 @@ import Logo from "../global/Logo";
 // Removed NextAuth Session import - using Better-Auth session type
 import { Avatar, AvatarFallback, AvatarImage } from "../ui/avatar";
 import { getInitials } from "@/lib/generateInitials";
+import { getLocaleFromPathname, localizePath } from "@/i18n/routing";
+import { DEFAULT_LOCALE } from "@/types/bilingual";
+import { usePathname } from "next/navigation";
 
 const features = [
   {
@@ -107,6 +110,9 @@ const features = [
 export default function SiteHeader({ session }: { session: any | null }) {
   const [open, setOpen] = React.useState(false);
   const [showFeatures, setShowFeatures] = React.useState(false);
+  const pathname = usePathname();
+  const locale = getLocaleFromPathname(pathname) ?? DEFAULT_LOCALE;
+  const localizedHref = (href: string) => localizePath(href, locale);
 
   return (
     <header className="sticky top-0 z-50 w-full border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 ">
@@ -196,7 +202,7 @@ export default function SiteHeader({ session }: { session: any | null }) {
         </div>
         {session ? (
           <Button asChild variant={"ghost"}>
-            <Link href="/dashboard">
+            <Link href={localizedHref("/dashboard")}>
               <Avatar>
                 <AvatarImage
                   src={session?.user?.image ?? ""}
@@ -212,10 +218,10 @@ export default function SiteHeader({ session }: { session: any | null }) {
         ) : (
           <div className="hidden md:flex items-center space-x-4">
             <Button asChild variant="ghost">
-              <Link href={"/login"}>Log in</Link>
+              <Link href={localizedHref("/login")}>Log in</Link>
             </Button>
             <Button>
-              <Link href="/register">Signup</Link>
+              <Link href={localizedHref("/register")}>Signup</Link>
             </Button>
           </div>
         )}

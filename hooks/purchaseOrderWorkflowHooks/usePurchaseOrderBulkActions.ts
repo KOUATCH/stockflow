@@ -1,11 +1,10 @@
 "use client"
 
+import { notify } from "@/lib/notifications/notify"
 import { bulkUpdatePurchaseOrderStatus } from "@/actions/purchaseOrderWorkflow/purchaseOrderWorkflowActions"
 import { PurchaseOrderStatus } from "@prisma/client"
 // import { bulkUpdatePurchaseOrderStatus } from "@/actions/purchase-order-actions"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
-import { toast } from "sonner"
-
 export type BulkActionType = "approve" | "cancel" | "submit"
 
 export function usePurchaseOrderBulkActions(organizationId: string) {
@@ -17,6 +16,7 @@ export function usePurchaseOrderBulkActions(organizationId: string) {
   }
 
   const bulkUpdate = useMutation({
+    meta: { operation: 'update', entity: 'bulk' , suppressSuccessNotification: true, suppressErrorNotification: true },
     mutationFn: async (params: {
       purchaseOrderIds: string[]
       toStatus: PurchaseOrderStatus
@@ -32,15 +32,15 @@ export function usePurchaseOrderBulkActions(organizationId: string) {
     onSuccess: (result) => {
       const { updated, failed } = result
       if (updated.length > 0) {
-        toast.success(`Successfully updated ${updated.length} purchase order(s)`)
+        notify.success(`Successfully updated ${updated.length} purchase order(s)`)
       }
       if (failed.length > 0) {
-        toast.error(`Failed to update ${failed.length} purchase order(s)`)
+        notify.error(`Failed to update ${failed.length} purchase order(s)`)
       }
       invalidateQueries()
     },
     onError: (error) => {
-      toast.error(`Bulk update failed: ${error.message}`)
+      notify.error(`Bulk update failed: ${error.message}`)
     },
   })
 

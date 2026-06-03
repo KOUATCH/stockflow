@@ -31,6 +31,7 @@ export function useCreateStockTransfer() {
   const { success, error } = useNotifications()
 
   return useMutation({
+    meta: { operation: 'create', entity: 'Stock Transfer' , suppressSuccessNotification: true, suppressErrorNotification: true },
     mutationFn: createStockTransfer,
     onSuccess: (data) => {
       // Invalidate and refetch transfers
@@ -71,6 +72,7 @@ export function useUpdateTransferStatus() {
   const { success, error } = useNotifications()
 
   return useMutation({
+    meta: { operation: 'update', entity: 'Transfer Status' , suppressSuccessNotification: true, suppressErrorNotification: true },
     mutationFn: ({
       id,
       status,
@@ -124,6 +126,7 @@ export function useDeleteStockTransfer() {
   const { success, error } = useNotifications()
 
   return useMutation({
+    meta: { operation: 'delete', entity: 'Stock Transfer' , suppressSuccessNotification: true, suppressErrorNotification: true },
     mutationFn: deleteStockTransfer,
     onSuccess: () => {
       // Invalidate and refetch transfers

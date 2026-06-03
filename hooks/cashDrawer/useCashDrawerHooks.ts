@@ -55,6 +55,7 @@ export function useOpenSession() {
   const queryClient = useQueryClient()
 
   return useMutation({
+    meta: { operation: 'open', entity: 'Session' },
     mutationFn: ({
       terminalId,
       userId,
@@ -85,6 +86,7 @@ export function useCloseSession() {
   const queryClient = useQueryClient()
 
   return useMutation({
+    meta: { operation: 'close', entity: 'Session' },
     mutationFn: ({
       sessionId,
       actualBalance,
@@ -108,6 +110,7 @@ export function useAddCash() {
   const queryClient = useQueryClient()
 
   return useMutation({
+    meta: { operation: 'add', entity: 'Cash' },
     mutationFn: ({
       sessionId,
       amount,
@@ -139,6 +142,7 @@ export function useRemoveCash() {
   const queryClient = useQueryClient()
 
   return useMutation({
+    meta: { operation: 'delete', entity: 'Cash' },
     mutationFn: ({
       sessionId,
       amount,

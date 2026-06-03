@@ -48,7 +48,8 @@ interface Role {
   id: string;
   name: string;
   code: string;
-  description?: string;
+  description?: string | null;
+  organizationId: string;
   permissions: string[];
   users: { id: string; name: string; email: string }[];
   _count: { users: number };
@@ -83,7 +84,7 @@ export function RoleManagement() {
   const [filterByPermissions, setFilterByPermissions] = useState<string[]>([]);
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid');
 
-  const { success, error, formSuccess, formError } = useNotifications();
+  const { success, error: notifyError, formSuccess, formError } = useNotifications();
   const { user, hasPermission } = usePermissions();
 
   // Form states
@@ -118,18 +119,21 @@ export function RoleManagement() {
       ]);
 
       if (rolesResult.success) {
-        setRoles(rolesResult.data);
+        setRoles(rolesResult.data ?? []);
       }
 
       if (templatesResult.success) {
-        setRoleTemplates(templatesResult.data);
+        setRoleTemplates((templatesResult.data ?? []).map((template) => ({
+          ...template,
+          permissions: [...template.permissions],
+        })));
       }
 
       if (permissionsResult.success) {
-        setAvailablePermissions(permissionsResult.data);
+        setAvailablePermissions(permissionsResult.data ?? []);
       }
     } catch (error) {
-      error("Failed to Load Data", "Failed to load role data");
+      notifyError("Failed to Load Data", "Failed to load role data");
     } finally {
       setLoading(false);
     }
@@ -152,10 +156,10 @@ export function RoleManagement() {
         resetForm();
         loadData();
       } else {
-        formError("Create Role", result.error);
+        formError("Create Role", result.error ?? "Failed to create role");
       }
     } catch (error) {
-      error("Create Role Failed", "Failed to create role");
+      notifyError("Create Role Failed", "Failed to create role");
     }
   };
 
@@ -176,10 +180,10 @@ export function RoleManagement() {
         resetForm();
         loadData();
       } else {
-        formError("Create Role", result.error);
+        formError("Update Role", result.error ?? "Failed to update role");
       }
     } catch (error) {
-      error("Update Role Failed", "Failed to update role");
+      notifyError("Update Role Failed", "Failed to update role");
     }
   };
 
@@ -191,10 +195,10 @@ export function RoleManagement() {
         formSuccess("Delete Role", "Role deleted successfully");
         loadData();
       } else {
-        formError("Create Role", result.error);
+        formError("Delete Role", result.error ?? "Failed to delete role");
       }
     } catch (error) {
-      error("Delete Role Failed", "Failed to delete role");
+      notifyError("Delete Role Failed", "Failed to delete role");
     }
   };
 
@@ -224,9 +228,9 @@ export function RoleManagement() {
     if (template) {
       setFormData(prev => ({
         ...prev,
-        name: template.name,
-        description: template.description,
-        permissions: template.permissions,
+      name: template.name,
+      description: template.description,
+      permissions: [...template.permissions],
       }));
     }
   };
@@ -244,19 +248,20 @@ export function RoleManagement() {
     const group = PERMISSION_GROUPS[groupName as keyof typeof PERMISSION_GROUPS];
     if (!group) return;
 
-    const allSelected = group.permissions.every(p => formData.permissions.includes(p));
+    const groupPermissions = [...group.permissions] as string[];
+    const allSelected = groupPermissions.every(p => formData.permissions.includes(p));
 
     if (allSelected) {
       // Remove all permissions from this group
       setFormData(prev => ({
         ...prev,
-        permissions: prev.permissions.filter(p => !group.permissions.includes(p)),
+        permissions: prev.permissions.filter(p => !groupPermissions.includes(p)),
       }));
     } else {
       // Add all permissions from this group
       setFormData(prev => ({
         ...prev,
-        permissions: [...new Set([...prev.permissions, ...group.permissions])],
+        permissions: [...new Set([...prev.permissions, ...groupPermissions])],
       }));
     }
   };
@@ -274,8 +279,9 @@ export function RoleManagement() {
   const renderPermissionGroups = () => {
     return Object.entries(PERMISSION_GROUPS).map(([groupKey, group]) => {
       const isExpanded = expandedGroups.has(groupKey);
-      const selectedCount = group.permissions.filter(p => formData.permissions.includes(p)).length;
-      const totalCount = group.permissions.length;
+      const groupPermissions = [...group.permissions] as string[];
+      const selectedCount = groupPermissions.filter(p => formData.permissions.includes(p)).length;
+      const totalCount = groupPermissions.length;
       const allSelected = selectedCount === totalCount;
       const someSelected = selectedCount > 0 && selectedCount < totalCount;
 
@@ -292,10 +298,7 @@ export function RoleManagement() {
                 {isExpanded ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
               </Button>
               <Checkbox
-                checked={allSelected}
-                ref={(el) => {
-                  if (el) el.indeterminate = someSelected;
-                }}
+                checked={someSelected ? "indeterminate" : allSelected}
                 onCheckedChange={() => toggleGroup(groupKey)}
               />
               <Label className="font-medium cursor-pointer" onClick={() => toggleGroup(groupKey)}>
@@ -309,7 +312,7 @@ export function RoleManagement() {
 
           {isExpanded && (
             <div className="grid grid-cols-1 md:grid-cols-2 gap-2 ml-6">
-              {group.permissions.map((permission) => (
+              {groupPermissions.map((permission) => (
                 <div key={permission} className="flex items-center space-x-2">
                   <Checkbox
                     checked={formData.permissions.includes(permission)}

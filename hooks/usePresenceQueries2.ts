@@ -99,6 +99,7 @@ export const useClockIn = () => {
   const { success, error } = useNotifications()
 
   return useMutation({
+    meta: { operation: 'start', entity: 'Presence Session', suppressSuccessNotification: true, suppressErrorNotification: true },
     mutationFn: async (data: {
       locationId: string
       stationId?: string
@@ -143,6 +144,7 @@ export const useClockOut = () => {
   const { success, error } = useNotifications()
 
   return useMutation({
+    meta: { operation: 'stop', entity: 'Presence Session', suppressSuccessNotification: true, suppressErrorNotification: true },
     mutationFn: async (data?: {
       method?: ClockMethod
       notes?: string
@@ -184,6 +186,7 @@ export const useStartBreak = () => {
   const { success, error } = useNotifications()
 
   return useMutation({
+    meta: { operation: 'start', entity: 'Break', suppressSuccessNotification: true, suppressErrorNotification: true },
     mutationFn: async (data?: {
       breakType?: BreakType
       expectedDuration?: number
@@ -235,6 +238,7 @@ export const useEndBreak = () => {
   const { success, error } = useNotifications()
 
   return useMutation({
+    meta: { operation: 'close', entity: 'Break', suppressSuccessNotification: true, suppressErrorNotification: true },
     mutationFn: async () => {
       const result = await endBreak()
       if (result.error) {
@@ -295,6 +299,7 @@ export const useCreateSchedule = () => {
   const { formSuccess, formError } = useNotifications()
 
   return useMutation({
+    meta: { operation: 'create', entity: 'Employee Schedule', suppressSuccessNotification: true, suppressErrorNotification: true },
     mutationFn: async (data: {
       userId: string
       locationId?: string
@@ -361,6 +366,7 @@ export const useMarkAlertAsRead = () => {
   const { error } = useNotifications()
 
   return useMutation({
+    meta: { operation: 'update', entity: 'Presence Alert', suppressSuccessNotification: true, suppressErrorNotification: true },
     mutationFn: async (alertId: string) => {
       const result = await markAlertAsRead(alertId)
       if (result.error) {
@@ -386,6 +392,7 @@ export const useResolveAlert = () => {
   const { success, error } = useNotifications()
 
   return useMutation({
+    meta: { operation: 'resolve', entity: 'Presence Alert', suppressSuccessNotification: true, suppressErrorNotification: true },
     mutationFn: async (data: { alertId: string; resolutionNotes?: string }) => {
       const result = await resolveAlert(data.alertId, data.resolutionNotes)
       if (result.error) {
@@ -425,6 +432,7 @@ export const useLogActivity = () => {
   const queryClient = useQueryClient()
 
   return useMutation({
+    meta: { operation: 'create', entity: 'Activity Log', notify: false },
     mutationFn: async (data: {
       activityType: ActivityType
       description?: string
@@ -441,7 +449,7 @@ export const useLogActivity = () => {
     },
     onError: (error) => {
       console.error("Failed to log activity:", error)
-      // Don't show toast for activity logging errors to avoid spam
+      // Don't show notification for activity logging errors to avoid spam
     },
   })
 }
@@ -505,6 +513,7 @@ export const useGenerateAttendanceReport = () => {
   const { operationComplete, operationStart, error } = useNotifications()
 
   return useMutation({
+    meta: { operation: 'generate', entity: 'Attendance Report', suppressSuccessNotification: true, suppressErrorNotification: true },
     mutationFn: async (data: {
       userId: string
       reportDate: Date

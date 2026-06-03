@@ -3,6 +3,13 @@
 import { auth } from "@/auth"
 import { db } from "@/prisma/db"
 
+const toNumber = (value: unknown): number => {
+  if (value && typeof value === "object" && "toNumber" in value && typeof value.toNumber === "function") {
+    return value.toNumber()
+  }
+  return Number(value ?? 0)
+}
+
 /**
  * Client-safe location actions that don't use getAuthenticatedUser()
  */
@@ -11,19 +18,50 @@ export async function getOrgLocationsClientSafe(organizationId?: string) {
   try {
     const session = await auth()
 
-    if (!session?.user) {
+    if (!session?.user?.id) {
       return { success: false, error: "Not authenticated", data: [] }
     }
 
-    const userOrgId = organizationId || session.user.organizationId
+    const user = await db.user.findFirst({
+      where: {
+        isActive: true,
+        OR: [
+          { id: session.user.id },
+          ...(session.user.email ? [{ email: session.user.email }] : []),
+        ],
+      },
+      select: {
+        organizationId: true,
+        roles: {
+          select: {
+            permissions: true,
+          },
+        },
+      },
+    })
+
+    if (!user) {
+      return { success: false, error: "Not authenticated", data: [] }
+    }
+
+    const permissions = new Set([
+      ...(session.user.permissions ?? []),
+      ...user.roles.flatMap((role) => role.permissions ?? []),
+    ])
+    const userOrgId = organizationId || user.organizationId
 
     if (!userOrgId) {
       return { success: false, error: "No organization ID", data: [] }
     }
 
+    if (userOrgId !== user.organizationId && !permissions.has("*")) {
+      return { success: false, error: "You do not have access to this organization", data: [] }
+    }
+
     const locations = await db.location.findMany({
       where: {
         organizationId: userOrgId,
+        deletedAt: null,
       },
       orderBy: {
         name: 'asc',
@@ -31,23 +69,24 @@ export async function getOrgLocationsClientSafe(organizationId?: string) {
       select: {
         id: true,
         name: true,
+        code: true,
+        type: true,
         address: true,
-        city: true,
-        state: true,
-        zipCode: true,
-        country: true,
         phone: true,
         email: true,
         isActive: true,
-        locationType: true,
-        description: true,
+        isDefault: true,
+        organizationId: true,
+        managerId: true,
+        allowNegativeStock: true,
+        requiresApproval: true,
         createdAt: true,
         updatedAt: true,
         _count: {
           select: {
             inventoryLevels: true,
             purchaseOrders: true,
-            sales: true,
+            salesOrders: true,
           },
         },
       },
@@ -72,20 +111,51 @@ export async function getLocationByIdClientSafe(locationId: string, organization
   try {
     const session = await auth()
 
-    if (!session?.user) {
+    if (!session?.user?.id) {
       return { success: false, error: "Not authenticated", data: null }
     }
 
-    const userOrgId = organizationId || session.user.organizationId
+    const user = await db.user.findFirst({
+      where: {
+        isActive: true,
+        OR: [
+          { id: session.user.id },
+          ...(session.user.email ? [{ email: session.user.email }] : []),
+        ],
+      },
+      select: {
+        organizationId: true,
+        roles: {
+          select: {
+            permissions: true,
+          },
+        },
+      },
+    })
+
+    if (!user) {
+      return { success: false, error: "Not authenticated", data: null }
+    }
+
+    const permissions = new Set([
+      ...(session.user.permissions ?? []),
+      ...user.roles.flatMap((role) => role.permissions ?? []),
+    ])
+    const userOrgId = organizationId || user.organizationId
 
     if (!userOrgId) {
       return { success: false, error: "No organization ID", data: null }
+    }
+
+    if (userOrgId !== user.organizationId && !permissions.has("*")) {
+      return { success: false, error: "You do not have access to this organization", data: null }
     }
 
     const location = await db.location.findFirst({
       where: {
         id: locationId,
         organizationId: userOrgId,
+        deletedAt: null,
       },
       include: {
         inventoryLevels: {
@@ -93,7 +163,8 @@ export async function getLocationByIdClientSafe(locationId: string, organization
             item: {
               select: {
                 id: true,
-                name: true,
+                nameEn: true,
+                nameFr: true,
                 sku: true,
               },
             },
@@ -107,7 +178,7 @@ export async function getLocationByIdClientSafe(locationId: string, organization
           select: {
             inventoryLevels: true,
             purchaseOrders: true,
-            sales: true,
+            salesOrders: true,
           },
         },
       },
@@ -119,7 +190,24 @@ export async function getLocationByIdClientSafe(locationId: string, organization
 
     return {
       success: true,
-      data: location,
+      data: {
+        ...location,
+        inventoryLevels: location.inventoryLevels.map((level) => ({
+          ...level,
+          quantityOnHand: toNumber(level.quantityOnHand),
+          quantityReserved: toNumber(level.quantityReserved),
+          quantityAvailable: toNumber(level.quantityAvailable),
+          quantityInTransit: toNumber(level.quantityInTransit),
+          quantityOnOrder: toNumber(level.quantityOnOrder),
+          reorderPoint: toNumber(level.reorderPoint),
+          averageCost: toNumber(level.averageCost),
+          totalValue: toNumber(level.totalValue),
+          item: {
+            ...level.item,
+            name: level.item.nameEn ?? level.item.nameFr ?? "",
+          },
+        })),
+      },
       error: null
     }
   } catch (error) {

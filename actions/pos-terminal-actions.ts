@@ -1,7 +1,7 @@
 "use server"
 
-import type { CreatepOSStationInput, UpdatepOSStationInput } from "@/lib/validations/pos-terminal"
-import { pOSStationSchema, updatepOSStationSchema } from "@/lib/validations/pos-terminal"
+import type { CreatePosStationInput, UpdatePosStationInput } from "@/lib/validations/pos-terminal"
+import { pOSStationSchema, updatePosStationSchema } from "@/lib/validations/pos-terminal"
 import { db } from "@/prisma/db"
 import { revalidatePath } from "next/cache"
 
@@ -35,14 +35,17 @@ export interface pOSStationWithRelations {
 }
 
 export async function createpOSStation(
-  input: CreatepOSStationInput,
+  input: CreatePosStationInput,
 ): Promise<{ success: boolean; data?: pOSStationWithRelations; error?: string }> {
   try {
     const validatedInput = pOSStationSchema.parse(input)
 
     // Check if terminal number already exists
-    const existingTerminal = await db.pOSStation.findUnique({
-      where: { terminalNumber: validatedInput.terminalNumber },
+    const existingTerminal = await db.pOSStation.findFirst({
+      where: {
+        organizationId: validatedInput.organizationId,
+        terminalNumber: validatedInput.terminalNumber,
+      },
     })
 
     if (existingTerminal) {
@@ -97,10 +100,10 @@ export async function createpOSStation(
 }
 
 export async function updatepOSStation(
-  input: UpdatepOSStationInput,
+  input: UpdatePosStationInput,
 ): Promise<{ success: boolean; data?: pOSStationWithRelations; error?: string }> {
   try {
-    const validatedInput = updatepOSStationSchema.parse(input)
+    const validatedInput = updatePosStationSchema.parse(input)
     const { id, ...updateData } = validatedInput
 
     // Check if terminal exists
@@ -117,6 +120,7 @@ export async function updatepOSStation(
       const duplicateTerminal = await db.pOSStation.findFirst({
         where: {
           terminalNumber: updateData.terminalNumber,
+          organizationId: existingTerminal.organizationId,
           id: { not: id },
         },
       })

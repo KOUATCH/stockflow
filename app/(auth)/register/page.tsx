@@ -1,7 +1,22 @@
-"use client";
-
+import { AuthLayout } from "@/components/auth";
 import BeautifulRegisterForm from "@/components/auth/BeautifulRegisterForm";
+import { auth } from "../../../auth";
+import { LOCALE_COOKIE, localizePath, pickLocale } from "@/i18n/routing";
+import { cookies } from "next/headers";
+import { redirect } from "next/navigation";
 
-export default function Page() {
-  return <BeautifulRegisterForm />;
+export default async function Page() {
+  const cookieStore = await cookies();
+  const locale = pickLocale(cookieStore.get(LOCALE_COOKIE)?.value);
+  const session = await auth();
+
+  if (session) {
+    redirect(localizePath("/dashboard", locale));
+  }
+
+  return (
+    <AuthLayout variant="register">
+      <BeautifulRegisterForm />
+    </AuthLayout>
+  );
 }

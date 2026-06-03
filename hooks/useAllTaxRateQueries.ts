@@ -1,6 +1,5 @@
-// hooks/useTaxRateQueries.ts
-// import { taxRateAPI } from "@/services/taxRateAPI";
-import { taxRateAPI } from "@/services/taxRateAPI";
+import { notify } from "@/lib/notifications/notify"
+import { getOrgTaxRates, createTaxRate, updateTaxRate, deleteTaxRate } from "@/actions/taxes/getTaxRatesAction";
 import { BriefTaxRatePayload, TaxRate, UpdateTaxRatePayload } from "@/types/taxRates";
 
 import {
@@ -8,8 +7,6 @@ import {
   useQuery,
   useQueryClient
 } from "@tanstack/react-query";
-import { toast } from "sonner";
-
 // Query keys for caching
 export const TaxRateGreatKeys = {
   all: ["TaxRate"] as const,
@@ -44,12 +41,18 @@ export const TaxRateKeys = {
 
 // hooks/useAllTaxRateQueries.ts
 export const useOrgTaxRates = (
-  organizationId: string, 
+  organizationId: string,
   options?: { initialData?: BriefTaxRatePayload[] }
 ) => {
   return useQuery({
     queryKey: ['orgTaxRates', organizationId],
-    queryFn: () => taxRateAPI.getAllOrgTaxRates(organizationId),
+    queryFn: async () => {
+      const result = await getOrgTaxRates(organizationId);
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to fetch tax rates');
+      }
+      return result.data || [];
+    },
     initialData: options?.initialData,
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
@@ -57,12 +60,22 @@ export const useOrgTaxRates = (
 
 
 
-export function useTaxRate(id: string) {
-  // Get a single TaxRate
+export function useTaxRate(id: string, organizationId: string) {
+  // Get a single TaxRate (Note: Server actions don't have individual fetch, using org list)
   return useQuery({
     queryKey: TaxRateKeys.detail(id),
-    queryFn: () => taxRateAPI.deleteTaxRate(id),
-    enabled: Boolean(id), // Only run if ID is provided
+    queryFn: async () => {
+      const result = await getOrgTaxRates(organizationId);
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to fetch tax rate');
+      }
+      const taxRate = result.data?.find(tr => tr.id === id);
+      if (!taxRate) {
+        throw new Error('Tax rate not found');
+      }
+      return taxRate;
+    },
+    enabled: Boolean(id) && Boolean(organizationId), // Only run if both IDs are provided
   });
 }
 
@@ -77,8 +90,14 @@ export function useDeleteATaxRateWithOrg() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: ({ id, organizationId }: { id: string; organizationId?: string }) => 
-      taxRateAPI.deleteTaxRate(id),
+    meta: { operation: 'delete', entity: 'Tax Rate Org' , suppressSuccessNotification: true, suppressErrorNotification: true },
+    mutationFn: async ({ id, organizationId }: { id: string; organizationId: string }) => {
+      const result = await deleteTaxRate({ id, organizationId });
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to delete tax rate');
+      }
+      return result;
+    },
     
     onMutate: async ({ id, organizationId }) => {
       // Build query keys based on available data
@@ -133,11 +152,11 @@ export function useDeleteATaxRateWithOrg() {
     },
 
     onSuccess: () => {
-      toast.success("TaxRate deleted successfully");
+      notify.success("TaxRate deleted successfully");
     },
 
     onError: (error: Error, _variables, context) => {
-      toast.error("Failed to delete TaxRate", {
+      notify.error("Failed to delete TaxRate", {
         description: error.message || "Unknown error occurred",
       });
 
@@ -169,8 +188,15 @@ export function useUpdateATaxRate() {
 
   // Update an existing TaxRate
   return useMutation({
-    mutationFn: ({ id, data }: { id: string; data: UpdateTaxRatePayload }) =>
-      taxRateAPI.updateTaxRate(id, data),
+    meta: { operation: 'update', entity: 'Tax Rate' , suppressSuccessNotification: true, suppressErrorNotification: true },
+    mutationFn: async ({ id, data }: { id: string; data: UpdateTaxRatePayload & { organizationId: string } }) => {
+      const { organizationId, ...payload } = data;
+      const result = await updateTaxRate({ id, organizationId, ...payload });
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to update tax rate');
+      }
+      return result.data;
+    },
     onMutate: async (variables) => {
       await queryClient.cancelQueries({ queryKey: TaxRateKeys.detail(variables.id) });
       await queryClient.cancelQueries({ queryKey: TaxRateKeys.lists() });
@@ -190,7 +216,7 @@ export function useUpdateATaxRate() {
       return { previousTaxRateDetail, previousTaxRatesList };
     },
     onError: (error, variables, context) => {
-      toast.error("Failed to update TaxRate", {
+      notify.error("Failed to update TaxRate", {
         description: error.message || "Unknown error occurred",
       });
 
@@ -203,7 +229,7 @@ export function useUpdateATaxRate() {
       }
     },
     onSuccess: (updatedTaxRate, variables) => {
-      toast.success("TaxRate updated successfully");
+      notify.success("TaxRate updated successfully");
 
       queryClient.setQueryData(TaxRateKeys.detail(variables.id), (oldData: TaxRate | undefined) => {
         return { ...oldData, ...updatedTaxRate };

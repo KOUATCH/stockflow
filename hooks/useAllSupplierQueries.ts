@@ -1,38 +1,123 @@
 "use client"
 
-import { createSupplier, deleteSupplier } from "@/actions/supplierSystem/supplierSystemActions"
-import { getOrgSuppliers } from "@/services/supplierAPI"
-import { SupplierDTO } from "@/types/suppliersSystemTypes"
-// import createActionSupplier from "@/actions/suppliers/createActionSupplier"
-// import deleteSupplier from "@/actions/suppliers/deleteSupplier"
-// import getOrgSuppliers from "@/actions/suppliers/getOrgSuppliers"
-// import updateSupplierBasicInfoById from "@/actions/suppliers/updateSupplierBasicInfoById"
-// import updateSupplierById from "@/actions/suppliers/updateSupplierById"
-// import updateSupplierDetailsById from "@/actions/suppliers/updateSupplierDetailsById"
-// import updateSupplierRelationsById from "@/actions/suppliers/updateSupplierRelationsById"
-// import type {
-//   SupplierCreateDTO,
-//   SupplierDTO,
-//   UpdateSupplierBasicInfoPayload,
-//   UpdateSupplierDetailsPayload,
-//   UpdateSupplierPayload,
-//   UpdateSupplierRelationsPayload,
-// } from "@/types/supplier"
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
+import { useMutation, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query"
 import { useEffect } from "react"
-import { toast } from "sonner"
 
-// Query keys for caching
+import { createSupplier } from "@/actions/suppliers/createSupplier"
+import { deleteSupplier } from "@/actions/suppliers/deleteSupplier"
+import { updateSupplier } from "@/actions/suppliers/updateSupplier"
+import { getOrgSuppliersClientSafe } from "@/actions/suppliers/clientSafeSuppliersActions"
+import { notify } from "@/lib/notifications/notify"
+import type {
+  CreateSupplierDTO,
+  SupplierDTO,
+  UpdateSupplierBasicInfoPayload,
+  UpdateSupplierDTO,
+  UpdateSupplierDetailsPayload,
+  UpdateSupplierPayload,
+  UpdateSupplierRelationsPayload,
+} from "@/types/supplier"
+
 export const SupplierKeys = {
   all: ["suppliers"] as const,
   lists: () => [...SupplierKeys.all, "list"] as const,
-  list: (filters: any) => [...SupplierKeys.lists(), { filters }] as const,
-  filteredList: (dateFilter: any, searchQuery: string) =>
+  list: (filters: unknown) => [...SupplierKeys.lists(), { filters }] as const,
+  filteredList: (dateFilter: unknown, searchQuery: string) =>
     [...SupplierKeys.lists(), { dateFilter, searchQuery }] as const,
   details: () => [...SupplierKeys.all, "detail"] as const,
   detail: (id: string) => [...SupplierKeys.details(), id] as const,
   orgSuppliers: (organizationId: string) => [...SupplierKeys.all, "org", organizationId] as const,
   briefOrgSuppliers: (organizationId: string) => [...SupplierKeys.all, "briefOrg", organizationId] as const,
+}
+
+type WrappedSupplierUpdate<T extends UpdateSupplierPayload = UpdateSupplierPayload> = {
+  id: string
+  data: T
+}
+
+type SupplierUpdateInput =
+  | UpdateSupplierDTO
+  | WrappedSupplierUpdate
+  | (UpdateSupplierPayload & { id: string })
+
+type DeleteSupplierInput =
+  | string
+  | {
+      id: string
+      organizationId?: string
+    }
+
+function isWrappedUpdate(input: SupplierUpdateInput): input is WrappedSupplierUpdate {
+  return typeof input === "object" && input !== null && "data" in input
+}
+
+function findOrganizationIdInData(value: unknown, supplierId: string): string | undefined {
+  if (!value) return undefined
+
+  if (Array.isArray(value)) {
+    for (const item of value) {
+      const organizationId = findOrganizationIdInData(item, supplierId)
+      if (organizationId) return organizationId
+    }
+    return undefined
+  }
+
+  if (typeof value !== "object") return undefined
+
+  const record = value as Record<string, unknown>
+  if (record.id === supplierId && typeof record.organizationId === "string") {
+    return record.organizationId
+  }
+
+  for (const key of ["data", "suppliers", "items"]) {
+    const organizationId = findOrganizationIdInData(record[key], supplierId)
+    if (organizationId) return organizationId
+  }
+
+  return undefined
+}
+
+function findSupplierOrganizationId(queryClient: QueryClient, supplierId: string): string | undefined {
+  const supplierQueries = queryClient.getQueryCache().findAll({ queryKey: SupplierKeys.all })
+  for (const query of supplierQueries) {
+    const organizationId = findOrganizationIdInData(query.state.data, supplierId)
+    if (organizationId) return organizationId
+  }
+  return undefined
+}
+
+function normalizeUpdateInput(
+  input: SupplierUpdateInput,
+  queryClient: QueryClient
+): UpdateSupplierDTO {
+  const data = isWrappedUpdate(input) ? input.data : input
+  const id = isWrappedUpdate(input) ? input.id : input.id
+  const organizationId = data.organizationId ?? findSupplierOrganizationId(queryClient, id)
+
+  if (!id) {
+    throw new Error("Supplier ID is required")
+  }
+
+  if (!organizationId) {
+    throw new Error("Organization ID is required to update supplier")
+  }
+
+  return {
+    ...data,
+    id,
+    organizationId,
+  }
+}
+
+function normalizeDeleteInput(
+  input: DeleteSupplierInput,
+  queryClient: QueryClient
+): { id: string; organizationId?: string } {
+  const id = typeof input === "string" ? input : input.id
+  const organizationId =
+    typeof input === "string" ? findSupplierOrganizationId(queryClient, input) : input.organizationId
+
+  return { id, organizationId }
 }
 
 export const useOrgSuppliersNew = (organizationId: string, options?: { enabled?: boolean }) => {
@@ -42,44 +127,57 @@ export const useOrgSuppliersNew = (organizationId: string, options?: { enabled?:
       if (!organizationId) {
         throw new Error("Organization ID is required")
       }
-      return await getOrgSuppliers(organizationId)
+      const response = await getOrgSuppliersClientSafe(organizationId)
+      if (!response.success) {
+        throw new Error(response.error || "Failed to fetch suppliers")
+      }
+      return response
     },
     enabled: !!organizationId && (options?.enabled ?? true),
-    staleTime: 5 * 60 * 1000, // 5 minutes
+    staleTime: 5 * 60 * 1000,
     retry: 3,
     retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 30000),
   })
 
   useEffect(() => {
     if (query.error) {
-      console.error("Failed to fetch organization suppliers:", query.error)
-      toast.error("Failed to load suppliers. Please try again.")
+      notify.error("Failed to load suppliers. Please try again.")
     }
   }, [query.error])
-
-  useEffect(() => {
-    if (query.isSuccess && query.data) {
-      console.log("Successfully loaded suppliers:", query.data?.data?.length || 0)
-    }
-  }, [query.isSuccess, query.data])
 
   return query
 }
 
+export const useOrgSuppliers = useOrgSuppliersNew
+
 export function useCreateSupplier() {
   const queryClient = useQueryClient()
+
   return useMutation({
-    mutationFn: async (data: SupplierCreateDTO) => await createSupplier(data),
-    onSuccess: (_data, variables) => {
-      toast.success("Supplier added successfully")
-      if (variables.organizationId) {
+    meta: {
+      operation: "create",
+      entity: "Supplier",
+      suppressSuccessNotification: true,
+      suppressErrorNotification: true,
+    },
+    mutationFn: async (data: CreateSupplierDTO) => {
+      const response = await createSupplier(data)
+      if (!response.success || !response.data) {
+        throw new Error(response.error || "Failed to add Supplier")
+      }
+      return response.data as SupplierDTO
+    },
+    onSuccess: (data, variables) => {
+      notify.success("Supplier added successfully")
+      queryClient.invalidateQueries({ queryKey: SupplierKeys.orgSuppliers(data.organizationId) })
+      queryClient.invalidateQueries({ queryKey: SupplierKeys.briefOrgSuppliers(data.organizationId) })
+      queryClient.invalidateQueries({ queryKey: SupplierKeys.lists() })
+      if (variables.organizationId !== data.organizationId) {
         queryClient.invalidateQueries({ queryKey: SupplierKeys.orgSuppliers(variables.organizationId) })
-      } else {
-        queryClient.invalidateQueries({ queryKey: SupplierKeys.lists() })
       }
     },
     onError: (error: Error) => {
-      toast.error("Failed to add Supplier", {
+      notify.error("Failed to add Supplier", {
         description: error.message || "Unknown error occurred",
       })
     },
@@ -88,10 +186,30 @@ export function useCreateSupplier() {
 
 export function useDeleteSupplier() {
   const queryClient = useQueryClient()
+
   return useMutation({
-    mutationFn: async ({ id, organizationId }: { id: string; organizationId?: string }) => await deleteSupplier(id),
-    onMutate: async ({ id, organizationId }) => {
+    meta: {
+      operation: "delete",
+      entity: "Supplier",
+      suppressSuccessNotification: true,
+      suppressErrorNotification: true,
+    },
+    mutationFn: async (input: DeleteSupplierInput) => {
+      const { id, organizationId } = normalizeDeleteInput(input, queryClient)
+      if (!organizationId) {
+        throw new Error("Organization ID is required to delete supplier")
+      }
+
+      const response = await deleteSupplier(id, organizationId)
+      if (!response.success) {
+        throw new Error(response.error || "Failed to delete Supplier")
+      }
+      return response.data
+    },
+    onMutate: async (input) => {
+      const { id, organizationId } = normalizeDeleteInput(input, queryClient)
       const queryKeys: Array<readonly unknown[]> = [SupplierKeys.lists()]
+
       if (organizationId) {
         queryKeys.push(SupplierKeys.orgSuppliers(organizationId))
         queryKeys.push(SupplierKeys.briefOrgSuppliers(organizationId))
@@ -99,25 +217,25 @@ export function useDeleteSupplier() {
 
       await Promise.all(queryKeys.map((key) => queryClient.cancelQueries({ queryKey: key })))
 
-      const previousData = new Map()
-
-      const removeSupplierFromData = (oldData: any) => {
+      const previousData = new Map<string, unknown>()
+      const removeSupplierFromData = (oldData: unknown): unknown => {
         if (!oldData) return oldData
         if (Array.isArray(oldData)) {
-          return oldData.filter((supplier: { id: string }) => supplier.id !== id)
+          return oldData.filter((supplier: { id?: string }) => supplier.id !== id)
         }
-        if (oldData.data && Array.isArray(oldData.data)) {
+        if (typeof oldData !== "object") return oldData
+
+        const record = oldData as Record<string, unknown>
+        if (Array.isArray(record.data)) {
           return {
-            ...oldData,
-            data: oldData.data.filter((supplier: { id: string }) => supplier.id !== id),
-            total: Math.max(0, (oldData.total || oldData.data.length) - 1),
+            ...record,
+            data: record.data.filter((supplier: { id?: string }) => supplier.id !== id),
           }
         }
-        if (oldData.suppliers && Array.isArray(oldData.suppliers)) {
+        if (Array.isArray(record.suppliers)) {
           return {
-            ...oldData,
-            suppliers: oldData.suppliers.filter((supplier: { id: string }) => supplier.id !== id),
-            total: Math.max(0, (oldData.total || oldData.suppliers.length) - 1),
+            ...record,
+            suppliers: record.suppliers.filter((supplier: { id?: string }) => supplier.id !== id),
           }
         }
         return oldData
@@ -130,30 +248,28 @@ export function useDeleteSupplier() {
           queryClient.setQueryData(key, removeSupplierFromData)
         }
       })
-      return { previousData, queryKeys }
+
+      return { previousData, queryKeys, organizationId }
     },
     onSuccess: () => {
-      toast.success("Supplier deleted successfully")
+      notify.success("Supplier deleted successfully")
     },
     onError: (error: Error, _variables, context) => {
-      toast.error("Failed to delete Supplier", {
+      notify.error("Failed to delete Supplier", {
         description: error.message || "Unknown error occurred",
       })
-      if (context?.previousData && context?.queryKeys) {
-        context.queryKeys.forEach((key) => {
-          const keyString = JSON.stringify(key)
-          const previousValue = context.previousData.get(keyString)
-          if (previousValue) {
-            queryClient.setQueryData(key, previousValue)
-          }
-        })
-      }
+      context?.queryKeys.forEach((key) => {
+        const previousValue = context.previousData.get(JSON.stringify(key))
+        if (previousValue) {
+          queryClient.setQueryData(key, previousValue)
+        }
+      })
     },
-    onSettled: (_data, _error, { organizationId }) => {
+    onSettled: (_data, _error, _variables, context) => {
       queryClient.invalidateQueries({ queryKey: SupplierKeys.lists() })
-      if (organizationId) {
-        queryClient.invalidateQueries({ queryKey: SupplierKeys.orgSuppliers(organizationId) })
-        queryClient.invalidateQueries({ queryKey: SupplierKeys.briefOrgSuppliers(organizationId) })
+      if (context?.organizationId) {
+        queryClient.invalidateQueries({ queryKey: SupplierKeys.orgSuppliers(context.organizationId) })
+        queryClient.invalidateQueries({ queryKey: SupplierKeys.briefOrgSuppliers(context.organizationId) })
       }
     },
   })
@@ -161,319 +277,53 @@ export function useDeleteSupplier() {
 
 export function useUpdateSupplier() {
   const queryClient = useQueryClient()
+
   return useMutation({
-    mutationFn: async ({ id, data }: { id: string; data: UpdateSupplierPayload }) => updateSupplierById(id, data),
-    onMutate: async (variables) => {
-      await queryClient.cancelQueries({ queryKey: SupplierKeys.detail(variables.id) })
-      await queryClient.cancelQueries({ queryKey: SupplierKeys.lists() })
-      if (variables.data.organizationId) {
-        await queryClient.cancelQueries({ queryKey: SupplierKeys.orgSuppliers(variables.data.organizationId) })
-      }
-
-      const previousSupplierDetail = queryClient.getQueryData(SupplierKeys.detail(variables.id))
-      const previousSuppliersList = queryClient.getQueryData(SupplierKeys.lists())
-      const previousOrgSuppliers = variables.data.organizationId
-        ? queryClient.getQueryData(SupplierKeys.orgSuppliers(variables.data.organizationId))
-        : undefined
-
-      queryClient.setQueryData(SupplierKeys.detail(variables.id), (oldData: SupplierDTO | undefined) => {
-        return { ...oldData, ...variables.data }
-      })
-      queryClient.setQueryData(SupplierKeys.lists(), (oldData: SupplierDTO[] | undefined) => {
-        if (!oldData) return [variables.data as SupplierDTO]
-        return oldData.map((supplier) => (supplier.id === variables.id ? { ...supplier, ...variables.data } : supplier))
-      })
-      if (variables.data.organizationId) {
-        queryClient.setQueryData(
-          SupplierKeys.orgSuppliers(variables.data.organizationId),
-          (oldData: { data: SupplierDTO[] } | undefined) => {
-            if (!oldData) return { data: [variables.data as SupplierDTO] }
-            return {
-              ...oldData,
-              data: oldData.data.map((supplier) =>
-                supplier.id === variables.id ? { ...supplier, ...variables.data } : supplier,
-              ),
-            }
-          },
-        )
-      }
-      return { previousSupplierDetail, previousSuppliersList, previousOrgSuppliers }
+    meta: {
+      operation: "update",
+      entity: "Supplier",
+      suppressSuccessNotification: true,
+      suppressErrorNotification: true,
     },
-    onError: (error, variables, context) => {
-      toast.error("Failed to update Supplier", {
-        description: error.message || "Unknown error occurred",
-      })
-      if (context?.previousSupplierDetail) {
-        queryClient.setQueryData(SupplierKeys.detail(variables.id), context.previousSupplierDetail)
+    mutationFn: async (input: SupplierUpdateInput) => {
+      const payload = normalizeUpdateInput(input, queryClient)
+      const response = await updateSupplier(payload)
+      if (!response.success || !response.data) {
+        throw new Error(response.error || "Failed to update Supplier")
       }
-      if (context?.previousSuppliersList) {
-        queryClient.setQueryData(SupplierKeys.lists(), context.previousSuppliersList)
-      }
-      if (context?.previousOrgSuppliers && variables.data.organizationId) {
-        queryClient.setQueryData(SupplierKeys.orgSuppliers(variables.data.organizationId), context.previousOrgSuppliers)
-      }
+      return response.data as SupplierDTO
     },
     onSuccess: (updatedSupplier, variables) => {
-      toast.success("Supplier updated successfully")
-      queryClient.setQueryData(SupplierKeys.detail(variables.id), (oldData: SupplierDTO | undefined) => {
-        return { ...oldData, ...updatedSupplier }
+      const payload = normalizeUpdateInput(variables, queryClient)
+      notify.success("Supplier updated successfully")
+      queryClient.setQueryData(SupplierKeys.detail(payload.id), updatedSupplier)
+      queryClient.invalidateQueries({ queryKey: SupplierKeys.detail(payload.id) })
+      queryClient.invalidateQueries({ queryKey: SupplierKeys.lists() })
+      queryClient.invalidateQueries({ queryKey: SupplierKeys.orgSuppliers(payload.organizationId) })
+      queryClient.invalidateQueries({ queryKey: SupplierKeys.briefOrgSuppliers(payload.organizationId) })
+    },
+    onError: (error: Error) => {
+      notify.error("Failed to update Supplier", {
+        description: error.message || "Unknown error occurred",
       })
-      queryClient.setQueryData(SupplierKeys.lists(), (oldData: SupplierDTO[] | undefined) => {
-        if (!oldData) return [updatedSupplier]
-        return oldData.map((supplier) => (supplier.id === variables.id ? updatedSupplier : supplier))
-      })
-      if (updatedSupplier?.data?.organizationId) {
-        queryClient.setQueryData(
-          SupplierKeys.orgSuppliers(updatedSupplier?.data?.organizationId),
-          (oldData: { data: SupplierDTO[] } | undefined) => {
-            if (!oldData) return { data: [updatedSupplier] }
-            return {
-              ...oldData,
-              data: oldData.data.map((supplier) => (supplier.id === updatedSupplier?.data?.id ? updatedSupplier : supplier)),
-            }
-          },
-        )
-      }
     },
   })
 }
 
 export function useUpdateSupplierBasicInfo() {
-  const queryClient = useQueryClient()
-  return useMutation({
-    mutationFn: async ({ id, data }: { id: string; data: UpdateSupplierBasicInfoPayload }) =>
-      updateSupplierBasicInfoById(id, data),
-    onMutate: async (variables) => {
-      await queryClient.cancelQueries({ queryKey: SupplierKeys.detail(variables.id) })
-      await queryClient.cancelQueries({ queryKey: SupplierKeys.lists() })
-      if (variables.data.organizationId) {
-        await queryClient.cancelQueries({ queryKey: SupplierKeys.orgSuppliers(variables.data.organizationId) })
-      }
-
-      const previousSupplierDetail = queryClient.getQueryData(SupplierKeys.detail(variables.id))
-      const previousSuppliersList = queryClient.getQueryData(SupplierKeys.lists())
-      const previousOrgSuppliers = variables.data.organizationId
-        ? queryClient.getQueryData(SupplierKeys.orgSuppliers(variables.data.organizationId))
-        : undefined
-
-      queryClient.setQueryData(SupplierKeys.detail(variables.id), (oldData: SupplierDTO | undefined) => {
-        return { ...oldData, ...variables.data }
-      })
-      queryClient.setQueryData(SupplierKeys.lists(), (oldData: SupplierDTO[] | undefined) => {
-        if (!oldData) return [variables.data as SupplierDTO]
-        return oldData.map((supplier) => (supplier.id === variables.id ? { ...supplier, ...variables.data } : supplier))
-      })
-      if (variables.data.organizationId) {
-        queryClient.setQueryData(
-          SupplierKeys.orgSuppliers(variables.data.organizationId),
-          (oldData: { data: SupplierDTO[] } | undefined) => {
-            if (!oldData) return { data: [variables.data as SupplierDTO] }
-            return {
-              ...oldData,
-              data: oldData.data.map((supplier) =>
-                supplier.id === variables.id ? { ...supplier, ...variables.data } : supplier,
-              ),
-            }
-          },
-        )
-      }
-      return { previousSupplierDetail, previousSuppliersList, previousOrgSuppliers }
-    },
-    onError: (error, variables, context) => {
-      toast.error("Failed to update supplier basic info", {
-        description: error.message || "Unknown error occurred",
-      })
-      if (context?.previousSupplierDetail) {
-        queryClient.setQueryData(SupplierKeys.detail(variables.id), context.previousSupplierDetail)
-      }
-      if (context?.previousSuppliersList) {
-        queryClient.setQueryData(SupplierKeys.lists(), context.previousSuppliersList)
-      }
-      if (context?.previousOrgSuppliers && variables.data.organizationId) {
-        queryClient.setQueryData(SupplierKeys.orgSuppliers(variables.data.organizationId), context.previousOrgSuppliers)
-      }
-    },
-    onSuccess: (updatedSupplier, variables) => {
-      toast.success("Supplier basic info updated successfully")
-      queryClient.setQueryData(SupplierKeys.detail(variables.id), (oldData: SupplierDTO | undefined) => {
-        return { ...oldData, ...updatedSupplier }
-      })
-      queryClient.setQueryData(SupplierKeys.lists(), (oldData: SupplierDTO[] | undefined) => {
-        if (!oldData) return [updatedSupplier]
-        return oldData.map((supplier) => (supplier.id === variables.id ? updatedSupplier : supplier))
-      })
-      if (updatedSupplier?.data?.organizationId) {
-        queryClient.setQueryData(
-          SupplierKeys.orgSuppliers(updatedSupplier?.data?.organizationId),
-          (oldData: { data: SupplierDTO[] } | undefined) => {
-            if (!oldData) return { data: [updatedSupplier] }
-            return {
-              ...oldData,
-              data: oldData.data.map((supplier) => (supplier.id === updatedSupplier?.data?.id? updatedSupplier : supplier)),
-            }
-          },
-        )
-      }
-    },
-  })
+  return useUpdateSupplier() as ReturnType<
+    () => ReturnType<typeof useMutation<SupplierDTO, Error, WrappedSupplierUpdate<UpdateSupplierBasicInfoPayload> | UpdateSupplierBasicInfoPayload>>
+  >
 }
 
 export function useUpdateSupplierDetails() {
-  const queryClient = useQueryClient()
-  return useMutation({
-    mutationFn: async ({ id, data }: { id: string; data: UpdateSupplierDetailsPayload }) =>
-      updateSupplierDetailsById(id, data),
-    onMutate: async (variables) => {
-      await queryClient.cancelQueries({ queryKey: SupplierKeys.detail(variables.id) })
-      await queryClient.cancelQueries({ queryKey: SupplierKeys.lists() })
-      if (variables.data.email) {
-        await queryClient.cancelQueries({ queryKey: SupplierKeys.orgSuppliers(variables.data.email) })
-      }
-
-      const previousSupplierDetail = queryClient.getQueryData(SupplierKeys.detail(variables.id))
-      const previousSuppliersList = queryClient.getQueryData(SupplierKeys.lists())
-      const previousOrgSuppliers = variables.data.email
-        ? queryClient.getQueryData(SupplierKeys.orgSuppliers(variables.data.email))
-        : undefined
-
-      queryClient.setQueryData(SupplierKeys.detail(variables.id), (oldData: SupplierDTO | undefined) => {
-        return { ...oldData, ...variables.data }
-      })
-      queryClient.setQueryData(SupplierKeys.lists(), (oldData: SupplierDTO[] | undefined) => {
-        if (!oldData) return [variables.data as SupplierDTO]
-        return oldData.map((supplier) => (supplier.id === variables.id ? { ...supplier, ...variables.data } : supplier))
-      })
-      if (variables.data.email) {
-        queryClient.setQueryData(
-          SupplierKeys.orgSuppliers(variables.data.email),
-          (oldData: { data: SupplierDTO[] } | undefined) => {
-            if (!oldData) return { data: [variables.data as SupplierDTO] }
-            return {
-              ...oldData,
-              data: oldData.data.map((supplier) =>
-                supplier.id === variables.id ? { ...supplier, ...variables.data } : supplier,
-              ),
-            }
-          },
-        )
-      }
-      return { previousSupplierDetail, previousSuppliersList, previousOrgSuppliers }
-    },
-    onError: (error, variables, context) => {
-      toast.error("Failed to update supplier details", {
-        description: error.message || "Unknown error occurred",
-      })
-      if (context?.previousSupplierDetail) {
-        queryClient.setQueryData(SupplierKeys.detail(variables.id), context.previousSupplierDetail)
-      }
-      if (context?.previousSuppliersList) {
-        queryClient.setQueryData(SupplierKeys.lists(), context.previousSuppliersList)
-      }
-      if (context?.previousOrgSuppliers && variables.data.email) {
-        queryClient.setQueryData(SupplierKeys.orgSuppliers(variables.data.email), context.previousOrgSuppliers)
-      }
-    },
-    onSuccess: (updatedSupplier, variables) => {
-      toast.success("Supplier details updated successfully")
-      queryClient.setQueryData(SupplierKeys.detail(variables.id), (oldData: SupplierDTO | undefined) => {
-        return { ...oldData, ...updatedSupplier }
-      })
-      queryClient.setQueryData(SupplierKeys.lists(), (oldData: SupplierDTO[] | undefined) => {
-        if (!oldData) return [updatedSupplier]
-        return oldData.map((supplier) => (supplier.id === variables.id ? updatedSupplier : supplier))
-      })
-      if (updatedSupplier?.data?.organizationId) {
-        queryClient.setQueryData(
-          SupplierKeys.orgSuppliers(updatedSupplier?.data?.organizationId),
-          (oldData: { data: SupplierDTO[] } | undefined) => {
-            if (!oldData) return { data: [updatedSupplier] }
-            return {
-              ...oldData,
-              data: oldData.data.map((supplier) => (supplier.id === updatedSupplier?.data?.id? updatedSupplier : supplier)),
-            }
-          },
-        )
-      }
-    },
-  })
+  return useUpdateSupplier() as ReturnType<
+    () => ReturnType<typeof useMutation<SupplierDTO, Error, WrappedSupplierUpdate<UpdateSupplierDetailsPayload> | UpdateSupplierDetailsPayload>>
+  >
 }
 
 export function useUpdateSupplierRelations() {
-  const queryClient = useQueryClient()
-  return useMutation({
-    mutationFn: async ({ id, data }: { id: string; data: UpdateSupplierRelationsPayload }) =>
-      updateSupplierRelationsById(id, data),
-    onMutate: async (variables) => {
-      await queryClient.cancelQueries({ queryKey: SupplierKeys.detail(variables.id) })
-      await queryClient.cancelQueries({ queryKey: SupplierKeys.lists() })
-      if (variables.data.id) {
-        await queryClient.cancelQueries({ queryKey: SupplierKeys.orgSuppliers(variables.data.id) })
-      }
-
-      const previousSupplierDetail = queryClient.getQueryData(SupplierKeys.detail(variables.id))
-      const previousSuppliersList = queryClient.getQueryData(SupplierKeys.lists())
-      const previousOrgSuppliers = variables.data.id
-        ? queryClient.getQueryData(SupplierKeys.orgSuppliers(variables.data.id))
-        : undefined
-
-      queryClient.setQueryData(SupplierKeys.detail(variables.id), (oldData: SupplierDTO | undefined) => {
-        return { ...oldData, ...variables.data }
-      })
-      queryClient.setQueryData(SupplierKeys.lists(), (oldData: SupplierDTO[] | undefined) => {
-        if (!oldData) return [variables.data as SupplierDTO]
-        return oldData.map((supplier) => (supplier.id === variables.id ? { ...supplier, ...variables.data } : supplier))
-      })
-      if (variables.data.id) {
-        queryClient.setQueryData(
-          SupplierKeys.orgSuppliers(variables.data.id),
-          (oldData: { data: SupplierDTO[] } | undefined) => {
-            if (!oldData) return { data: [variables.data as SupplierDTO] }
-            return {
-              ...oldData,
-              data: oldData.data.map((supplier) =>
-                supplier.id === variables.id ? { ...supplier, ...variables.data } : supplier,
-              ),
-            }
-          },
-        )
-      }
-      return { previousSupplierDetail, previousSuppliersList, previousOrgSuppliers }
-    },
-    onError: (error, variables, context) => {
-      toast.error("Failed to update supplier relations", {
-        description: error.message || "Unknown error occurred",
-      })
-      if (context?.previousSupplierDetail) {
-        queryClient.setQueryData(SupplierKeys.detail(variables.id), context.previousSupplierDetail)
-      }
-      if (context?.previousSuppliersList) {
-        queryClient.setQueryData(SupplierKeys.lists(), context.previousSuppliersList)
-      }
-      if (context?.previousOrgSuppliers && variables.data.id) {
-        queryClient.setQueryData(SupplierKeys.orgSuppliers(variables.data.id), context.previousOrgSuppliers)
-      }
-    },
-    onSuccess: (updatedSupplier, variables) => {
-      toast.success("Supplier relations updated successfully")
-      queryClient.setQueryData(SupplierKeys.detail(variables.id), (oldData: SupplierDTO | undefined) => {
-        return { ...oldData, ...updatedSupplier }
-      })
-      queryClient.setQueryData(SupplierKeys.lists(), (oldData: SupplierDTO[] | undefined) => {
-        if (!oldData) return [updatedSupplier]
-        return oldData.map((supplier) => (supplier.id === variables.id ? updatedSupplier : supplier))
-      })
-      if (updatedSupplier?.data?.organizationId) {
-        queryClient.setQueryData(
-          SupplierKeys.orgSuppliers(updatedSupplier?.data?.organizationId),
-          (oldData: { data: SupplierDTO[] } | undefined) => {
-            if (!oldData) return { data: [updatedSupplier] }
-            return {
-              ...oldData,
-              data: oldData.data.map((supplier) => (supplier.id === updatedSupplier?.data?.id? updatedSupplier : supplier)),
-            }
-          },
-        )
-      }
-    },
-  })
+  return useUpdateSupplier() as ReturnType<
+    () => ReturnType<typeof useMutation<SupplierDTO, Error, WrappedSupplierUpdate<UpdateSupplierRelationsPayload> | UpdateSupplierRelationsPayload>>
+  >
 }

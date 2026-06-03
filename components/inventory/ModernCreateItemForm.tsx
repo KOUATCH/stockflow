@@ -1,6 +1,6 @@
 "use client"
 
-import ImageUploadButtonModernOriginal from "@/components/FormInputs/ImageUploadButtonModernOriginal"
+import EnhancedImageUploadButton from "@/components/FormInputs/EnhancedImageUploadButton"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardTitle } from "@/components/ui/card"
@@ -48,30 +48,60 @@ import { useForm } from "react-hook-form"
 import { z } from "zod"
 import { useNotifications } from "../notifications/NotificationProvider"
 
-// Enhanced validation schema for items
+// Enhanced validation schema for items - matches backend schema exactly
 const itemCreationSchema = z.object({
-  name: z.string().min(1, "Product name is required").max(100, "Name must be less than 100 characters").trim(),
-  description: z.string().optional(),
-  sku: z.string()
-    .min(3, "SKU must be at least 3 characters")
-    .max(50, "SKU must be less than 50 characters")
-    .regex(/^[A-Z0-9-_]+$/, "SKU can only contain uppercase letters, numbers, hyphens, and underscores"),
-  barcode: z.string().optional(),
-  costPrice: z.number().min(0, "Cost price must be positive").max(1000000, "Cost price seems too high"),
-  sellingPrice: z.number().min(0, "Selling price must be positive").max(1000000, "Selling price seems too high"),
-  categoryId: z.string().optional(),
-  brandId: z.string().optional(),
-  unitId: z.string().optional(),
-  taxRateId: z.string().optional(),
-  minStockLevel: z.number().min(0, "Minimum stock must be positive").optional(),
-  maxStockLevel: z.number().min(0, "Maximum stock must be positive").optional(),
-  weight: z.number().min(0, "Weight must be positive").optional(),
-  dimensions: z.string().optional(),
-  isActive: z.boolean().default(true),
-  isSerialTracked: z.boolean().default(false),
-  thumbnail: z.string().optional(),
-  imageUrls: z.string().optional(),
-  organizationId: z.string().min(1, "Organization ID is required"),
+  organizationId: z.string().min(1, 'Organization ID is required'),
+  // Core
+  nameEn: z.string().min(1, 'English name is required').max(255),
+  nameFr: z.string().transform((val) => val === "" ? null : val).nullable().optional(),
+  sku: z.string().min(1, 'SKU is required').max(128),
+
+  // Optionals
+  descriptionEn: z.string().transform((val) => val === "" ? null : val).nullable().optional(),
+  descriptionFr: z.string().transform((val) => val === "" ? null : val).nullable().optional(),
+  imageUrls: z.string().transform((val) => val === "" ? null : val).nullable().optional(),
+  thumbnail: z.string().transform((val) => val === "" ? null : val).nullable().optional(),
+  barcode: z.string().transform((val) => val === "" ? null : val).nullable().optional(),
+  dimensions: z.string().transform((val) => val === "" ? null : val).nullable().optional(),
+  weight: z.coerce.number().min(0).nullable().optional(),
+
+  // Optional item codes - removed as not supported by current schema
+
+  // Pricing
+  costPrice: z.coerce.number().min(0).default(0),
+  sellingPrice: z.coerce.number().min(0).default(0),
+  tax: z.coerce.number().min(0).nullable().optional(),
+
+  // Relations
+  categoryId: z.string().transform((val) => val === "" ? null : val).nullable().optional(),
+  brandId: z.string().transform((val) => val === "" ? null : val).nullable().optional(),
+  unitId: z.string().transform((val) => val === "" ? null : val).nullable().optional(),
+  taxRateId: z.string().transform((val) => val === "" ? null : val).nullable().optional(),
+
+  // Stock policy stored at item-level
+  minStockLevel: z.coerce.number().min(0).default(0),
+  maxStockLevel: z.coerce.number().min(0).nullable().optional(),
+  unitOfMeasure: z.string().transform((val) => val === "" ? null : val).nullable().optional(),
+
+  // Tracking
+  isActive: z.coerce.boolean().nullable().optional(),
+  isSerialTracked: z.coerce.boolean().nullable().optional(),
+  slug: z.string().transform((val) => val === "" ? null : val).nullable().optional(),
+
+  // Optional initial inventory to seed a location
+  initialInventory: z
+    .object({
+      locationId: z.string().min(1),
+      quantity: z.coerce.number().int().min(0),
+      unitCost: z.coerce.number().min(0).default(0),
+      notes: z.string().optional(),
+      createdById: z.string().optional(),
+      batchNumber: z.string().optional(),
+      serialNumbers: z.array(z.string()).optional(),
+      expiryDate: z.coerce.date().optional(),
+      referenceNumber: z.string().optional(),
+    })
+    .optional(),
 }).refine((data) => data.sellingPrice >= data.costPrice, {
   message: "Selling price should be greater than or equal to cost price",
   path: ["sellingPrice"],
@@ -86,24 +116,24 @@ const itemCreationSchema = z.object({
 })
 
 export type ItemCreationFormData = z.infer<typeof itemCreationSchema>
+type ItemCreationInitialData = Partial<ItemCreationFormData>
 
 interface ModernCreateItemFormProps {
   onSubmit?: (data: ItemCreationFormData) => Promise<void>
-  action?: (formData: FormData) => Promise<void>
+  action?: (formData: FormData) => Promise<void | { success: boolean; error?: string; redirect?: string }>
   isLoading?: boolean
-  onCancel?: () => void
-  categories?: Array<{ id: string; title: string }>
+  categories?: Array<{ id: string; titleEn: string; titleFr?: string | null }>
   brands?: Array<{ id: string; brandName: string }>
-  units?: Array<{ id: string; name: string; abbreviation: string }>
-  taxRate?: Array<{ id: string; rate: number; name: string }>
+  units?: Array<{ id: string; nameEn: string; nameFr?: string | null; symbol: string }>
+  taxRate?: Array<{ id: string; rate: number; nameEn: string; nameFr?: string | null }>
   organizationId: string
   // Edit mode props
-  initialData?: Partial<ItemCreationFormData>
+  initialData?: ItemCreationInitialData
   isEditMode?: boolean
   itemId?: string
 }
 
-const DEFAULT_IMAGE_URL = "https://14J7oh8kso.ufs.sh/f/HLxTbDBCDLwfAXaapcezIN7vwylKf1PXSCqAuseUG0gx8mhd"
+const DEFAULT_IMAGE_URL = "/placeholder.png"
 
 const FORM_STEPS = [
   { id: 'basic', title: 'Basic Info', icon: Package, description: 'Product name and description' },
@@ -119,7 +149,6 @@ export function ModernCreateItemForm({
   onSubmit,
   action,
   isLoading = false,
-  onCancel,
   categories = [],
   brands = [],
   units = [],
@@ -130,7 +159,7 @@ export function ModernCreateItemForm({
   itemId
 }: ModernCreateItemFormProps) {
   const router = useRouter()
-  const [itemImageUrl, setItemImageUrl] = useState(DEFAULT_IMAGE_URL)
+  const [itemImageUrl, setItemImageUrl] = useState("")
   const [currentStep, setCurrentStep] = useState<FormStep>('basic')
   const [completedSteps, setCompletedSteps] = useState<Set<FormStep>>(new Set())
   const [isImageUploading, setIsImageUploading] = useState(false)
@@ -151,8 +180,10 @@ export function ModernCreateItemForm({
   const form = useForm<ItemCreationFormData>({
     resolver: zodResolver(itemCreationSchema),
     defaultValues: initialData ? {
-      name: initialData.name || "",
-      description: initialData.description || "",
+      nameEn: initialData.nameEn || "",
+      nameFr: initialData.nameFr || "",
+      descriptionEn: initialData.descriptionEn || "",
+      descriptionFr: initialData.descriptionFr || "",
       sku: initialData.sku || "",
       barcode: initialData.barcode || "",
       costPrice: initialData.costPrice || 0,
@@ -167,29 +198,35 @@ export function ModernCreateItemForm({
       dimensions: initialData.dimensions || "",
       isActive: initialData.isActive ?? true,
       isSerialTracked: initialData.isSerialTracked ?? false,
-      thumbnail: initialData.thumbnail || DEFAULT_IMAGE_URL,
-      imageUrls: initialData.imageUrls || DEFAULT_IMAGE_URL,
+      thumbnail: initialData.thumbnail || "",
+      imageUrls: initialData.imageUrls || "",
       organizationId: initialData.organizationId || organizationId,
     } : {
-      name: "",
-      description: "",
+      organizationId,
+      nameEn: "",
+      nameFr: "",
       sku: "",
+      descriptionEn: "",
+      descriptionFr: "",
+      imageUrls: "",
+      thumbnail: "",
       barcode: "",
+      dimensions: "",
+      weight: 0,
       costPrice: 0,
       sellingPrice: 0,
+      tax: 0,
       categoryId: "",
       brandId: "",
       unitId: "",
       taxRateId: "",
       minStockLevel: 0,
       maxStockLevel: 0,
-      weight: 0,
-      dimensions: "",
+      unitOfMeasure: "",
       isActive: true,
       isSerialTracked: false,
-      thumbnail: DEFAULT_IMAGE_URL,
-      imageUrls: DEFAULT_IMAGE_URL,
-      organizationId,
+      slug: "",
+      initialInventory: undefined,
     },
     mode: "onChange"
   })
@@ -199,7 +236,8 @@ export function ModernCreateItemForm({
 
   // Watch form values for real-time calculations
   const watchedValues = form.watch()
-  const { costPrice, sellingPrice, name, sku, isActive } = watchedValues
+  const { costPrice, sellingPrice, nameEn, sku, isActive } = watchedValues
+  const displayName = nameEn || watchedValues.nameFr || ""
 
   // Calculate profit margin
   const profitMargin = sellingPrice && costPrice
@@ -212,18 +250,40 @@ export function ModernCreateItemForm({
   const validateStep = async (step: FormStep, silent = false): Promise<boolean> => {
     const operationId = !silent ? operationStart(`Validating ${FORM_STEPS.find(s => s.id === step)?.title}`) : null
 
+    // 🔍 Debug: Log form values BEFORE validation
+    const valuesBefore = form.getValues()
+    if (!silent) {
+      console.log(`🔍 Form values BEFORE ${step} validation:`, {
+        unitId: valuesBefore.unitId,
+        taxRateId: valuesBefore.taxRateId,
+        costPrice: valuesBefore.costPrice,
+        sellingPrice: valuesBefore.sellingPrice
+      })
+    }
+
     const fieldsByStep: Record<FormStep, (keyof ItemCreationFormData)[]> = {
-      basic: ['name'],
+      basic: ['nameEn'],
       details: ['sku'],
       pricing: ['costPrice', 'sellingPrice'],
       inventory: [], // No required fields in inventory step - all are optional
-      media: []
+      media: [] // Image is optional
     }
 
     const fieldsToValidate = fieldsByStep[step]
 
-    // If no fields to validate, consider step valid
+    // If no fields to validate, consider step valid (avoid form.trigger)
     const result = fieldsToValidate.length === 0 ? true : await form.trigger(fieldsToValidate)
+
+    // 🔍 Debug: Log form values AFTER validation
+    const valuesAfter = form.getValues()
+    if (!silent) {
+      console.log(`🔍 Form values AFTER ${step} validation:`, {
+        unitId: valuesAfter.unitId,
+        taxRateId: valuesAfter.taxRateId,
+        costPrice: valuesAfter.costPrice,
+        sellingPrice: valuesAfter.sellingPrice
+      })
+    }
 
     // Debug logging (only if not silent)
     if (!silent) {
@@ -253,10 +313,70 @@ export function ModernCreateItemForm({
   }
 
   const handleNext = async () => {
+    const currentValues = form.getValues()
+    console.log('🔍 Current form values before validation:', {
+      unitId: currentValues.unitId,
+      taxRateId: currentValues.taxRateId,
+      barcode: currentValues.barcode,
+      costPrice: currentValues.costPrice,
+      sellingPrice: currentValues.sellingPrice,
+      descriptionEn: currentValues.descriptionEn,
+      descriptionFr: currentValues.descriptionFr
+    })
+
     const isValid = await validateStep(currentStep)
+
     if (isValid && currentStepIndex < FORM_STEPS.length - 1) {
       const nextStep = FORM_STEPS[currentStepIndex + 1]
+
+      // 🔍 Debug: Check values right before step change
+      const valuesBeforeStepChange = form.getValues()
+      console.log(`🔍 Values right before changing to ${nextStep.title}:`, {
+        unitId: valuesBeforeStepChange.unitId,
+        taxRateId: valuesBeforeStepChange.taxRateId,
+        costPrice: valuesBeforeStepChange.costPrice,
+        sellingPrice: valuesBeforeStepChange.sellingPrice
+      })
+
+      // 💡 SURGICAL FIX: Preserve critical values before step change
+      const preservedValues = {
+        unitId: valuesBeforeStepChange.unitId,
+        taxRateId: valuesBeforeStepChange.taxRateId,
+        costPrice: valuesBeforeStepChange.costPrice,
+        sellingPrice: valuesBeforeStepChange.sellingPrice,
+        barcode: valuesBeforeStepChange.barcode,
+        descriptionEn: valuesBeforeStepChange.descriptionEn,
+        descriptionFr: valuesBeforeStepChange.descriptionFr
+      }
+
       setCurrentStep(nextStep.id)
+
+      // 💡 SURGICAL FIX: Restore values immediately after step change
+      setTimeout(() => {
+        const valuesAfterStepChange = form.getValues()
+        console.log(`🔍 Values right after changing to ${nextStep.title}:`, {
+          unitId: valuesAfterStepChange.unitId,
+          taxRateId: valuesAfterStepChange.taxRateId,
+          costPrice: valuesAfterStepChange.costPrice,
+          sellingPrice: valuesAfterStepChange.sellingPrice
+        })
+
+        // Restore any lost values
+        let needsRestore = false
+        Object.entries(preservedValues).forEach(([key, value]) => {
+          const currentValue = form.getValues(key as keyof ItemCreationFormData)
+          if (value && (!currentValue || currentValue === "" || currentValue === 0)) {
+            console.log(`🔧 Restoring ${key}: ${currentValue} → ${value}`)
+            form.setValue(key as keyof ItemCreationFormData, value)
+            needsRestore = true
+          }
+        })
+
+        if (needsRestore) {
+          console.log('✅ Values restored after step change')
+        }
+      }, 50) // Shorter delay for faster restoration
+
       info("Step Progress", `Moving to ${nextStep.title} - ${nextStep.description}`)
     }
   }
@@ -286,6 +406,27 @@ export function ModernCreateItemForm({
   }
 
   const handleSubmit = async (data: ItemCreationFormData) => {
+    console.log('🔍 Form submission started with data:', data)
+    console.log('🔍 Key fields check:', {
+      unitId: data.unitId,
+      taxRateId: data.taxRateId,
+      barcode: data.barcode,
+      costPrice: data.costPrice,
+      sellingPrice: data.sellingPrice,
+      descriptionEn: data.descriptionEn,
+      descriptionFr: data.descriptionFr
+    })
+
+    // Auto-generate missing required fields
+    // Note: Product name auto-generation removed - user must provide name
+
+    if (!data.sku || data.sku.trim() === '') {
+      const autoSku = generateSimpleSKU(9, "ITEM")
+      form.setValue('sku', autoSku, { shouldValidate: true })
+      data.sku = autoSku
+      info("Auto-Generated", `SKU set to: ${autoSku}`)
+    }
+
     // Check if image is still uploading
     if (isImageUploading) {
       warning("Upload in Progress", "Please wait for the image upload to complete before creating the product.")
@@ -297,8 +438,24 @@ export function ModernCreateItemForm({
     try {
       const submitData = {
         ...data,
-        thumbnail: itemImageUrl || DEFAULT_IMAGE_URL,
-        imageUrls: itemImageUrl || DEFAULT_IMAGE_URL,
+        thumbnail: itemImageUrl || "",
+        imageUrls: itemImageUrl || "",
+        ...(isEditMode && itemId ? { itemId } : {})
+      }
+
+      console.log('🔍 submitData before FormData creation:', submitData)
+
+      // Quick diagnostic for missing values
+      const issues = []
+      if (!submitData.unitId) issues.push('unitId is falsy')
+      if (!submitData.taxRateId) issues.push('taxRateId is falsy')
+      if (submitData.costPrice === 0) issues.push('costPrice is 0')
+      if (submitData.sellingPrice === 0) issues.push('sellingPrice is 0')
+
+      if (issues.length > 0) {
+        console.log('⚠️ Data issues detected:', issues)
+      } else {
+        console.log('✅ All key fields have values')
       }
 
       info("Processing Product", "Validating product information and saving to inventory...")
@@ -306,35 +463,71 @@ export function ModernCreateItemForm({
       if (action) {
         // Server action approach
         const formData = new FormData()
+
+        // Add itemId for edit mode
+        if (isEditMode && itemId) {
+          formData.append('itemId', itemId)
+        }
+
         Object.entries(submitData).forEach(([key, value]) => {
-          // Special handling for imageUrls to ensure it's never undefined
+          // Special handling for imageUrls
           if (key === 'imageUrls') {
-            const imageUrlValue = value || DEFAULT_IMAGE_URL
+            const imageUrlValue = value || ""
             formData.append(key, String(imageUrlValue))
             console.log(`Setting imageUrls: ${imageUrlValue}`)
-          } else if (value !== undefined && value !== null) {
-            formData.append(key, String(value))
+          } else {
+            // Always append the field, even if null/undefined - server action will handle
+            const formValue = value ? String(value) : ""
+            formData.append(key, formValue)
+            console.log(`FormData ${key}: ${formValue} (original value: ${value})`)
           }
         })
-        await action(formData)
+        console.log('Calling server action with formData')
+        const result = await action(formData)
+        console.log('Server action completed successfully')
+
+        // Handle server action response
+        if (result && !result.success) {
+          throw new Error(result.error ?? "Product save failed")
+        }
+
+        // Handle redirect if provided
+        const redirectPath = result?.redirect
+        if (redirectPath) {
+          operationComplete(
+            isEditMode ? "Product Updated" : "Product Created",
+            isEditMode
+              ? `${data.nameEn} has been successfully updated in your inventory`
+              : `${data.nameEn} has been successfully added to your inventory with SKU: ${data.sku}`
+          )
+          // Use router.push instead of immediate redirect to allow notification to show
+          setTimeout(() => router.push(redirectPath), 1500)
+          return
+        }
       } else if (onSubmit) {
         // Traditional callback approach
         await onSubmit(submitData)
       }
 
-      operationComplete("Product Created", `${data.name} has been successfully added to your inventory with SKU: ${data.sku}`)
+      operationComplete(
+        isEditMode ? "Product Updated" : "Product Created",
+        isEditMode
+          ? `${data.nameEn} has been successfully updated in your inventory`
+          : `${data.nameEn} has been successfully added to your inventory with SKU: ${data.sku}`
+      )
     } catch (err) {
-      console.log("Failed to create item:", err)
-      error("Creation Failed", "Failed to create product. Please check your information and try again.")
+      console.log(isEditMode ? "Failed to update item:" : "Failed to create item:", err)
+      error(
+        isEditMode ? "Update Failed" : "Creation Failed",
+        isEditMode
+          ? "Failed to update product. Please check your information and try again."
+          : "Failed to create product. Please check your information and try again."
+      )
     }
   }
 
   const handleCancel = () => {
-    if (onCancel) {
-      onCancel()
-    } else {
-      router.back()
-    }
+    router.back()
   }
 
   // Generate SKU functionality
@@ -346,15 +539,18 @@ export function ModernCreateItemForm({
 
   // Auto-generate SKU when name changes
   useEffect(() => {
-    if (name && !sku) {
-      const autoSku = name
+    if (nameEn && !sku) {
+      const autoSku = nameEn
         .toUpperCase()
         .replace(/[^A-Z0-9]/g, '')
         .slice(0, 6) + Math.random().toString(36).substr(2, 3).toUpperCase()
       form.setValue("sku", autoSku, { shouldValidate: true })
       info("Auto-Generated SKU", `SKU automatically created from product name: ${autoSku}`)
     }
-  }, [name, sku, form, info])
+  }, [nameEn, sku, form, info])
+
+  // Auto-generate default name if completely empty on form mount
+  // Note: Auto product name generation removed - user must provide name
 
   // Provide helpful notifications based on form progress
   useEffect(() => {
@@ -399,7 +595,11 @@ export function ModernCreateItemForm({
     if (isEditMode && initialData) {
       // Set image URL if available
       if (initialData.thumbnail || initialData.imageUrls) {
-        setItemImageUrl(initialData.thumbnail || initialData.imageUrls || DEFAULT_IMAGE_URL)
+        const imageUrl = initialData.thumbnail || initialData.imageUrls || ""
+        setItemImageUrl(imageUrl)
+        // Also update the form field to ensure consistency
+        form.setValue('imageUrls', imageUrl, { shouldValidate: true })
+        form.setValue('thumbnail', imageUrl, { shouldValidate: true })
       }
 
       // Silently validate and mark completed steps without notifications
@@ -414,6 +614,14 @@ export function ModernCreateItemForm({
           }
         }
 
+        // If we have an image, mark media step as completed too
+        if (initialData.thumbnail || initialData.imageUrls) {
+          const mediaStepValid = await validateStep('media', true)
+          if (mediaStepValid) {
+            completedStepsList.push('media')
+          }
+        }
+
         // Update completed steps without triggering notifications
         if (completedStepsList.length > 0) {
           setCompletedSteps(new Set(completedStepsList))
@@ -424,7 +632,7 @@ export function ModernCreateItemForm({
       const timeoutId = setTimeout(initializeEditMode, 50)
       return () => clearTimeout(timeoutId)
     }
-  }, [isEditMode, initialData])
+  }, [isEditMode, initialData, form])
 
   // Copy SKU to clipboard
   const copySKU = useCallback(async () => {
@@ -440,8 +648,8 @@ export function ModernCreateItemForm({
   }, [form, success, error])
 
   // Generate preview initials
-  const avatarFallback = name
-    ? name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()
+  const avatarFallback = displayName
+    ? displayName.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()
     : "??"
 
   const formatCurrency = (amount: number) => {
@@ -462,56 +670,108 @@ export function ModernCreateItemForm({
                 <Package className="w-8 h-8 text-white" />
               </div>
               <h3 className="text-2xl font-bold text-foreground mb-2">Basic Information</h3>
-              <p className="text-muted-foreground">Let's start with the essential details about your product</p>
+              <p className="text-muted-foreground">Start with the essential details about your product</p>
             </div>
 
             <div className="space-y-6">
-              <FormField
-                control={form.control}
-                name="name"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-base font-semibold text-foreground flex items-center gap-2">
-                      <Sparkles className="h-4 w-4 text-emerald-600" />
-                      Product Name *
-                    </FormLabel>
-                    <FormControl>
-                      <Input
-                        placeholder="Enter a catchy product name"
-                        className="h-12 text-lg bg-background border-2 border-border focus:border-emerald-500 rounded-xl shadow-sm"
-                        {...field}
-                      />
-                    </FormControl>
-                    <FormDescription className="text-sm text-muted-foreground">
-                      This will be the main name customers see
-                    </FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              <div className="grid gap-6 md:grid-cols-2">
+                <FormField
+                  control={form.control}
+                  name="nameEn"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-base font-semibold text-foreground flex items-center gap-2">
+                        <Sparkles className="h-4 w-4 text-emerald-600" />
+                        Product Name (English) *
+                      </FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="Enter product name"
+                          className="h-12 text-lg bg-background border-2 border-border focus:border-emerald-500 rounded-xl shadow-sm"
+                          {...field}
+                        />
+                      </FormControl>
+                      <FormDescription className="text-sm text-muted-foreground">
+                        Stored as the English product name
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
 
-              <FormField
-                control={form.control}
-                name="description"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel className="text-base font-semibold text-foreground">Product Description</FormLabel>
-                    <FormControl>
-                      <Textarea
-                        placeholder="Describe what makes this product special. Include key features, benefits, and any important details customers should know..."
-                        className="min-h-[120px] bg-background border-2 border-border focus:border-emerald-500 rounded-xl shadow-sm resize-none"
-                        {...field}
-                      />
-                    </FormControl>
-                    <FormDescription className="text-sm text-muted-foreground">
-                      A good description helps customers understand your product better
-                    </FormDescription>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+                <FormField
+                  control={form.control}
+                  name="nameFr"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-base font-semibold text-foreground flex items-center gap-2">
+                        <Sparkles className="h-4 w-4 text-emerald-600" />
+                        Product Name (French)
+                      </FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="Nom du produit"
+                          className="h-12 text-lg bg-background border-2 border-border focus:border-emerald-500 rounded-xl shadow-sm"
+                          {...field}
+                          value={field.value || ""}
+                        />
+                      </FormControl>
+                      <FormDescription className="text-sm text-muted-foreground">
+                        Used for French locale display when available
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
 
-              {name && (
+              <div className="grid gap-6 md:grid-cols-2">
+                <FormField
+                  control={form.control}
+                  name="descriptionEn"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-base font-semibold text-foreground">Description (English)</FormLabel>
+                      <FormControl>
+                        <Textarea
+                          placeholder="Describe the product in English..."
+                          className="min-h-[120px] bg-background border-2 border-border focus:border-emerald-500 rounded-xl shadow-sm resize-none"
+                          {...field}
+                          value={field.value || ""}
+                        />
+                      </FormControl>
+                      <FormDescription className="text-sm text-muted-foreground">
+                        Stored as the English product description
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="descriptionFr"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel className="text-base font-semibold text-foreground">Description (French)</FormLabel>
+                      <FormControl>
+                        <Textarea
+                          placeholder="Decrivez le produit en francais..."
+                          className="min-h-[120px] bg-background border-2 border-border focus:border-emerald-500 rounded-xl shadow-sm resize-none"
+                          {...field}
+                          value={field.value || ""}
+                        />
+                      </FormControl>
+                      <FormDescription className="text-sm text-muted-foreground">
+                        Used for French locale display when available
+                      </FormDescription>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
+
+              {displayName && (
                 <div className="p-4 rounded-xl bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-emerald-900/20 dark:to-teal-900/20 border border-emerald-200 dark:border-emerald-700">
                   <div className="flex items-center gap-3">
                     <CheckCircle className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
@@ -604,6 +864,7 @@ export function ModernCreateItemForm({
                         placeholder="UPC, EAN, or other barcode"
                         className="h-12 bg-background border-2 border-border focus:border-emerald-500 rounded-xl shadow-sm font-mono"
                         {...field}
+                        value={field.value ?? ""}
                       />
                     </FormControl>
                     <FormDescription className="text-sm text-muted-foreground">
@@ -625,7 +886,7 @@ export function ModernCreateItemForm({
                       <Tags className="h-4 w-4 text-emerald-600" />
                       Category
                     </FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <Select onValueChange={field.onChange} value={field.value || undefined}>
                       <FormControl>
                         <SelectTrigger className="h-12 bg-background border-2 border-border focus:border-emerald-500 rounded-xl shadow-sm">
                           <SelectValue placeholder="Choose a category" />
@@ -634,7 +895,7 @@ export function ModernCreateItemForm({
                       <SelectContent>
                         {categories.map((category) => (
                           <SelectItem key={category.id} value={category.id}>
-                            {category.title}
+                            {category.titleEn}
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -656,7 +917,7 @@ export function ModernCreateItemForm({
                       <Building className="h-4 w-4 text-emerald-600" />
                       Brand
                     </FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <Select onValueChange={field.onChange} value={field.value || undefined}>
                       <FormControl>
                         <SelectTrigger className="h-12 bg-background border-2 border-border focus:border-emerald-500 rounded-xl shadow-sm">
                           <SelectValue placeholder="Select a brand" />
@@ -711,8 +972,13 @@ export function ModernCreateItemForm({
                           min="0"
                           step="0.01"
                           className="pl-12 h-12 text-lg bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm border-2 border-slate-200 dark:border-slate-700 focus:border-emerald-500 dark:focus:border-emerald-400 rounded-xl shadow-sm"
-                          {...field}
-                          onChange={(e) => field.onChange(Number(e.target.value) || 0)}
+                          value={field.value}
+                          onChange={(e) => {
+                            const value = e.target.value
+                            field.onChange(value === '' ? 0 : parseFloat(value) || 0)
+                          }}
+                          onBlur={field.onBlur}
+                          name={field.name}
                         />
                       </div>
                     </FormControl>
@@ -742,8 +1008,13 @@ export function ModernCreateItemForm({
                           min="0"
                           step="0.01"
                           className="pl-12 h-12 text-lg bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm border-2 border-slate-200 dark:border-slate-700 focus:border-emerald-500 dark:focus:border-emerald-400 rounded-xl shadow-sm"
-                          {...field}
-                          onChange={(e) => field.onChange(Number(e.target.value) || 0)}
+                          value={field.value}
+                          onChange={(e) => {
+                            const value = e.target.value
+                            field.onChange(value === '' ? 0 : parseFloat(value) || 0)
+                          }}
+                          onBlur={field.onBlur}
+                          name={field.name}
                         />
                       </div>
                     </FormControl>
@@ -807,7 +1078,7 @@ export function ModernCreateItemForm({
                       <Scale className="h-4 w-4 text-emerald-600" />
                       Unit of Measure
                     </FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <Select onValueChange={field.onChange} value={field.value || undefined}>
                       <FormControl>
                         <SelectTrigger className="h-12 bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm border-2 border-slate-200 dark:border-slate-700 focus:border-emerald-500 dark:focus:border-emerald-400 rounded-xl shadow-sm">
                           <SelectValue placeholder="Select unit" />
@@ -816,7 +1087,7 @@ export function ModernCreateItemForm({
                       <SelectContent>
                         {units.map((unit) => (
                           <SelectItem key={unit.id} value={unit.id}>
-                            {unit.name} ({unit.abbreviation})
+                            {unit.nameEn} ({unit.symbol})
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -838,7 +1109,7 @@ export function ModernCreateItemForm({
                       <Percent className="h-4 w-4 text-emerald-600" />
                       Tax Rate
                     </FormLabel>
-                    <Select onValueChange={field.onChange} defaultValue={field.value}>
+                    <Select onValueChange={field.onChange} value={field.value || undefined}>
                       <FormControl>
                         <SelectTrigger className="h-12 bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm border-2 border-slate-200 dark:border-slate-700 focus:border-emerald-500 dark:focus:border-emerald-400 rounded-xl shadow-sm">
                           <SelectValue placeholder="Select tax rate" />
@@ -847,7 +1118,7 @@ export function ModernCreateItemForm({
                       <SelectContent>
                         {taxRate.map((rate) => (
                           <SelectItem key={rate.id} value={rate.id}>
-                            {rate.name} ({rate.rate}%)
+                            {rate.nameEn} ({rate.rate}%)
                           </SelectItem>
                         ))}
                       </SelectContent>
@@ -891,6 +1162,7 @@ export function ModernCreateItemForm({
                         min="0"
                         className="h-12 bg-background border-2 border-border focus:border-emerald-500 rounded-xl shadow-sm"
                         {...field}
+                        value={field.value ?? 0}
                         onChange={(e) => field.onChange(Number(e.target.value) || 0)}
                       />
                     </FormControl>
@@ -918,6 +1190,7 @@ export function ModernCreateItemForm({
                         min="0"
                         className="h-12 bg-background border-2 border-border focus:border-emerald-500 rounded-xl shadow-sm"
                         {...field}
+                        value={field.value ?? 0}
                         onChange={(e) => field.onChange(Number(e.target.value) || 0)}
                       />
                     </FormControl>
@@ -948,6 +1221,7 @@ export function ModernCreateItemForm({
                         step="0.1"
                         className="h-12 bg-background border-2 border-border focus:border-emerald-500 rounded-xl shadow-sm"
                         {...field}
+                        value={field.value ?? 0}
                         onChange={(e) => field.onChange(Number(e.target.value) || 0)}
                       />
                     </FormControl>
@@ -973,6 +1247,7 @@ export function ModernCreateItemForm({
                         placeholder="L x W x H (e.g., 10 x 5 x 3 cm)"
                         className="h-12 bg-background border-2 border-border focus:border-emerald-500 rounded-xl shadow-sm"
                         {...field}
+                        value={field.value ?? ""}
                       />
                     </FormControl>
                     <FormDescription className="text-sm text-muted-foreground">
@@ -1000,7 +1275,7 @@ export function ModernCreateItemForm({
                       </FormDescription>
                     </div>
                     <FormControl>
-                      <Switch checked={field.value} onCheckedChange={field.onChange} className="data-[state=checked]:bg-emerald-500" />
+                      <Switch checked={field.value ?? false} onCheckedChange={field.onChange} className="data-[state=checked]:bg-emerald-500" />
                     </FormControl>
                   </FormItem>
                 )}
@@ -1021,7 +1296,7 @@ export function ModernCreateItemForm({
                       </FormDescription>
                     </div>
                     <FormControl>
-                      <Switch checked={field.value} onCheckedChange={field.onChange} className="data-[state=checked]:bg-emerald-500" />
+                      <Switch checked={field.value ?? false} onCheckedChange={field.onChange} className="data-[state=checked]:bg-emerald-500" />
                     </FormControl>
                   </FormItem>
                 )}
@@ -1043,15 +1318,19 @@ export function ModernCreateItemForm({
 
             <div className="text-center space-y-6">
               <div className="mx-auto max-w-md">
-                <ImageUploadButtonModernOriginal
+                <EnhancedImageUploadButton
                   title="Upload Product Image"
                   imageUrl={itemImageUrl}
                   setImageUrl={(url: string) => {
                     setItemImageUrl(url)
-                    if (url && url !== DEFAULT_IMAGE_URL) {
+                    // Update form fields when image is uploaded
+                    form.setValue('imageUrls', url, { shouldValidate: true })
+                    form.setValue('thumbnail', url, { shouldValidate: true })
+                    if (url) {
                       success("Image Uploaded", "Product image has been successfully uploaded and will be used for your product listing")
                     }
                   }}
+                  organizationId={organizationId}
                   endpoint="itemImageUpload"
                   onUploadStart={() => {
                     console.log('Upload started - setting isImageUploading to true')
@@ -1116,10 +1395,13 @@ export function ModernCreateItemForm({
               </div>
               <div>
                 <h1 className="text-3xl sm:text-4xl font-bold bg-gradient-to-r from-emerald-600 via-teal-600 to-cyan-600 bg-clip-text text-transparent">
-                  Create New Product
+                  {isEditMode ? 'Edit Product' : 'Create New Product'}
                 </h1>
                 <p className="text-muted-foreground mt-1">
-                  Add a new product to your inventory with comprehensive details
+                  {isEditMode
+                    ? 'Update the product details and save your changes'
+                    : 'Add a new product to your inventory with comprehensive details'
+                  }
                 </p>
               </div>
             </div>
@@ -1193,7 +1475,69 @@ export function ModernCreateItemForm({
               <Card className="bg-card backdrop-blur-lg border shadow-2xl rounded-3xl overflow-hidden">
                 <CardContent className="p-8">
                   <Form {...form}>
-                    <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-8">
+                    <form onSubmit={form.handleSubmit(handleSubmit, (errors) => {
+                      console.error('Form validation errors:', errors)
+                      const errorFields = Object.keys(errors)
+                      if (errorFields.includes('nameEn')) {
+                        error('Missing Information', 'Product name is required. Please provide a product name.')
+                      } else if (errorFields.includes('sku')) {
+                        warning('Missing Information', 'SKU is being auto-generated. Please try submitting again.')
+                      } else {
+                        error('Form Validation Error', `Please fix the following: ${errorFields.join(', ')}`)
+                      }
+                    })} className="space-y-8">
+
+                      {/* Hidden fields to maintain form registrations across steps */}
+                      <div style={{ display: 'none' }}>
+                        <FormField
+                          control={form.control}
+                          name="unitId"
+                          render={({ field }) => {
+                            console.log('🔍 Hidden unitId field render:', field.value)
+                            return <input {...field} value={field.value ?? ""} />
+                          }}
+                        />
+                        <FormField
+                          control={form.control}
+                          name="taxRateId"
+                          render={({ field }) => {
+                            console.log('🔍 Hidden taxRateId field render:', field.value)
+                            return <input {...field} value={field.value ?? ""} />
+                          }}
+                        />
+                        <FormField
+                          control={form.control}
+                          name="costPrice"
+                          render={({ field }) => {
+                            console.log('🔍 Hidden costPrice field render:', field.value)
+                            return <input type="number" {...field} />
+                          }}
+                        />
+                        <FormField
+                          control={form.control}
+                          name="sellingPrice"
+                          render={({ field }) => {
+                            console.log('🔍 Hidden sellingPrice field render:', field.value)
+                            return <input type="number" {...field} />
+                          }}
+                        />
+                        <FormField
+                          control={form.control}
+                          name="barcode"
+                          render={({ field }) => <input {...field} value={field.value ?? ""} />}
+                        />
+                        <FormField
+                          control={form.control}
+                          name="descriptionEn"
+                          render={({ field }) => <textarea {...field} value={field.value || ""} />}
+                        />
+                        <FormField
+                          control={form.control}
+                          name="descriptionFr"
+                          render={({ field }) => <textarea {...field} value={field.value || ""} />}
+                        />
+                      </div>
+
                       {getCurrentStepComponent()}
 
                       {/* Form Navigation */}
@@ -1212,7 +1556,31 @@ export function ModernCreateItemForm({
                         {currentStepIndex === FORM_STEPS.length - 1 ? (
                           <Button
                             type="submit"
-                            disabled={form.formState.isSubmitting || isLoading || isImageUploading || (!isEditMode && itemImageUrl === DEFAULT_IMAGE_URL)}
+                            disabled={form.formState.isSubmitting || isLoading || isImageUploading}
+                            onClick={async () => {
+                              console.log('Create Product button clicked!')
+                              console.log('Current form values:', form.getValues())
+
+                              // Auto-fill required fields if empty
+                              const currentValues = form.getValues()
+                              let needsUpdate = false
+
+                              // Note: Product name auto-generation removed - user must provide name
+
+                              if (!currentValues.sku || currentValues.sku.trim() === '') {
+                                const autoSku = generateSimpleSKU(9, "ITEM")
+                                form.setValue('sku', autoSku, { shouldValidate: true })
+                                needsUpdate = true
+                                info("Auto-Generated", `SKU set to: ${autoSku}`)
+                              }
+
+                              // If we updated fields, re-validate
+                              if (needsUpdate) {
+                                await new Promise(resolve => setTimeout(resolve, 100)) // Small delay for form to update
+                                const isValid = await form.trigger()
+                                console.log('Form validation after auto-fill:', isValid)
+                              }
+                            }}
                             className="px-8 py-3 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white shadow-lg"
                           >
                             {form.formState.isSubmitting || isLoading ? (
@@ -1224,11 +1592,6 @@ export function ModernCreateItemForm({
                               <>
                                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                                 Uploading Image...
-                              </>
-                            ) : (!isEditMode && itemImageUrl === DEFAULT_IMAGE_URL) ? (
-                              <>
-                                <ImageIcon className="mr-2 h-4 w-4" />
-                                Upload Image First
                               </>
                             ) : (
                               <>
@@ -1272,14 +1635,14 @@ export function ModernCreateItemForm({
                     <div className="relative mx-auto w-32 h-32 rounded-2xl overflow-hidden border-4 border-border shadow-xl">
                       <img
                         src={itemImageUrl || DEFAULT_IMAGE_URL}
-                        alt={name || "Product preview"}
+                        alt={displayName || "Product preview"}
                         className="w-full h-full object-cover"
                       />
                       <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent" />
                     </div>
                     <div>
                       <h3 className="font-bold text-foreground text-xl mb-1">
-                        {name || "New Product"}
+                        {displayName || "New Product"}
                       </h3>
                       {sku && (
                         <p className="text-sm text-muted-foreground font-mono bg-muted px-2 py-1 rounded-lg inline-block">

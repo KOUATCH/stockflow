@@ -6,26 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { AlertTriangle, Package, TrendingUp, RefreshCw, Plus } from 'lucide-react';
 import { getInventoryLevelsClientSafe, getLowStockItemsClientSafe } from '@/actions/inventory/clientSafeInventoryData';
-
-interface InventoryLevel {
-  id: string;
-  itemId: string;
-  locationId: string;
-  quantityOnHand: number;
-  quantityReserved: number;
-  quantityAvailable: number;
-  totalValue: number;
-  item?: {
-    id: string;
-    name: string;
-    sku: string;
-    imageUrls: string;
-  };
-  location?: {
-    id: string;
-    name: string;
-  };
-}
+import type { InventoryLevel } from '@/types/inventory';
 
 interface BasicItem {
   id: string;
@@ -283,9 +264,9 @@ export function FallbackInventoryDashboard() {
                   <div key={`${level.itemId}-${level.locationId}`} className="flex items-center justify-between p-4 border rounded-lg">
                     <div className="flex items-center space-x-4">
                       <div className="w-12 h-12 bg-gray-100 rounded-lg flex items-center justify-center">
-                        {level.item?.imageUrls ? (
+                        {level.item?.imageUrls?.[0] ? (
                           <img
-                            src={level.item.imageUrls || "/placeholder.svg"}
+                            src={level.item.imageUrls[0]}
                             alt={level.item.name}
                             className="w-10 h-10 object-cover rounded"
                           />

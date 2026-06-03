@@ -1,5 +1,6 @@
 "use client"
 
+import { notify } from "@/lib/notifications/notify"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import {
@@ -20,7 +21,6 @@ import { Download, Edit, MoreHorizontal, Plus, RefreshCw, Search, Trash2 } from 
 import { useRouter } from "next/navigation"
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { FormProvider, useForm } from "react-hook-form"
-import { toast } from "sonner"
 import * as XLSX from "xlsx"
 import { z } from "zod"
 
@@ -219,11 +219,11 @@ const NewDecentBrandForm = ({ title, organizationId, editingId, initialData }: B
         // Export to file
         XLSX.writeFile(workbook, fileName)
 
-        toast.success("Export successful", {
+        notify.success("Export successful", {
           description: `Brands exported to ${fileName}`,
         })
       } catch (error) {
-        toast.error("Export failed", {
+        notify.error("Export failed", {
           description: error instanceof Error ? error.message : "Unknown error occurred",
         })
       }
@@ -261,7 +261,7 @@ const NewDecentBrandForm = ({ title, organizationId, editingId, initialData }: B
     setTimeout(() => {
       // setBrands([...initialData])
       setIsLoading(false)
-      toast.success("Data refreshed")
+      notify.success("Data refreshed")
     }, 1000)
   }, [])
 
@@ -294,7 +294,7 @@ const NewDecentBrandForm = ({ title, organizationId, editingId, initialData }: B
         }
 
         setBrands((prev) => [...prev, newBrandData])
-        toast.success("Brand added successfully")
+        notify.success("Brand added successfully")
       } else {
         // Edit existing item
         const updateData: BriefBrandPayload = {
@@ -306,13 +306,13 @@ const NewDecentBrandForm = ({ title, organizationId, editingId, initialData }: B
         }
 
         setBrands((prev) => prev.map((brand) => (brand.id === itemToEdit.id ? updateData : brand)))
-        toast.success("Brand updated successfully")
+        notify.success("Brand updated successfully")
       }
 
       setFormDialogOpen(false)
       resetFormToDefaults()
     } catch (error) {
-      toast.error("An unexpected error occurred", {
+      notify.error("An unexpected error occurred", {
         description: error instanceof Error ? error.message : "Unknown error",
       })
     } finally {
@@ -340,9 +340,9 @@ const NewDecentBrandForm = ({ title, organizationId, editingId, initialData }: B
         await new Promise((resolve) => setTimeout(resolve, 1000))
 
         setBrands((prev) => prev.filter((brand) => brand.id !== itemToDelete.id))
-        toast.success("Brand deleted successfully")
+        notify.success("Brand deleted successfully")
       } catch (error) {
-        toast.error("Failed to delete item", {
+        notify.error("Failed to delete item", {
           description: error instanceof Error ? error.message : "Unknown error occurred",
         })
       } finally {

@@ -1,296 +1,277 @@
 "use client"
 
-import { Badge } from "@/components/ui/badge"
-import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardTitle } from "@/components/ui/card"
-import { Form, FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
-import { Input } from "@/components/ui/input"
-import { Progress } from "@/components/ui/progress"
-import { TooltipProvider } from "@/components/ui/tooltip"
 import { zodResolver } from "@hookform/resolvers/zod"
-import {
-  ArrowLeft,
-  CheckCircle,
-  Eye,
-  Loader2,
-  Save,
-  Sparkles,
-  Tag
-} from "lucide-react"
+import { ArrowLeft, Building2, Loader2, Save } from "lucide-react"
 import { useRouter } from "next/navigation"
-import { useEffect, useState } from "react"
+import { useMemo, useState } from "react"
 import { useForm } from "react-hook-form"
 import { z } from "zod"
-import { useNotifications } from "../notifications/NotificationProvider"
 
-// Enhanced validation schema for brands
-const brandCreationSchema = z.object({
-  brandName: z.string().min(1, "Brand name is required").max(100, "Name must be less than 100 characters").trim(),
+import { BrandCreateSchema } from "@/services/brand/brand.schemas"
+import { useCreateBrand, useUpdateBrand } from "@/hooks/useBrands"
+import type { BrandDTO } from "@/types/brand"
+import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
+import { Input } from "@/components/ui/input"
+import { Switch } from "@/components/ui/switch"
+import { Textarea } from "@/components/ui/textarea"
+
+const brandFormSchema = BrandCreateSchema.extend({
+  isActive: z.boolean().default(true),
 })
 
-export type BrandCreationFormData = z.infer<typeof brandCreationSchema>
+type BrandFormValues = z.infer<typeof brandFormSchema>
 
-interface ModernBrandFormProps {
-  action?: (formData: FormData) => Promise<void>
-  isLoading?: boolean
-  onCancel?: () => void
+type ModernBrandFormProps = {
+  mode?: "create" | "edit"
   organizationId: string
+  initialData?: BrandDTO | null
+  returnHref?: string
+}
+
+function initials(name: string) {
+  return name
+    .split(" ")
+    .filter(Boolean)
+    .map((part) => part[0])
+    .join("")
+    .toUpperCase()
+    .slice(0, 2)
+}
+
+function slugPreview(name: string) {
+  return name
+    .toLowerCase()
+    .trim()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/(^-|-$)+/g, "")
 }
 
 export function ModernBrandForm({
-  action,
-  isLoading = false,
-  onCancel,
-  organizationId
+  mode = "create",
+  organizationId,
+  initialData,
+  returnHref = "/dashboard/inventory/brands",
 }: ModernBrandFormProps) {
   const router = useRouter()
-  const { success, error, warning, info, operationStart, operationComplete } = useNotifications()
+  const createBrand = useCreateBrand()
+  const updateBrand = useUpdateBrand()
+  const [serverError, setServerError] = useState<string | null>(null)
 
-  // Welcome notification when component mounts
-  useEffect(() => {
-    info("Create Brand", "Enter a memorable brand name to add to your inventory system!")
-  }, [info])
+  const isEdit = mode === "edit" && Boolean(initialData)
+  const isSubmitting = createBrand.isPending || updateBrand.isPending
 
-  const form = useForm<BrandCreationFormData>({
-    resolver: zodResolver(brandCreationSchema),
+  const form = useForm<BrandFormValues>({
+    resolver: zodResolver(brandFormSchema),
     defaultValues: {
-      brandName: "",
+      nameEn: initialData?.nameEn ?? "",
+      nameFr: initialData?.nameFr ?? "",
+      descriptionEn: initialData?.descriptionEn ?? "",
+      descriptionFr: initialData?.descriptionFr ?? "",
+      logoUrl: initialData?.logoUrl ?? "",
+      isActive: initialData?.isActive ?? true,
     },
-    mode: "onChange"
+    mode: "onBlur",
   })
 
-  // Watch form values for real-time feedback
-  const watchedValues = form.watch()
-  const { brandName } = watchedValues
+  const watchedName = form.watch("nameEn")
+  const watchedStatus = form.watch("isActive")
+  const previewSlug = useMemo(() => slugPreview(watchedName || ""), [watchedName])
 
-  const handleSubmit = async (data: BrandCreationFormData) => {
-    const operationId = operationStart("Creating Brand")
+  async function onSubmit(values: BrandFormValues) {
+    setServerError(null)
+
+    const payload = {
+      organizationId,
+      nameEn: values.nameEn,
+      nameFr: values.nameFr || null,
+      descriptionEn: values.descriptionEn || null,
+      descriptionFr: values.descriptionFr || null,
+      logoUrl: values.logoUrl || null,
+      isActive: values.isActive,
+    }
 
     try {
-      info("Processing Brand", "Creating your new brand...")
-
-      if (action) {
-        // Server action approach
-        const formData = new FormData()
-        Object.entries(data).forEach(([key, value]) => {
-          if (value !== undefined && value !== null) {
-            formData.append(key, String(value))
-          }
+      if (isEdit && initialData) {
+        await updateBrand.mutateAsync({
+          id: initialData.id,
+          data: payload,
         })
-        await action(formData)
+        router.push(`${returnHref}/${initialData.id}`)
+      } else {
+        await createBrand.mutateAsync(payload)
+        form.reset()
+        router.push(returnHref)
       }
-
-      operationComplete("Brand Created", `${data.brandName} has been successfully added to your brands!`)
+      router.refresh()
     } catch (error) {
-      console.log("Failed to create brand:", error)
-      operationComplete("Creation Failed", "Failed to create brand. Please check your information and try again.")
+      setServerError(error instanceof Error ? error.message : "The brand could not be saved.")
     }
   }
-
-  const handleCancel = () => {
-    if (onCancel) {
-      onCancel()
-    } else {
-      router.back()
-    }
-  }
-
-  // Generate slug preview from brand name
-  const slugPreview = brandName
-    ? brandName.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/(^-|-$)/g, '')
-    : ""
 
   return (
-    <TooltipProvider>
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50/30 to-indigo-50/50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-800">
-        <div className="max-w-4xl mx-auto px-4 sm:px-6 py-4 sm:py-8">
-          {/* Header */}
-          <div className="mb-8">
-            <div className="flex items-center gap-4 mb-6">
-              <Button
-                onClick={handleCancel}
-                variant="ghost"
-                size="sm"
-                className="text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100"
-              >
-                <ArrowLeft className="w-4 h-4 mr-2" />
-                Back to Brands
-              </Button>
+    <div className="min-h-screen bg-background">
+      <div className="mx-auto flex w-full max-w-5xl flex-col gap-6 px-4 py-6 sm:px-6 lg:px-8">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-3">
+            <Button type="button" variant="ghost" size="icon" onClick={() => router.push(returnHref)}>
+              <ArrowLeft className="h-4 w-4" />
+              <span className="sr-only">Back to brands</span>
+            </Button>
+            <div>
+              <h1 className="text-2xl font-semibold tracking-normal text-foreground">
+                {isEdit ? "Edit Brand" : "Create Brand"}
+              </h1>
+              <p className="text-sm text-muted-foreground">
+                {isEdit ? initialData?.nameEn : "Add a bilingual brand record"}
+              </p>
             </div>
+          </div>
+          <Badge variant={watchedStatus ? "secondary" : "outline"} className="w-fit">
+            {watchedStatus ? "Active" : "Inactive"}
+          </Badge>
+        </div>
 
-            <div className="flex items-center gap-4">
-              <div className="p-3 rounded-xl bg-gradient-to-br from-pink-500 to-rose-600 shadow-lg">
-                <Tag className="w-8 h-8 text-white" />
+        <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_280px]">
+          <Card>
+            <CardHeader>
+              <CardTitle>Brand Details</CardTitle>
+              <CardDescription>Names, descriptions, logo, and operating status.</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <Form {...form}>
+                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+                  {serverError ? (
+                    <div className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                      {serverError}
+                    </div>
+                  ) : null}
+
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <FormField
+                      control={form.control}
+                      name="nameEn"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Brand Name (English)</FormLabel>
+                          <FormControl>
+                            <Input autoComplete="organization" placeholder="Acme Foods" disabled={isSubmitting} {...field} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="nameFr"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Brand Name (French)</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Acme Aliments" disabled={isSubmitting} {...field} value={field.value ?? ""} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <FormField
+                      control={form.control}
+                      name="descriptionEn"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Description (English)</FormLabel>
+                          <FormControl>
+                            <Textarea disabled={isSubmitting} {...field} value={field.value ?? ""} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="descriptionFr"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Description (French)</FormLabel>
+                          <FormControl>
+                            <Textarea disabled={isSubmitting} {...field} value={field.value ?? ""} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_180px] md:items-end">
+                    <FormField
+                      control={form.control}
+                      name="logoUrl"
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Logo URL</FormLabel>
+                          <FormControl>
+                            <Input type="url" placeholder="https://example.com/logo.png" disabled={isSubmitting} {...field} value={field.value ?? ""} />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name="isActive"
+                      render={({ field }) => (
+                        <FormItem className="flex h-10 items-center justify-between rounded-md border px-3">
+                          <FormLabel className="text-sm font-medium">Active</FormLabel>
+                          <FormControl>
+                            <Switch checked={Boolean(field.value)} onCheckedChange={field.onChange} disabled={isSubmitting} />
+                          </FormControl>
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+
+                  <div className="flex flex-col-reverse gap-3 border-t pt-5 sm:flex-row sm:justify-end">
+                    <Button type="button" variant="outline" onClick={() => router.push(returnHref)} disabled={isSubmitting}>
+                      Cancel
+                    </Button>
+                    <Button type="submit" disabled={isSubmitting}>
+                      {isSubmitting ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                      {isEdit ? "Save Changes" : "Create Brand"}
+                    </Button>
+                  </div>
+                </form>
+              </Form>
+            </CardContent>
+          </Card>
+
+          <Card>
+            <CardHeader>
+              <CardTitle>Preview</CardTitle>
+              <CardDescription>{previewSlug || "brand-slug"}</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="flex h-20 w-20 items-center justify-center rounded-lg border bg-muted text-xl font-semibold text-muted-foreground">
+                {watchedName ? initials(watchedName) : <Building2 className="h-7 w-7" />}
               </div>
               <div>
-                <h1 className="text-3xl sm:text-4xl font-bold bg-gradient-to-r from-slate-900 to-slate-700 dark:from-white dark:to-slate-300 bg-clip-text text-transparent">
-                  Create New Brand
-                </h1>
-                <p className="text-slate-600 dark:text-slate-400 mt-1">
-                  Add a new brand to organize your inventory
-                </p>
+                <p className="font-medium text-foreground">{watchedName || "Brand name"}</p>
+                <p className="text-sm text-muted-foreground">{form.watch("nameFr") || "French name"}</p>
               </div>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-            {/* Main Form */}
-            <div className="lg:col-span-2">
-              <Card className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-lg border-0 shadow-2xl rounded-3xl overflow-hidden">
-                <CardContent className="p-8">
-                  <div className="text-center mb-8">
-                    <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-gradient-to-br from-pink-500 to-rose-600 shadow-lg mb-4">
-                      <Tag className="w-8 h-8 text-white" />
-                    </div>
-                    <h3 className="text-2xl font-bold text-slate-900 dark:text-white mb-2">Brand Information</h3>
-                    <p className="text-slate-600 dark:text-slate-400">Enter the name of the brand you want to add</p>
-                  </div>
-
-                  <Form {...form}>
-                    <form onSubmit={form.handleSubmit(handleSubmit)} className="space-y-8">
-                      <FormField
-                        control={form.control}
-                        name="brandName"
-                        render={({ field }) => (
-                          <FormItem>
-                            <FormLabel className="text-base font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-2">
-                              <Sparkles className="h-4 w-4 text-pink-500" />
-                              Brand Name *
-                            </FormLabel>
-                            <FormControl>
-                              <Input
-                                placeholder="Enter brand name (e.g., Nike, Apple, Samsung)"
-                                className="h-12 text-lg bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm border-2 border-slate-200 dark:border-slate-700 focus:border-pink-500 dark:focus:border-pink-400 rounded-xl shadow-sm"
-                                {...field}
-                              />
-                            </FormControl>
-                            <FormDescription className="text-sm text-slate-500 dark:text-slate-400">
-                              This will be used to categorize products in your inventory
-                            </FormDescription>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-
-                      {brandName && (
-                        <div className="p-6 rounded-2xl bg-gradient-to-r from-pink-50 to-rose-50 dark:from-pink-900/20 dark:to-rose-900/20 border-2 border-pink-200 dark:border-pink-700">
-                          <div className="flex items-center gap-3 mb-4">
-                            <CheckCircle className="h-6 w-6 text-pink-600 dark:text-pink-400" />
-                            <h4 className="text-lg font-semibold text-pink-900 dark:text-pink-100">Brand Preview</h4>
-                          </div>
-                          <div className="space-y-3">
-                            <div className="flex justify-between items-center">
-                              <span className="text-sm text-pink-600 dark:text-pink-400">Name:</span>
-                              <span className="font-medium text-pink-900 dark:text-pink-100">{brandName}</span>
-                            </div>
-                            <div className="flex justify-between items-center">
-                              <span className="text-sm text-pink-600 dark:text-pink-400">URL Slug:</span>
-                              <span className="font-mono text-sm text-pink-800 dark:text-pink-200 bg-pink-100 dark:bg-pink-900/30 px-2 py-1 rounded">
-                                {slugPreview || "auto-generated"}
-                              </span>
-                            </div>
-                          </div>
-                        </div>
-                      )}
-
-                      {/* Form Actions */}
-                      <div className="flex justify-between items-center pt-8 border-t border-slate-200 dark:border-slate-700">
-                        <Button
-                          type="button"
-                          onClick={handleCancel}
-                          variant="outline"
-                          className="px-6 py-3 bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm border-2 border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600"
-                        >
-                          <ArrowLeft className="w-4 h-4 mr-2" />
-                          Cancel
-                        </Button>
-
-                        <Button
-                          type="submit"
-                          disabled={form.formState.isSubmitting || isLoading || !brandName}
-                          className="px-8 py-3 bg-gradient-to-r from-pink-600 to-rose-600 hover:from-pink-700 hover:to-rose-700 text-white shadow-lg"
-                        >
-                          {form.formState.isSubmitting || isLoading ? (
-                            <>
-                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                              Creating Brand...
-                            </>
-                          ) : (
-                            <>
-                              <Save className="mr-2 h-4 w-4" />
-                              Create Brand
-                            </>
-                          )}
-                        </Button>
-                      </div>
-                    </form>
-                  </Form>
-                </CardContent>
-              </Card>
-            </div>
-
-            {/* Preview Panel */}
-            <div className="lg:col-span-1">
-              <Card className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-lg border-0 shadow-2xl rounded-3xl overflow-hidden sticky top-8">
-                <div className="bg-gradient-to-r from-slate-50 to-pink-50/50 dark:from-slate-800 dark:to-slate-700 px-6 py-4 border-b border-slate-200/60 dark:border-slate-700/60">
-                  <CardTitle className="text-lg font-semibold text-slate-900 dark:text-white flex items-center gap-2">
-                    <Eye className="h-5 w-5 text-pink-600 dark:text-pink-400" />
-                    Live Preview
-                  </CardTitle>
-                  <CardDescription className="text-slate-600 dark:text-slate-400 mt-1">
-                    See how your brand will appear
-                  </CardDescription>
-                </div>
-                <CardContent className="p-6 space-y-6">
-                  {/* Brand Preview */}
-                  <div className="text-center space-y-4">
-                    <div className="relative mx-auto w-20 h-20 rounded-2xl overflow-hidden border-4 border-slate-200 dark:border-slate-700 shadow-xl bg-gradient-to-br from-pink-500 to-rose-600 flex items-center justify-center">
-                      <Tag className="w-10 h-10 text-white" />
-                    </div>
-                    <div>
-                      <h3 className="font-bold text-slate-900 dark:text-white text-xl mb-1">
-                        {brandName || "New Brand"}
-                      </h3>
-                      {slugPreview && (
-                        <p className="text-sm text-slate-500 dark:text-slate-400 font-mono bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-lg inline-block">
-                          {slugPreview}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-
-                  {/* Status Badge */}
-                  <div className="flex justify-center">
-                    <Badge
-                      variant="default"
-                      className="px-3 py-1 bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300 border-green-200 dark:border-green-700"
-                    >
-                      <div className="w-2 h-2 rounded-full mr-2 bg-green-500"></div>
-                      Active Brand
-                    </Badge>
-                  </div>
-
-                  {/* Completion Status */}
-                  <div className="pt-4 border-t border-slate-200 dark:border-slate-700">
-                    <div className="space-y-2">
-                      <div className="flex justify-between text-sm">
-                        <span className="text-slate-600 dark:text-slate-400">Completion</span>
-                        <span className="font-medium text-slate-900 dark:text-white">
-                          {brandName ? "100" : "0"}%
-                        </span>
-                      </div>
-                      <Progress value={brandName ? 100 : 0} className="h-2" />
-                    </div>
-                    <p className="text-xs text-slate-500 dark:text-slate-400 text-center mt-3">
-                      {brandName ? "Ready to create brand!" : "Enter a brand name to continue"}
-                    </p>
-                  </div>
-                </CardContent>
-              </Card>
-            </div>
-          </div>
+              <div className="rounded-md border bg-muted/40 px-3 py-2 font-mono text-xs text-muted-foreground">
+                /brands/{previewSlug || "brand-slug"}
+              </div>
+            </CardContent>
+          </Card>
         </div>
       </div>
-    </TooltipProvider>
+    </div>
   )
 }

@@ -1,4 +1,6 @@
 "use client";
+
+import { notify } from "@/lib/notifications/notify"
 import { createNewBlog } from "@/actions/blogs";
 import FormSelectInput from "@/components/FormInputs/FormSelectInput";
 import { Button } from "@/components/ui/button";
@@ -16,7 +18,6 @@ import { generateSlug } from "@/lib/generateSlug";
 import { Loader2, Plus, PlusCircle } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
-import { toast } from "sonner";
 ;
 
 export function BlogCreateForm({
@@ -57,7 +58,7 @@ export function BlogCreateForm({
       if (res && res.id) {
         setLoading(false);
         router.push(`/dashboard/blogs/update/${res.id}`);
-        toast.success("Blog created successfully");
+        notify.success("Blog created successfully");
       }
     } catch (error) {
       setLoading(false);

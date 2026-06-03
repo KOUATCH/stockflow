@@ -21,6 +21,7 @@ import {
 } from 'lucide-react'
 import { getPayrollSummary, getPayrollPeriods } from '@/actions/payroll/payrollManagement'
 import { getPayrollAnalytics } from '@/actions/payroll/payrollAnalytics'
+import { getComprehensivePayrollSummary } from '@/actions/payroll/enhanced-payroll-actions'
 import { format, startOfMonth, endOfMonth } from 'date-fns'
 
 interface PayrollDashboardProps {
@@ -30,6 +31,7 @@ interface PayrollDashboardProps {
 export default function PayrollDashboard({ organizationId }: PayrollDashboardProps) {
   const [loading, setLoading] = useState(true)
   const [payrollSummary, setPayrollSummary] = useState<any>(null)
+  const [comprehensiveData, setComprehensiveData] = useState<any>(null)
   const [payrollPeriods, setPayrollPeriods] = useState<any[]>([])
   const [analytics, setAnalytics] = useState<any>(null)
   const [selectedPeriod, setSelectedPeriod] = useState('current')
@@ -45,15 +47,17 @@ export default function PayrollDashboard({ organizationId }: PayrollDashboardPro
       const startDate = startOfMonth(currentDate)
       const endDate = endOfMonth(currentDate)
 
-      const [summaryResult, periodsResult, analyticsResult] = await Promise.all([
+      const [summaryResult, periodsResult, analyticsResult, comprehensiveResult] = await Promise.all([
         getPayrollSummary(organizationId, startDate, endDate),
         getPayrollPeriods(organizationId, currentDate.getFullYear()),
-        getPayrollAnalytics(organizationId, startDate, endDate)
+        getPayrollAnalytics(organizationId, startDate, endDate),
+        getComprehensivePayrollSummary(organizationId, startDate, endDate)
       ])
 
       if (summaryResult.success) setPayrollSummary(summaryResult.data)
       if (periodsResult.success) setPayrollPeriods(periodsResult.data)
       if (analyticsResult.success) setAnalytics(analyticsResult.data)
+      if (comprehensiveResult.success) setComprehensiveData(comprehensiveResult.data)
     } catch (error) {
       console.error('Error loading payroll data:', error)
     } finally {
@@ -142,9 +146,11 @@ export default function PayrollDashboard({ organizationId }: PayrollDashboardPro
               <div>
                 <p className="text-sm text-amber-600/80 font-medium">Total Employees</p>
                 <p className="text-2xl font-bold text-amber-700">
-                  {payrollSummary?.totals?.totalEmployees || 0}
+                  {comprehensiveData?.employees?.total || payrollSummary?.totals?.totalEmployees || 0}
                 </p>
-                <p className="text-xs text-amber-600/60">+2 from last month</p>
+                <p className="text-xs text-amber-600/60">
+                  {comprehensiveData?.employees?.newHires > 0 ? `+${comprehensiveData.employees.newHires} new hires` : 'Active employees'}
+                </p>
               </div>
             </div>
           </CardContent>
@@ -166,9 +172,13 @@ export default function PayrollDashboard({ organizationId }: PayrollDashboardPro
               <div>
                 <p className="text-sm text-emerald-600/80 font-medium">Monthly Payroll</p>
                 <p className="text-2xl font-bold text-emerald-700">
-                  {formatCurrency(payrollSummary?.totals?.totalGrossPay || 0)}
+                  {formatCurrency(comprehensiveData?.financials?.totalGrossPay || payrollSummary?.totals?.totalGrossPay || 0)}
                 </p>
-                <p className="text-xs text-emerald-600/60">+3.2% from last month</p>
+                <p className="text-xs text-emerald-600/60">
+                  {comprehensiveData?.trends?.payrollGrowth > 0 ?
+                    `+${comprehensiveData.trends.payrollGrowth.toFixed(1)}% growth` :
+                    'Monthly gross pay'}
+                </p>
               </div>
             </div>
           </CardContent>
@@ -190,9 +200,13 @@ export default function PayrollDashboard({ organizationId }: PayrollDashboardPro
               <div>
                 <p className="text-sm text-orange-600/80 font-medium">Average Salary</p>
                 <p className="text-2xl font-bold text-orange-700">
-                  {formatCurrency(payrollSummary?.totals?.averageSalary || 0)}
+                  {formatCurrency(comprehensiveData?.financials?.averageSalary || payrollSummary?.totals?.averageSalary || 0)}
                 </p>
-                <p className="text-xs text-orange-600/60">+1.8% from last month</p>
+                <p className="text-xs text-orange-600/60">
+                  {comprehensiveData?.attendance?.avgHoursPerEmployee ?
+                    `${comprehensiveData.attendance.avgHoursPerEmployee.toFixed(1)}h avg/employee` :
+                    'Per employee'}
+                </p>
               </div>
             </div>
           </CardContent>
@@ -214,9 +228,13 @@ export default function PayrollDashboard({ organizationId }: PayrollDashboardPro
               <div>
                 <p className="text-sm text-violet-600/80 font-medium">Net Payroll</p>
                 <p className="text-2xl font-bold text-violet-700">
-                  {formatCurrency(payrollSummary?.totals?.totalNetPay || 0)}
+                  {formatCurrency(comprehensiveData?.financials?.totalNetPay || payrollSummary?.totals?.totalNetPay || 0)}
                 </p>
-                <p className="text-xs text-violet-600/60">After deductions</p>
+                <p className="text-xs text-violet-600/60">
+                  {comprehensiveData?.attendance?.avgAttendanceRate ?
+                    `${comprehensiveData.attendance.avgAttendanceRate.toFixed(1)}% attendance` :
+                    'After deductions'}
+                </p>
               </div>
             </div>
           </CardContent>
@@ -254,7 +272,7 @@ export default function PayrollDashboard({ organizationId }: PayrollDashboardPro
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                {payrollSummary?.breakdown?.byDepartment?.map((dept: any, index: number) => (
+                {(comprehensiveData?.departments || payrollSummary?.breakdown?.byDepartment || []).map((dept: any, index: number) => (
                   <div key={index} className="space-y-2">
                     <div className="flex justify-between text-sm">
                       <span>{dept.department}</span>
@@ -265,11 +283,19 @@ export default function PayrollDashboard({ organizationId }: PayrollDashboardPro
                       <span>Avg: {formatCurrency(dept.averageSalary)}</span>
                     </div>
                     <Progress
-                      value={(dept.totalGrossPay / (payrollSummary?.totals?.totalGrossPay || 1)) * 100}
+                      value={(dept.totalGrossPay / (comprehensiveData?.financials?.totalGrossPay || payrollSummary?.totals?.totalGrossPay || 1)) * 100}
                       className="h-2"
                     />
+                    {dept.overtimePercentage !== undefined && (
+                      <p className="text-xs text-orange-600">
+                        {dept.overtimePercentage.toFixed(1)}% overtime
+                      </p>
+                    )}
                   </div>
                 ))}
+                {(!comprehensiveData?.departments && !payrollSummary?.breakdown?.byDepartment) && (
+                  <p className="text-sm text-muted-foreground">No department data available</p>
+                )}
               </CardContent>
             </Card>
 
@@ -285,7 +311,7 @@ export default function PayrollDashboard({ organizationId }: PayrollDashboardPro
                 </CardDescription>
               </CardHeader>
               <CardContent className="space-y-4">
-                {analytics?.alerts?.map((alert: any, index: number) => (
+                {(comprehensiveData?.alerts || analytics?.alerts || []).map((alert: any, index: number) => (
                   <div key={index} className="flex items-start space-x-3">
                     <AlertTriangle className={`h-4 w-4 mt-0.5 ${
                       alert.severity === 'high' ? 'text-red-500' :
@@ -302,8 +328,11 @@ export default function PayrollDashboard({ organizationId }: PayrollDashboardPro
                     </div>
                   </div>
                 ))}
-                {(!analytics?.alerts || analytics.alerts.length === 0) && (
-                  <p className="text-sm text-muted-foreground">No alerts at this time</p>
+                {(!comprehensiveData?.alerts && !analytics?.alerts) && (
+                  <p className="text-sm text-muted-foreground text-center py-4">
+                    <AlertTriangle className="h-8 w-8 mx-auto mb-2 text-green-500" />
+                    All systems running smoothly
+                  </p>
                 )}
               </CardContent>
             </Card>
@@ -420,28 +449,55 @@ export default function PayrollDashboard({ organizationId }: PayrollDashboardPro
                   <div className="space-y-2">
                     <p className="text-sm font-medium">Payroll Growth Rate</p>
                     <p className="text-2xl font-bold text-green-600">
-                      +{analytics?.overview?.payrollGrowthRate || 0}%
+                      {comprehensiveData?.trends?.payrollGrowth > 0 ? '+' : ''}{comprehensiveData?.trends?.payrollGrowth?.toFixed(1) || analytics?.overview?.payrollGrowthRate || 0}%
                     </p>
                   </div>
                   <div className="space-y-2">
                     <p className="text-sm font-medium">Cost Per Employee</p>
                     <p className="text-2xl font-bold">
-                      {formatCurrency(analytics?.overview?.costPerEmployee || 0)}
+                      {formatCurrency(comprehensiveData?.financials?.averageSalary || analytics?.overview?.costPerEmployee || 0)}
                     </p>
                   </div>
                   <div className="space-y-2">
-                    <p className="text-sm font-medium">Overtime Percentage</p>
-                    <p className="text-2xl font-bold text-yellow-600">
-                      {analytics?.efficiency?.averageOvertimePercentage || 0}%
+                    <p className="text-sm font-medium">Total Hours Worked</p>
+                    <p className="text-2xl font-bold text-blue-600">
+                      {comprehensiveData?.attendance?.totalHoursWorked?.toLocaleString() || '0'}h
                     </p>
                   </div>
                   <div className="space-y-2">
-                    <p className="text-sm font-medium">Benefits Cost</p>
-                    <p className="text-2xl font-bold">
-                      {formatCurrency(analytics?.breakdown?.byCostType?.find((item: any) => item.type === 'Benefits')?.amount || 0)}
+                    <p className="text-sm font-medium">Attendance Rate</p>
+                    <p className="text-2xl font-bold text-purple-600">
+                      {comprehensiveData?.attendance?.avgAttendanceRate?.toFixed(1) || '0'}%
                     </p>
                   </div>
                 </div>
+
+                {/* Additional Analytics */}
+                {comprehensiveData && (
+                  <div className="mt-6 grid gap-4 md:grid-cols-3">
+                    <div className="p-4 bg-blue-50 rounded-lg">
+                      <h4 className="font-medium text-blue-800">Overtime Analysis</h4>
+                      <p className="text-2xl font-bold text-blue-600">
+                        {formatCurrency(comprehensiveData.financials.totalOvertimePay)}
+                      </p>
+                      <p className="text-xs text-blue-600">Total overtime pay</p>
+                    </div>
+                    <div className="p-4 bg-green-50 rounded-lg">
+                      <h4 className="font-medium text-green-800">Punctuality Score</h4>
+                      <p className="text-2xl font-bold text-green-600">
+                        {comprehensiveData.attendance.punctualityScore?.toFixed(1) || '0'}%
+                      </p>
+                      <p className="text-xs text-green-600">On-time arrivals</p>
+                    </div>
+                    <div className="p-4 bg-orange-50 rounded-lg">
+                      <h4 className="font-medium text-orange-800">Payroll Cost Ratio</h4>
+                      <p className="text-2xl font-bold text-orange-600">
+                        {comprehensiveData.financials.payrollCostPercentage?.toFixed(1) || '0'}%
+                      </p>
+                      <p className="text-xs text-orange-600">Of total expenses</p>
+                    </div>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </div>
@@ -463,7 +519,12 @@ export default function PayrollDashboard({ organizationId }: PayrollDashboardPro
                 <div>
                   <h4 className="font-medium">Active Employees</h4>
                   <p className="text-sm text-muted-foreground">
-                    {payrollSummary?.totals?.totalEmployees || 0} employees currently active
+                    {comprehensiveData?.employees?.total || payrollSummary?.totals?.totalEmployees || 0} employees currently active
+                    {comprehensiveData?.employees?.newHires > 0 && (
+                      <span className="ml-2 text-green-600">
+                        • {comprehensiveData.employees.newHires} new this period
+                      </span>
+                    )}
                   </p>
                 </div>
                 <Button>
@@ -471,11 +532,56 @@ export default function PayrollDashboard({ organizationId }: PayrollDashboardPro
                   Add Employee
                 </Button>
               </div>
+
+              {/* Employee Summary Stats */}
+              {comprehensiveData && (
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                  <div className="text-center p-3 bg-blue-50 rounded-lg">
+                    <p className="text-2xl font-bold text-blue-600">{comprehensiveData.employees.active}</p>
+                    <p className="text-xs text-blue-600">Active</p>
+                  </div>
+                  <div className="text-center p-3 bg-green-50 rounded-lg">
+                    <p className="text-2xl font-bold text-green-600">{comprehensiveData.employees.newHires}</p>
+                    <p className="text-xs text-green-600">New Hires</p>
+                  </div>
+                  <div className="text-center p-3 bg-purple-50 rounded-lg">
+                    <p className="text-2xl font-bold text-purple-600">{comprehensiveData.departments.length}</p>
+                    <p className="text-xs text-purple-600">Departments</p>
+                  </div>
+                  <div className="text-center p-3 bg-orange-50 rounded-lg">
+                    <p className="text-2xl font-bold text-orange-600">
+                      {comprehensiveData.attendance.avgHoursPerEmployee.toFixed(1)}h
+                    </p>
+                    <p className="text-xs text-orange-600">Avg Hours</p>
+                  </div>
+                </div>
+              )}
+
               <div className="border rounded-lg">
-                <div className="p-4 text-center text-muted-foreground">
-                  <Users className="h-8 w-8 mx-auto mb-2" />
-                  <p>Employee list will be displayed here</p>
-                  <p className="text-sm">Click "Add Employee" to get started</p>
+                <div className="p-4">
+                  {comprehensiveData?.departments ? (
+                    <div className="space-y-4">
+                      <h5 className="font-medium">Department Overview</h5>
+                      {comprehensiveData.departments.map((dept: any, index: number) => (
+                        <div key={index} className="flex justify-between items-center p-3 bg-gray-50 rounded">
+                          <div>
+                            <p className="font-medium">{dept.department}</p>
+                            <p className="text-sm text-gray-600">{dept.employeeCount} employees</p>
+                          </div>
+                          <div className="text-right">
+                            <p className="font-medium">{formatCurrency(dept.averageSalary)}</p>
+                            <p className="text-sm text-gray-600">avg salary</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center text-muted-foreground">
+                      <Users className="h-8 w-8 mx-auto mb-2" />
+                      <p>Employee data will be displayed here</p>
+                      <p className="text-sm">Add employees to see detailed information</p>
+                    </div>
+                  )}
                 </div>
               </div>
             </CardContent>

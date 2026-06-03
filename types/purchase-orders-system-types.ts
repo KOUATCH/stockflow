@@ -121,6 +121,7 @@ export interface PaginatedPurchaseOrdersResponse {
 export interface PurchaseOrderResponse<T> {
   success: boolean
   error?: string | null
+  message?: string
   data: T
 }
 

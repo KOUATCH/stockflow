@@ -1,5 +1,6 @@
 "use client"
 
+import { notify } from "@/lib/notifications/notify"
 import {
   getInventory,
   getInventorySummary,
@@ -9,8 +10,6 @@ import {
 } from "@/actions/inventory/inventoryActions"
 import type { InventoryFilters, InventoryTransaction } from "@/actions/inventory/inventoryActions"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { toast } from "sonner"
-
 // ============================================================================
 // QUERY KEYS
 // ============================================================================
@@ -77,6 +76,7 @@ export function useUpdateReorderLevels() {
   const queryClient = useQueryClient()
 
   return useMutation({
+    meta: { operation: 'update', entity: 'Reorder Levels' , suppressSuccessNotification: true, suppressErrorNotification: true },
     mutationFn: ({
       inventoryId,
       reorderLevel,
@@ -89,12 +89,12 @@ export function useUpdateReorderLevels() {
       organizationId: string
     }) => updateReorderLevels(inventoryId, reorderLevel, maxLevel, organizationId),
     onSuccess: (data, variables) => {
-      toast.success("Reorder levels updated successfully")
+      notify.success("Reorder levels updated successfully")
       queryClient.invalidateQueries({ queryKey: InventoryKeys.all })
       queryClient.invalidateQueries({ queryKey: InventoryKeys.summary(variables.organizationId) })
     },
     onError: (error: Error) => {
-      toast.error(error.message || "Failed to update reorder levels")
+      notify.error(error.message || "Failed to update reorder levels")
     },
   })
 }
@@ -106,6 +106,7 @@ export function useInventoryAdjustment() {
   const queryClient = useQueryClient()
 
   return useMutation({
+    meta: { operation: 'create', entity: 'Inventory Adjustment', suppressSuccessNotification: true, suppressErrorNotification: true },
     mutationFn: ({
       itemId,
       locationId,
@@ -122,7 +123,7 @@ export function useInventoryAdjustment() {
       userId: string
     }) => createInventoryAdjustment(itemId, locationId, adjustmentQuantity, reason, organizationId, userId),
     onSuccess: (data, variables) => {
-      toast.success("Inventory adjustment completed successfully")
+      notify.success("Inventory adjustment completed successfully")
       queryClient.invalidateQueries({ queryKey: InventoryKeys.all })
       queryClient.invalidateQueries({ queryKey: InventoryKeys.summary(variables.organizationId) })
       queryClient.invalidateQueries({
@@ -130,7 +131,7 @@ export function useInventoryAdjustment() {
       })
     },
     onError: (error: Error) => {
-      toast.error(error.message || "Failed to create inventory adjustment")
+      notify.error(error.message || "Failed to create inventory adjustment")
     },
   })
 }

@@ -18,14 +18,10 @@ export async function getUserWithRoles(userId: string) {
         roles: {
           select: {
             id: true,
-            name: true,
+            nameEn: true,
+            nameFr: true,
             code: true,
             permissions: true,
-            rolePermissions: {
-              include: {
-                permission: true
-              }
-            }
           }
         }
       }
@@ -47,12 +43,9 @@ export async function getUserPermissions(userId: string) {
     }
 
     // Flatten all permissions from all roles
-    const allPermissions = user.roles.reduce((acc, role) => {
-      // Get permissions from role.permissions array (direct permissions)
-      // AND from rolePermissions relationship (linked permissions)
+    const allPermissions = user.roles.reduce<string[]>((acc, role) => {
       const directPermissions = role.permissions || []
-      const linkedPermissions = role.rolePermissions?.map(rp => rp.permission.code) || []
-      return [...acc, ...directPermissions, ...linkedPermissions]
+      return [...acc, ...directPermissions]
     }, [] as string[])
 
     // Remove duplicates and return

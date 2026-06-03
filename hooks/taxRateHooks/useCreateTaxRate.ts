@@ -9,6 +9,7 @@ export function useCreateTaxRate() {
   const { formSuccess, formError } = useNotifications();
 
   return useMutation({
+    meta: { operation: 'create', entity: 'Tax Rate' },
     mutationFn: async (data: TaxRateCreateDTO) => {
       const result = await createTaxRate(data)
 

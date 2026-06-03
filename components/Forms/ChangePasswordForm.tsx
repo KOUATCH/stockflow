@@ -1,15 +1,16 @@
 "use client";
 
+import { notify } from "@/lib/notifications/notify"
 import { Card, CardContent } from "@/components/ui/card";
-import { User as PrismaUser } from "@prisma/client";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 
 import { updateUserPassword } from "@/actions/users/updateUserPassword";
+import { getLocaleFromPathname, localizePath } from "@/i18n/routing";
+import { DEFAULT_LOCALE } from "@/types/bilingual";
 import { Lock, LockOpen } from "lucide-react";
 import { signOut } from "@/lib/auth-client";
-import { toast } from "sonner";
 import PasswordInput from "../FormInputs/PasswordInput";
 import TextInput from "../FormInputs/TextInput";
 import FormFooter from "./FormFooter";
@@ -25,7 +26,7 @@ export type SelectOptionProps = {
 };
 type ClientFormProps = {
   editingId?: string | undefined;
-  initialData?: PrismaUser | undefined | null;
+  initialData?: unknown;
 };
 export default function ChangePasswordForm({
   editingId,
@@ -43,6 +44,9 @@ export default function ChangePasswordForm({
     },
   });
   const router = useRouter();
+  const pathname = usePathname();
+  const locale = getLocaleFromPathname(pathname) ?? DEFAULT_LOCALE;
+  const localizedHref = (href: string) => localizePath(href, locale);
   const [passErr, setPassErr] = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -58,16 +62,16 @@ export default function ChangePasswordForm({
         }
         if (res?.status === 200) {
           setLoading(false);
-          toast.success("Password Updated Successfully!");
+          notify.success("Password Updated Successfully!");
           reset();
           await signOut();
-          router.push("/login");
+          router.push(localizedHref("/login"));
         }
       }
     } catch (error) {
       setLoading(false);
       console.error("Network Error:", error);
-      toast.error("Its seems something is wrong, try again");
+      notify.error("Its seems something is wrong, try again");
     }
   }
 

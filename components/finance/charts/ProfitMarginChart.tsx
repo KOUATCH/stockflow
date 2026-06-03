@@ -118,7 +118,7 @@ export function ProfitMarginChart({ data }: ProfitMarginChartProps) {
                 stroke="#f59e0b"
                 strokeDasharray="5 5"
                 strokeWidth={2}
-                label={{ value: "Target 40%", position: "topLeft" }}
+                label={{ value: "Target 40%", position: "insideTopLeft" }}
               />
 
               {/* Gross Margin Area */}

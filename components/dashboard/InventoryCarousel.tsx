@@ -1,40 +1,29 @@
 "use client"
 
-import React, { useState, useRef, useEffect } from 'react'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { Card, CardContent } from '@/components/ui/card'
 import { Progress } from '@/components/ui/progress'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Skeleton } from '@/components/ui/skeleton'
-import { ScrollArea } from '@/components/ui/scroll-area'
+import { formatCurrency, formatNumber, formatPercentage } from '@/lib/utils'
 import {
+  BarChart3,
   ChevronLeft,
   ChevronRight,
-  Package,
-  TrendingUp,
-  TrendingDown,
-  AlertTriangle,
-  CheckCircle,
-  BarChart3,
   Grid3X3,
-  List,
   Layers,
-  Eye,
+  List,
   MoreHorizontal,
+  Package,
   Search,
-  Filter,
   SortAsc,
   SortDesc,
-  RefreshCw,
-  ExternalLink,
-  Star,
-  Zap,
-  Clock,
-  DollarSign,
-  ShoppingCart
+  TrendingDown,
+  TrendingUp,
+  Zap
 } from 'lucide-react'
-import { formatCurrency, formatNumber, formatPercentage } from '@/lib/utils'
+import React, { useRef, useState } from 'react'
 
 interface InventoryItem {
   id: string
@@ -157,8 +146,8 @@ export default function InventoryCarousel({ items: propItems, isLoading = false,
   const filteredAndSortedItems = React.useMemo(() => {
     let filtered = items.filter(item => {
       const matchesSearch = item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                           item.sku.toLowerCase().includes(searchQuery.toLowerCase()) ||
-                           item.category.toLowerCase().includes(searchQuery.toLowerCase())
+        item.sku.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        item.category.toLowerCase().includes(searchQuery.toLowerCase())
       const matchesCategory = filterCategory === 'all' || item.category === filterCategory
       const matchesStatus = filterStatus === 'all' || item.status === filterStatus
 
@@ -241,6 +230,25 @@ export default function InventoryCarousel({ items: propItems, isLoading = false,
       case 'up': return <TrendingUp className="h-3 w-3 text-green-600" />
       case 'down': return <TrendingDown className="h-3 w-3 text-red-600" />
       default: return <BarChart3 className="h-3 w-3 text-gray-600" />
+    }
+  }
+
+  const getStockProgressColor = (currentStock: number, minStock: number, maxStock: number) => {
+    const percentage = (currentStock / maxStock) * 100
+    const minPercentage = (minStock / maxStock) * 100
+
+    if (currentStock === 0) {
+      return "stock-critical" // Completely out of stock
+    } else if (percentage <= minPercentage) {
+      return "stock-danger" // Below minimum level
+    } else if (percentage <= minPercentage * 2) {
+      return "stock-warning" // Getting low
+    } else if (percentage >= 85) {
+      return "stock-overstock" // Overstocked
+    } else if (percentage >= 60) {
+      return "stock-excellent" // Good level
+    } else {
+      return "stock-moderate" // Moderate level
     }
   }
 
@@ -409,8 +417,8 @@ export default function InventoryCarousel({ items: propItems, isLoading = false,
           {Array.from({ length: Math.min(totalPages, 5) }, (_, index) => {
             const pageIndex = totalPages <= 5 ? index :
               currentPage < 3 ? index :
-              currentPage > totalPages - 3 ? totalPages - 5 + index :
-              currentPage - 2 + index
+                currentPage > totalPages - 3 ? totalPages - 5 + index :
+                  currentPage - 2 + index
 
             return (
               <Button
@@ -469,7 +477,7 @@ export default function InventoryCarousel({ items: propItems, isLoading = false,
                       </div>
                       <Progress
                         value={(item.currentStock / item.maxStock) * 100}
-                        className="h-2"
+                        className={`h-2 ${getStockProgressColor(item.currentStock, item.minStock, item.maxStock)}`}
                       />
                     </div>
 
@@ -526,7 +534,7 @@ export default function InventoryCarousel({ items: propItems, isLoading = false,
                         <span className="ml-1">{item.sales30d}</span>
                       </span>
                     </div>
-                    <Progress value={(item.currentStock / item.maxStock) * 100} className="h-1" />
+                    <Progress value={(item.currentStock / item.maxStock) * 100} className={`h-1 ${getStockProgressColor(item.currentStock, item.minStock, item.maxStock)}`} />
                   </div>
                 </CardContent>
               </Card>
@@ -565,7 +573,7 @@ export default function InventoryCarousel({ items: propItems, isLoading = false,
                         <td className="p-4">
                           <div className="space-y-1">
                             <p className="text-sm font-semibold">{formatNumber(item.currentStock)}</p>
-                            <Progress value={(item.currentStock / item.maxStock) * 100} className="h-1 w-16" />
+                            <Progress value={(item.currentStock / item.maxStock) * 100} className={`h-1 w-16 ${getStockProgressColor(item.currentStock, item.minStock, item.maxStock)}`} />
                           </div>
                         </td>
                         <td className="p-4 text-sm font-semibold">{formatCurrency(item.totalValue)}</td>
@@ -627,7 +635,7 @@ export default function InventoryCarousel({ items: propItems, isLoading = false,
                         <span>Stock Health</span>
                         <span>{((item.currentStock / item.maxStock) * 100).toFixed(0)}%</span>
                       </div>
-                      <Progress value={(item.currentStock / item.maxStock) * 100} className="h-2" />
+                      <Progress value={(item.currentStock / item.maxStock) * 100} className={`h-2 ${getStockProgressColor(item.currentStock, item.minStock, item.maxStock)}`} />
                     </div>
 
                     <div className="grid grid-cols-3 gap-2 text-center">

@@ -1,25 +1,42 @@
 "use server"
 
+import { randomUUID } from "crypto"
+
 import { db } from "@/prisma/db"
-import type { Customer } from "@prisma/client"
+import type { Customer, Prisma } from "@prisma/client"
 import { revalidatePath } from "next/cache"
 
-// Create customer
-export async function createCustomer(data: Omit<Customer, "id" | "createdAt" | "updatedAt">) {
-  try {
-    // Generate customer code if not provided
-    if (!data.code) {
-      const customerCount = await db.customer.count({
-        where: { organizationId: data.organizationId },
-      })
-      data.code = `CUST-${String(customerCount + 1).padStart(4, "0")}`
-    }
+type CustomerCreateInput = Omit<Customer, "id" | "createdAt" | "updatedAt">
 
+function revalidateCustomerPaths(id?: string): void {
+  revalidatePath("/[locale]/dashboard/customers", "page")
+
+  if (id) {
+    revalidatePath("/[locale]/dashboard/customers/[id]", "page")
+  }
+}
+
+async function nextCustomerCode(organizationId: string): Promise<string> {
+  const customerCount = await db.customer.count({
+    where: { organizationId },
+  })
+
+  return `CUST-${String(customerCount + 1).padStart(4, "0")}`
+}
+
+export async function createCustomer(data: CustomerCreateInput) {
+  try {
+    const now = new Date()
     const customer = await db.customer.create({
-      data,
+      data: {
+        ...data,
+        id: randomUUID(),
+        code: data.code || await nextCustomerCode(data.organizationId),
+        updatedAt: now,
+      },
     })
 
-    revalidatePath("/customers")
+    revalidateCustomerPaths(customer.id)
     return { success: true, data: customer }
   } catch (error) {
     console.error("Error creating customer:", error)
@@ -27,24 +44,24 @@ export async function createCustomer(data: Omit<Customer, "id" | "createdAt" | "
   }
 }
 
-// Update customer
 export async function updateCustomer(id: string, data: Partial<Customer>) {
   try {
-    const customer = await db.customer.update({
+    const updated = await db.customer.update({
       where: { id },
-      data,
+      data: {
+        ...data,
+        updatedAt: new Date(),
+      },
     })
 
-    revalidatePath("/customers")
-    revalidatePath(`/customers/${id}`)
-    return { success: true, data: customer }
+    revalidateCustomerPaths(id)
+    return { success: true, data: updated }
   } catch (error) {
     console.error("Error updating customer:", error)
     return { success: false, error: "Failed to update customer" }
   }
 }
 
-// Get customers
 export async function getCustomers(params: {
   organizationId: string
   page?: number
@@ -55,8 +72,9 @@ export async function getCustomers(params: {
   try {
     const { organizationId, page = 1, limit = 20, search, isActive } = params
 
-    const where = {
+    const where: Prisma.CustomerWhereInput = {
       organizationId,
+      deletedAt: null,
       ...(search && {
         OR: [
           { name: { contains: search, mode: "insensitive" } },

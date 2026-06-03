@@ -2,26 +2,30 @@ import { Role, User } from "@prisma/client";
 
 
 export type CategoryProps = {
-  title: string;
-  slug: string;
-  imageUrl: string;
-  description: string;
+  titleEn: string;
+  titleFr?: string | null;
+  slug?: string;
+  imageUrl?: string | null;
+  descriptionEn?: string | null;
+  descriptionFr?: string | null;
   organizationId: string;
 };
 
 
 export type OrganizationProps = {
-  id: string;
+  id?: string;
   name: string;
-  slug: string;
+  slug?: string;
   industry?: string;
   country?: string;
   state?: string;
   address?: string;
   currency?: string;
   timezone?: string;
+  defaultLocale?: "en" | "fr";
   inventoryStartDate?: Date;
-  fiscalYear?: string;
+  fiscalYearStart?: string;
+  isActive?: boolean;
   
 };
 
@@ -37,10 +41,16 @@ export type CategoryDTO = {
   organizationId: string | null;
   createdAt: Date;
   updatedAt: Date;
-  description: string | undefined;
-  title: string;
+  description?: string | undefined;
+  descriptionEn?: string | null;
+  descriptionFr?: string | null;
+  title?: string;
+  titleEn: string;
+  titleFr?: string | null;
   slug: string;
   imageUrl: string | null;
+  parentId?: string | null;
+  isActive?: boolean;
 };
 
 
@@ -69,11 +79,10 @@ export type SavingProps = {
 //   password: string;
 // };
 export type UnitProps = {
-  name: string;
+  nameEn: string;
+  nameFr?: string | null;
   symbol: string;
   organizationId: string;
-
-
 };
 export interface UnitResponse {
   name: string;
@@ -172,6 +181,13 @@ export interface RegisterUserProps {
   // Company Information
   companyName: string
   companySize: string
+  industry?: string
+  country?: string
+  state?: string
+  address?: string
+  currency?: string
+  timezone?: string
+  defaultLocale?: "en" | "fr"
 
   // Security
   password: string
@@ -185,16 +201,23 @@ export interface UserProps {
   firstName: string
   lastName: string
   name: string
+  organizationName: string
   phone: string
   image?: string
 }
 
 export interface OrgDataProps {
   name: string
-  slug: string
-  email: string
-  phone: string
+  slug?: string
+  industry?: string | null
+  country?: string | null
+  state?: string | null
   address?: string
+  currency?: string
+  timezone?: string
+  defaultLocale?: "en" | "fr"
+  email?: string
+  phone?: string
   logo?: string
 }
 

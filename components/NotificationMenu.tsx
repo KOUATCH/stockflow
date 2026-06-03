@@ -1,4 +1,6 @@
 "use client";
+
+import { notify } from "@/lib/notifications/notify"
 // import { updateNotificationStatusById } from "@/actions/pos";
 
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -19,7 +21,6 @@ import {
     Trash
 } from "lucide-react";
 import Image from "next/image";
-import { toast } from "sonner";
 ;
 
 export function NotificationMenu({
@@ -31,7 +32,7 @@ export function NotificationMenu({
   async function handleChangeStatus(id: string) {
     try {
       // await updateNotificationStatusById(id);
-      toast.success("Notification removed successfully");
+      notify.success("Notification removed successfully");
     } catch (error) {
       console.log(error);
     }

@@ -1,7 +1,48 @@
 "use server";
 
+import { Locale as PrismaLocale } from "@prisma/client";
+import { randomUUID } from "crypto";
 import { db } from "@/prisma/db";
+import { generateSlug } from "@/lib/generateSlug";
 import { revalidatePath } from "next/cache";
+
+type OrganizationMutationData = {
+  name: string;
+  slug?: string;
+  industry?: string | null;
+  country?: string | null;
+  state?: string | null;
+  address?: string | null;
+  currency?: string;
+  timezone?: string;
+  defaultLocale?: "en" | "fr";
+  inventoryStartDate?: Date | null;
+  fiscalYearStart?: string | null;
+  isActive?: boolean;
+};
+
+function cleanText(value?: string | null) {
+  const trimmed = value?.trim();
+  return trimmed ? trimmed : null;
+}
+
+function normalizeSlug(value: string) {
+  const slug = generateSlug(value).replace(/^-+|-+$/g, "");
+  return slug || `organization-${randomUUID().slice(0, 8)}`;
+}
+
+function toPrismaLocale(value?: string | null) {
+  return value === "fr" ? PrismaLocale.FR : PrismaLocale.EN;
+}
+
+function revalidateOrganizationPaths() {
+  revalidatePath("/[locale]/dashboard/settings/company", "page");
+  revalidatePath("/[locale]/dashboard/settings/organization", "page");
+}
+
+function userDisplayName(user: { firstName: string | null; lastName: string | null; email: string }) {
+  return [user.firstName, user.lastName].filter(Boolean).join(" ") || user.email;
+}
 
 // Get all organizations
 export async function getOrganizations() {
@@ -15,7 +56,8 @@ export async function getOrganizations() {
         users: {
           select: {
             id: true,
-            name: true,
+            firstName: true,
+            lastName: true,
             email: true,
             isActive: true,
           }
@@ -32,7 +74,13 @@ export async function getOrganizations() {
 
     return {
       success: true,
-      data: organizations,
+      data: organizations.map((organization) => ({
+        ...organization,
+        users: organization.users.map((user) => ({
+          ...user,
+          name: userDisplayName(user),
+        })),
+      })),
     };
   } catch (error) {
     console.error("Error fetching organizations:", error);
@@ -53,7 +101,8 @@ export async function getOrganizationById(organizationId: string) {
         users: {
           select: {
             id: true,
-            name: true,
+            firstName: true,
+            lastName: true,
             email: true,
             isActive: true,
             roles: true,
@@ -83,7 +132,13 @@ export async function getOrganizationById(organizationId: string) {
 
     return {
       success: true,
-      data: organization,
+      data: {
+        ...organization,
+        users: organization.users.map((user) => ({
+          ...user,
+          name: userDisplayName(user),
+        })),
+      },
     };
   } catch (error) {
     console.error("Error fetching organization:", error);
@@ -97,19 +152,36 @@ export async function getOrganizationById(organizationId: string) {
 // Create a new organization
 export async function createOrganization(organizationData: {
   name: string;
-  description?: string;
-  address?: string;
-  phone?: string;
-  email?: string;
-  website?: string;
+  slug?: string;
+  industry?: string | null;
+  country?: string | null;
+  state?: string | null;
+  address?: string | null;
+  currency?: string;
+  timezone?: string;
+  defaultLocale?: "en" | "fr";
 }) {
   try {
+    const slug = organizationData.slug || normalizeSlug(organizationData.name);
 
     const newOrganization = await db.organization.create({
-      data: organizationData,
+      data: {
+        id: randomUUID(),
+        name: organizationData.name,
+        slug,
+        industry: cleanText(organizationData.industry),
+        country: cleanText(organizationData.country),
+        state: cleanText(organizationData.state),
+        address: cleanText(organizationData.address),
+        currency: organizationData.currency || "XAF",
+        timezone: organizationData.timezone || "Africa/Douala",
+        defaultLocale: toPrismaLocale(organizationData.defaultLocale),
+        isActive: true,
+        updatedAt: new Date(),
+      },
     });
 
-    revalidatePath("/dashboard/settings/organizations");
+    revalidateOrganizationPaths();
 
     return {
       success: true,
@@ -127,20 +199,44 @@ export async function createOrganization(organizationData: {
 // Update an organization
 export async function updateOrganization(organizationId: string, organizationData: Partial<{
   name: string;
-  description: string;
+  slug: string;
+  industry: string | null;
+  country: string | null;
+  state: string | null;
   address: string;
-  phone: string;
-  email: string;
-  website: string;
+  currency: string;
+  timezone: string;
+  defaultLocale: "en" | "fr";
+  inventoryStartDate: Date | null;
+  fiscalYearStart: string | null;
+  isActive: boolean;
 }>) {
   try {
+    const updateData: Partial<OrganizationMutationData> = {
+      ...(organizationData.name !== undefined ? { name: organizationData.name } : {}),
+      ...(organizationData.slug !== undefined ? { slug: organizationData.slug } : {}),
+      ...(organizationData.industry !== undefined ? { industry: cleanText(organizationData.industry) } : {}),
+      ...(organizationData.country !== undefined ? { country: cleanText(organizationData.country) } : {}),
+      ...(organizationData.state !== undefined ? { state: cleanText(organizationData.state) } : {}),
+      ...(organizationData.address !== undefined ? { address: cleanText(organizationData.address) } : {}),
+      ...(organizationData.currency !== undefined ? { currency: organizationData.currency } : {}),
+      ...(organizationData.timezone !== undefined ? { timezone: organizationData.timezone } : {}),
+      ...(organizationData.defaultLocale !== undefined ? { defaultLocale: organizationData.defaultLocale } : {}),
+      ...(organizationData.inventoryStartDate !== undefined ? { inventoryStartDate: organizationData.inventoryStartDate } : {}),
+      ...(organizationData.fiscalYearStart !== undefined ? { fiscalYearStart: organizationData.fiscalYearStart } : {}),
+      ...(organizationData.isActive !== undefined ? { isActive: organizationData.isActive } : {}),
+    };
 
     const updatedOrganization = await db.organization.update({
       where: { id: organizationId },
-      data: organizationData,
+      data: {
+        ...updateData,
+        defaultLocale: updateData.defaultLocale ? toPrismaLocale(updateData.defaultLocale) : undefined,
+        updatedAt: new Date(),
+      },
     });
 
-    revalidatePath("/dashboard/settings/organizations");
+    revalidateOrganizationPaths();
 
     return {
       success: true,
@@ -192,7 +288,7 @@ export async function deleteOrganization(organizationId: string) {
       where: { id: organizationId },
     });
 
-    revalidatePath("/dashboard/settings/organizations");
+    revalidateOrganizationPaths();
 
     return {
       success: true,

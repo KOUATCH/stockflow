@@ -93,9 +93,29 @@ const transactionTypeConfig = {
   },
 }
 
+type StockMovementTransactionRow = {
+  id: string
+  type: string
+  quantity: number
+  reservedQuantity?: number
+  unitPrice: number
+  totalValue: number
+  reference?: string | null
+  referenceNumber?: string | null
+  notes?: string | null
+  createdAt: Date | string
+  item: {
+    name: string
+    sku: string
+  }
+  location?: {
+    name?: string | null
+  } | null
+}
+
 export function StockMovementDashboard() {
-  const { data: session } = useSession()
-  const orgId = user || ""
+  const { organizationId } = useClientAuth()
+  const orgId = organizationId || ""
 
   const [selectedItem, setSelectedItem] = useState<string>("all")
   const [selectedLocation, setSelectedLocation] = useState<string>("all")
@@ -309,9 +329,10 @@ export function StockMovementDashboard() {
                         </TableCell>
                       </TableRow>
                     ) : (
-                      transactions.map((transaction) => {
+                      transactions.map((transaction: StockMovementTransactionRow) => {
                         const typeConfig = transactionTypeConfig[transaction.type as keyof typeof transactionTypeConfig]
                         const isInbound = ["INBOUND", "TRANSFER_IN", "ADJUSTMENT_IN"].includes(transaction.type)
+                        const reservedQuantity = transaction.reservedQuantity ?? 0
 
                         return (
                           <TableRow key={transaction.id}>
@@ -347,8 +368,8 @@ export function StockMovementDashboard() {
                               )}
                             </TableCell>
                             <TableCell className="text-center">
-                              {transaction.reservedQuantity > 0 && (
-                                <span className="font-medium text-indigo-600">{transaction.reservedQuantity}</span>
+                              {reservedQuantity > 0 && (
+                                <span className="font-medium text-indigo-600">{reservedQuantity}</span>
                               )}
                             </TableCell>
                             <TableCell className="text-right">{formatCurrency(transaction.unitPrice)}</TableCell>

@@ -1,12 +1,15 @@
 "use client";
+
+import { notify } from "@/lib/notifications/notify"
 import { Key, Loader2, Lock } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 
 import { resetUserPassword } from "@/actions/users/updateUserPassword";
-import { useRouter, useSearchParams } from "next/navigation";
-import { toast } from "sonner";
+import { getLocaleFromPathname, localizePath } from "@/i18n/routing";
+import { DEFAULT_LOCALE } from "@/types/bilingual";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import PasswordInput from "../FormInputs/PasswordInput";
 import SubmitButton from "../FormInputs/SubmitButton";
 import CustomCarousel from "../frontend/custom-carousel";
@@ -25,6 +28,9 @@ export default function ResetPasswordForm() {
     reset,
   } = useForm<ResetProps>();
   const params = useSearchParams();
+  const pathname = usePathname();
+  const locale = getLocaleFromPathname(pathname) ?? DEFAULT_LOCALE;
+  const localizedHref = (href: string) => localizePath(href, locale);
   const email = params.get("email") || "";
   const token = params.get("token") || "";
   const [passErr, setPassErr] = useState("");
@@ -45,12 +51,12 @@ export default function ResetPasswordForm() {
         return;
       }
       setLoading(false);
-      toast.success("Password reset successfully");
-      router.push("/login");
+      notify.success("Password reset successfully");
+      router.push(localizedHref("/login"));
     } catch (error) {
       setLoading(false);
       console.error("Network Error:", error);
-      toast.error("Its seems something is wrong, try again");
+      notify.error("Its seems something is wrong, try again");
     }
   }
   return (
@@ -100,7 +106,7 @@ export default function ResetPasswordForm() {
             <p className="mt-6  text-sm text-gray-500">
               Already Registered? {""}
               <Link
-                href="/login"
+                href={localizedHref("/login")}
                 className="font-semibold leading-6 text-rose-600 hover:text-rose-500"
               >
                 Login

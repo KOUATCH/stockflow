@@ -9,7 +9,7 @@ import {
   createPayment,
   createSalesOrder,
   updateInventoryLevels,
-} from "@/actions/pos/POSActionFinal"
+} from "@/actions/newPOSSession/pos/POSActionFinal"
 import { useNotifications } from "@/components/notifications/NotificationProvider"
 import { useOrgLocationsNew } from "@/hooks/useAllLocationsQueries"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
@@ -91,7 +91,7 @@ interface CartItem {
 
 // Example mock customers for selection dialog
 
-export function pOSStationRecent({ organizationId }: { organizationId?: string }) {
+export function POSStationRecent({ organizationId }: { organizationId?: string }) {
   const [cart, setCart] = useState<CartItem[]>([])
   const [searchTerm, setSearchTerm] = useState("")
   const [selectedCustomer, setSelectedCustomer] = useState<Customer | null>(null)
@@ -140,7 +140,7 @@ export function pOSStationRecent({ organizationId }: { organizationId?: string }
   console.log(locationResponse)
 
 
-  const { data, isLoading, error } = useItemsWithInventory({
+  const { data, isLoading, error: itemsError } = useItemsWithInventory({
     locationId: selectedLocation,
     organizationId: orgId,
     trackInventory: true,
@@ -187,6 +187,7 @@ export function pOSStationRecent({ organizationId }: { organizationId?: string }
 
   // Add mutations for server actions
   const createSalesOrderMutation = useMutation({
+    meta: { operation: 'create', entity: 'Sales Order' },
     mutationFn: createSalesOrder,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["sales-orders"] })
@@ -194,6 +195,7 @@ export function pOSStationRecent({ organizationId }: { organizationId?: string }
   })
 
   const createPaymentMutation = useMutation({
+    meta: { operation: 'create', entity: 'Payment' },
     mutationFn: createPayment,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["payments"] })
@@ -201,6 +203,7 @@ export function pOSStationRecent({ organizationId }: { organizationId?: string }
   })
 
   const updateInventoryMutation = useMutation({
+    meta: { operation: 'update', entity: 'Inventory' },
     mutationFn: updateInventoryLevels,
     onSuccess: () => {
       // Invalidate and refetch items to update inventory levels
@@ -211,6 +214,7 @@ export function pOSStationRecent({ organizationId }: { organizationId?: string }
   })
 
   const createTransactionsMutation = useMutation({
+    meta: { operation: 'create', entity: 'Transactions' },
     mutationFn: createInventoryTransactions,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["inventory-transactions"] })
@@ -1216,3 +1220,5 @@ export function pOSStationRecent({ organizationId }: { organizationId?: string }
   )
   // ... (rest of the component)
 }
+
+export { POSStationRecent as pOSStationRecent }

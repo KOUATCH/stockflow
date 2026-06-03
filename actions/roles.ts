@@ -4,6 +4,14 @@ import { ROLE_TEMPLATES } from "@/lib/permissions";
 import { db } from "@/prisma/db";
 import { RoleFormData } from "@/types/types";
 
+const displayUserName = (user: { firstName: string | null; lastName: string | null; email: string }) =>
+  [user.firstName, user.lastName].filter(Boolean).join(" ") || user.email;
+
+const withDisplayRoleName = <T extends { nameEn: string; nameFr: string | null }>(role: T) => ({
+  ...role,
+  name: role.nameEn || role.nameFr || "",
+});
+
 // Get all roles for an organization
 export async function getRoles(organizationId: string) {
   try {
@@ -16,7 +24,8 @@ export async function getRoles(organizationId: string) {
         users: {
           select: {
             id: true,
-            name: true,
+            firstName: true,
+            lastName: true,
             email: true,
           },
         },
@@ -33,7 +42,13 @@ export async function getRoles(organizationId: string) {
 
     return {
       success: true,
-      data: roles,
+      data: roles.map((role) => ({
+        ...withDisplayRoleName(role),
+        users: role.users.map((user) => ({
+          ...user,
+          name: displayUserName(user),
+        })),
+      })),
     };
   } catch (error) {
     console.error("Error fetching roles:", error);
@@ -69,7 +84,7 @@ export async function createRole(data: RoleFormData) {
 
     const newRole = await db.role.create({
       data: {
-        name,
+        nameEn: name,
         code,
         description,
         permissions,
@@ -87,7 +102,7 @@ export async function createRole(data: RoleFormData) {
     return {
       success: true,
       message: "Role created successfully",
-      data: newRole,
+      data: withDisplayRoleName(newRole),
     };
   } catch (error) {
     console.error("Error creating role:", error);
@@ -116,7 +131,7 @@ export async function updateRole(roleId: string, data: Partial<RoleFormData>) {
     const updateData: any = {};
 
     if (data.name) {
-      updateData.name = data.name;
+      updateData.nameEn = data.name;
       updateData.code = data.name.toLowerCase().replace(/[^a-z0-9]/g, '_');
 
       // Check if another role with same code exists
@@ -159,7 +174,7 @@ export async function updateRole(roleId: string, data: Partial<RoleFormData>) {
     return {
       success: true,
       message: "Role updated successfully",
-      data: updatedRole,
+      data: withDisplayRoleName(updatedRole),
     };
   } catch (error) {
     console.error("Error updating role:", error);
@@ -375,7 +390,7 @@ export async function initializeDefaultRoles(organizationId: string) {
       defaultRoles.map(template =>
         db.role.create({
           data: {
-            name: template.name,
+            nameEn: template.name,
             code: template.code,
             description: template.description,
             permissions: Array.from(template.permissions),
@@ -388,7 +403,7 @@ export async function initializeDefaultRoles(organizationId: string) {
     return {
       success: true,
       message: "Default roles created successfully",
-      data: createdRoles,
+      data: createdRoles.map(withDisplayRoleName),
     };
   } catch (error) {
     console.error("Error initializing default roles:", error);

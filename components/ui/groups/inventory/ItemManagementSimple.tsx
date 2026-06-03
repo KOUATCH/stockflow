@@ -2,14 +2,14 @@
 
 import getOrgBrands from "@/actions/brands/getOrgBrands"
 import getOrgCategories from "@/actions/categories/getOrgCategories"
-import getOrgItemsWithInventoryLevels from "@/actions/itemsShow/getOrgItemsWithInventoryLevels"
+import { getOrgItemsWithInventoryLevels } from "@/actions/itemsShow/getOrgItemsWithInventoryLevels"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import { TableLoading } from "@/components/ui/data-table"
 import { getAuthenticatedUser } from "@/config/useAuth"
-import { getOrgTaxRates } from "@/services/taxRateAPI"
-import { getOrgUnits } from "@/services/unitAPI"
+import { getOrgTaxRates } from "@/actions/taxRate/getOrgTaxRates"
+import { getOrgUnits } from "@/actions/units/getOrgUnits"
 import {
   Activity,
   AlertTriangle,

@@ -1,11 +1,10 @@
+import { notify } from "@/lib/notifications/notify"
 import createLocation from "@/actions/locations/createLocation"
 import deleteLocation from "@/actions/locations/deleteLocation"
 import { getOrgLocations } from "@/actions/locations/getOrgLocations"
 import updateLocationById from "@/actions/locations/updateLocationById"
 import type { LocationDTO } from "@/types/location"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { toast } from "sonner"
-
 // Query keys for caching
 export const LocationKeys = {
   all: ["locations"] as const,
@@ -31,7 +30,7 @@ export const useOrgLocationsNew = (organizationId: string, options?: { enabled?:
         return result
       } catch (error) {
         console.error("Failed to fetch organization locations:", error)
-        toast.error("Failed to load locations. Please try again.")
+        notify.error("Failed to load locations. Please try again.")
         throw error // Re-throw to let React Query handle it
       }
     },
@@ -45,9 +44,10 @@ export const useOrgLocationsNew = (organizationId: string, options?: { enabled?:
 export function useCreateALocation() {
   const queryClient = useQueryClient()
   return useMutation({
+    meta: { operation: 'create', entity: 'Location' , suppressSuccessNotification: true, suppressErrorNotification: true },
     mutationFn: async (data: LocationDTO) => await createLocation(data),
     onSuccess: (_data, variables) => {
-      toast.success("Location added successfully")
+      notify.success("Location added successfully")
       if (variables.organizationId) {
         queryClient.invalidateQueries({ queryKey: LocationKeys.orgLocations(variables.organizationId) })
       } else {
@@ -55,7 +55,7 @@ export function useCreateALocation() {
       }
     },
     onError: (error: Error) => {
-      toast.error("Failed to add Location", {
+      notify.error("Failed to add Location", {
         description: error.message || "Unknown error occurred",
       })
     },
@@ -65,6 +65,7 @@ export function useCreateALocation() {
 export function useDeleteLocation() {
   const queryClient = useQueryClient()
   return useMutation({
+    meta: { operation: 'delete', entity: 'Location' , suppressSuccessNotification: true, suppressErrorNotification: true },
     mutationFn: async ({ id, organizationId }: { id: string; organizationId?: string }) => await deleteLocation(id),
     onMutate: async ({ id, organizationId }) => {
       const queryKeys: Array<readonly unknown[]> = [LocationKeys.lists()]
@@ -109,10 +110,10 @@ export function useDeleteLocation() {
       return { previousData, queryKeys }
     },
     onSuccess: () => {
-      toast.success("Location deleted successfully")
+      notify.success("Location deleted successfully")
     },
     onError: (error: Error, _variables, context) => {
-      toast.error("Failed to delete Location", {
+      notify.error("Failed to delete Location", {
         description: error.message || "Unknown error occurred",
       })
       if (context?.previousData && context?.queryKeys) {
@@ -138,6 +139,7 @@ export function useDeleteLocation() {
 export function useUpdateALocation() {
   const queryClient = useQueryClient()
   return useMutation({
+    meta: { operation: 'update', entity: 'Location' , suppressSuccessNotification: true, suppressErrorNotification: true },
     mutationFn: async ({ id, data }: { id: string; data: LocationDTO }) => await updateLocationById(id, data),
     onMutate: async (variables) => {
       await queryClient.cancelQueries({ queryKey: LocationKeys.detail(variables.id) })
@@ -176,7 +178,7 @@ export function useUpdateALocation() {
       return { previousLocationDetail, previousLocationsList, previousOrgLocations }
     },
     onError: (error, variables, context) => {
-      toast.error("Failed to update Location", {
+      notify.error("Failed to update Location", {
         description: error.message || "Unknown error occurred",
       })
       if (context?.previousLocationDetail) {
@@ -190,7 +192,7 @@ export function useUpdateALocation() {
       }
     },
     onSuccess: (updatedLocation, variables) => {
-      toast.success("Location updated successfully")
+      notify.success("Location updated successfully")
       queryClient.setQueryData(LocationKeys.detail(variables.id), (oldData: LocationDTO | undefined) => {
         return { ...oldData, ...updatedLocation }
       })
@@ -219,6 +221,7 @@ export function useUpdateALocation() {
 export function useUpdateLocationBasicInfo() {
   const queryClient = useQueryClient()
   return useMutation({
+    meta: { operation: 'update', entity: 'Location Basic Info' , suppressSuccessNotification: true, suppressErrorNotification: true },
     mutationFn: async ({ id, data }: { id: string; data: LocationDTO }) => updateLocationById(id, data),
     onMutate: async (variables) => {
       await queryClient.cancelQueries({ queryKey: LocationKeys.detail(variables.id) })
@@ -257,7 +260,7 @@ export function useUpdateLocationBasicInfo() {
       return { previousLocationDetail, previousLocationsList, previousOrgLocations }
     },
     onError: (error, variables, context) => {
-      toast.error("Failed to update location basic info", {
+      notify.error("Failed to update location basic info", {
         description: error.message || "Unknown error occurred",
       })
       if (context?.previousLocationDetail) {
@@ -271,7 +274,7 @@ export function useUpdateLocationBasicInfo() {
       }
     },
     onSuccess: (updatedLocation, variables) => {
-      toast.success("Location basic info updated successfully")
+      notify.success("Location basic info updated successfully")
       queryClient.setQueryData(LocationKeys.detail(variables.id), (oldData: LocationDTO | undefined) => {
         return { ...oldData, ...updatedLocation }
       })
@@ -300,6 +303,7 @@ export function useUpdateLocationBasicInfo() {
 export function useUpdateLocationOthers() {
   const queryClient = useQueryClient()
   return useMutation({
+    meta: { operation: 'update', entity: 'Location Others' , suppressSuccessNotification: true, suppressErrorNotification: true },
     mutationFn: async ({ id, data }: { id: string; data: LocationDTO }) => updateLocationById(id, data),
     onMutate: async (variables) => {
       await queryClient.cancelQueries({ queryKey: LocationKeys.detail(variables.id) })
@@ -338,7 +342,7 @@ export function useUpdateLocationOthers() {
       return { previousLocationDetail, previousLocationsList, previousOrgLocations }
     },
     onError: (error, variables, context) => {
-      toast.error("Failed to update location details", {
+      notify.error("Failed to update location details", {
         description: error.message || "Unknown error occurred",
       })
       if (context?.previousLocationDetail) {
@@ -352,7 +356,7 @@ export function useUpdateLocationOthers() {
       }
     },
     onSuccess: (updatedLocation, variables) => {
-      toast.success("Location basic info updated successfully")
+      notify.success("Location basic info updated successfully")
       queryClient.setQueryData(LocationKeys.detail(variables.id), (oldData: LocationDTO | undefined) => {
         return { ...oldData, ...updatedLocation }
       })

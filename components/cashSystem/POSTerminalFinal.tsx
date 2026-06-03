@@ -1,8 +1,9 @@
 "use client"
 
-import { createInventoryTransactions, createPayment, createPOSSession, createSale, getActivePOSSession, updateInventoryLevels } from "@/actions/pos/POSActionFinal"
+import { notify } from "@/lib/notifications/notify"
+import { createInventoryTransactions, createPayment, createPOSSession, createSale, getActivePOSSession, updateInventoryLevels } from "@/actions/newPOSSession/pos/POSActionFinal"
 
-import { useToast } from "@/hooks/use-toast"
+import { useNotifications } from "@/components/notifications/NotificationProvider"
 import { Customer } from "@/lib/cashSystem/db"
 import { CartItem } from "@/lib/cashSystem/types"
 import { useMutation, useQueryClient } from "@tanstack/react-query"
@@ -202,17 +203,14 @@ export function POSTerminalFinal({ organizationId, locationId, terminalId, userI
     avgTransaction: 136.15,
   })
 
-  const { toast } = useToast()
-  const queryClient = useQueryClient()
+  const { success, error: showError, warning, info } = useNotifications()
+  const isMissingOrganization = !organizationId
 
-  if (!organizationId) {
-    toast({
-      variant: "destructive",
-      title: "Error",
-      description: "User organization not found.",
-    })
-    return <></>
-  }
+  useEffect(() => {
+    if (isMissingOrganization) {
+      showError("Error", "User organization not found.")
+    }
+  }, [isMissingOrganization, showError])
 
   // Update available terminals when location changes
   useEffect(() => {
@@ -239,11 +237,7 @@ export function POSTerminalFinal({ organizationId, locationId, terminalId, userI
   })
 
   if (error) {
-    toast({
-      variant: "destructive",
-      title: "Error",
-      description: itemsData?.message || "Failed to load items.",
-    })
+    showError("Error", itemsData?.message || "Failed to load items.")
   }
   const items = itemsData?.data || []
 
@@ -273,7 +267,7 @@ export function POSTerminalFinal({ organizationId, locationId, terminalId, userI
   useEffect(() => {
     if (selectedLocationId && cart.length > 0) {
       clearCart()
-      toast({
+      notify({
         title: "Location Changed",
         description: "Cart cleared due to location change. Items are now filtered for the new location.",
       })
@@ -308,6 +302,7 @@ export function POSTerminalFinal({ organizationId, locationId, terminalId, userI
   }
 
   const createSaleMutation = useMutation<any, unknown, any>({
+    meta: { operation: 'create', entity: 'Sale' , suppressSuccessNotification: true, suppressErrorNotification: true },
     mutationFn: createSale,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["sales-orders"] })
@@ -316,7 +311,7 @@ export function POSTerminalFinal({ organizationId, locationId, terminalId, userI
     },
     onError: (error) => {
       console.error("Sale creation failed:", error)
-      toast({
+      notify({
         variant: "destructive",
         title: "Sale Failed",
         description: "Failed to create sale. Please try again.",
@@ -325,13 +320,14 @@ export function POSTerminalFinal({ organizationId, locationId, terminalId, userI
   })
 
   const createPaymentMutation = useMutation({
+    meta: { operation: 'create', entity: 'Payment' , suppressSuccessNotification: true, suppressErrorNotification: true },
     mutationFn: createPayment,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["payments"] })
     },
     onError: (error) => {
       console.error("Payment creation failed:", error)
-      toast({
+      notify({
         variant: "destructive",
         title: "Payment Failed",
         description: "Failed to process payment. Please try again.",
@@ -340,6 +336,7 @@ export function POSTerminalFinal({ organizationId, locationId, terminalId, userI
   })
 
   const updateInventoryMutation = useMutation({
+    meta: { operation: 'update', entity: 'Inventory' },
     mutationFn: updateInventoryLevels,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["inventory-levels"] })
@@ -348,6 +345,7 @@ export function POSTerminalFinal({ organizationId, locationId, terminalId, userI
   })
 
   const createTransactionsMutation = useMutation({
+    meta: { operation: 'create', entity: 'Transactions' },
     mutationFn: createInventoryTransactions,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["inventory-transactions"] })
@@ -394,7 +392,7 @@ export function POSTerminalFinal({ organizationId, locationId, terminalId, userI
 
   const processPayment = async () => {
     if (!currentSession) {
-      toast({
+      notify({
         variant: "destructive",
         title: "No Active Session",
         description: "Please start a POS session before processing payments.",
@@ -403,7 +401,7 @@ export function POSTerminalFinal({ organizationId, locationId, terminalId, userI
     }
 
     if (!cashDrawerStatus.isOpen && paymentMethod === PaymentMethod.CASH) {
-      toast({
+      notify({
         variant: "destructive",
         title: "Cash Drawer Closed",
         description: "Please open the cash drawer before processing cash payments.",
@@ -417,7 +415,7 @@ export function POSTerminalFinal({ organizationId, locationId, terminalId, userI
     try {
       const inventoryCheck = validateInventory()
       if (!inventoryCheck.valid) {
-        toast({
+        notify({
           variant: "destructive",
           title: "Inventory Error",
           description: inventoryCheck.message,
@@ -426,7 +424,7 @@ export function POSTerminalFinal({ organizationId, locationId, terminalId, userI
         return
       }
 
-      toast({
+      notify({
         title: "Processing Payment",
         description: "Please wait while we process your transaction...",
       })
@@ -511,7 +509,7 @@ export function POSTerminalFinal({ organizationId, locationId, terminalId, userI
       setIsPaymentDialogOpen(false)
       setCashTendered("")
 
-      toast({
+      notify({
         title: "Sale Completed Successfully!",
         description: `Sale ID: ${saleResult.saleId} - Total: $${calculateTotal().toFixed(2)}`,
       })
@@ -522,7 +520,7 @@ export function POSTerminalFinal({ organizationId, locationId, terminalId, userI
       })
 
       if (lowStockItems && lowStockItems.length > 0) {
-        toast({
+        notify({
           title: "Low Stock Alert",
           description: `${lowStockItems.length} item(s) are running low on stock.`,
           variant: "destructive",
@@ -530,7 +528,7 @@ export function POSTerminalFinal({ organizationId, locationId, terminalId, userI
       }
     } catch (error) {
       console.error("Payment processing error:", error)
-      toast({
+      notify({
         variant: "destructive",
         title: "Payment Failed",
         description: error instanceof Error ? error.message : "An unexpected error occurred",
@@ -556,7 +554,7 @@ export function POSTerminalFinal({ organizationId, locationId, terminalId, userI
     const availableStock = item.inventoryLevels?.[0]?.quantityAvailable ?? 0
 
     if (currentQuantityInCart >= availableStock && availableStock > 0) {
-      toast({
+      notify({
         variant: "destructive",
         title: "Insufficient Stock",
         description: `Cannot add more ${item.name}. Only ${availableStock} in stock.`,
@@ -598,10 +596,7 @@ export function POSTerminalFinal({ organizationId, locationId, terminalId, userI
       ])
     }
 
-    toast({
-      title: "Item Added",
-      description: `${item.name} added to cart`,
-    })
+    success("Item Added", `${item.name} added to cart`)
   }
 
   const updateQuantity = (cartItemId: string, quantity: number) => {
@@ -617,7 +612,7 @@ export function POSTerminalFinal({ organizationId, locationId, terminalId, userI
     const availableStock = item?.inventoryLevels?.[0]?.quantityAvailable ?? 0
 
     if (item && quantity > availableStock && availableStock > 0) {
-      toast({
+      notify({
         variant: "destructive",
         title: "Insufficient Stock",
         description: `Cannot set quantity to ${quantity}. Only ${availableStock} in stock.`,
@@ -688,7 +683,7 @@ export function POSTerminalFinal({ organizationId, locationId, terminalId, userI
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
     if (cart.length === 0) {
-      toast({
+      notify({
         variant: "destructive",
         title: "Empty Cart",
         description: "Please add items to cart before processing payment.",
@@ -727,7 +722,7 @@ export function POSTerminalFinal({ organizationId, locationId, terminalId, userI
             })
           }
 
-          toast({
+          notify({
             title: "Session Restored",
             description: `Continuing session ${session.sessionNumber}`,
           })
@@ -750,12 +745,12 @@ export function POSTerminalFinal({ organizationId, locationId, terminalId, userI
               lastActivity: new Date(),
             })
 
-            toast({
+            notify({
               title: "New Session Started",
               description: `Session ${session.sessionNumber} created successfully`,
             })
           } else {
-            toast({
+            notify({
               variant: "destructive",
               title: "Session Error",
               description: newSessionResult.error || "Failed to create POS session",
@@ -764,7 +759,7 @@ export function POSTerminalFinal({ organizationId, locationId, terminalId, userI
         }
       } catch (error) {
         console.error("Failed to initialize session:", error)
-        toast({
+        notify({
           variant: "destructive",
           title: "Session Error",
           description: "Failed to initialize POS session",
@@ -778,6 +773,7 @@ export function POSTerminalFinal({ organizationId, locationId, terminalId, userI
   }, [selectedTerminalId, userId, selectedLocationId, organizationId])
 
   const createSessionMutation = useMutation({
+    meta: { operation: 'create', entity: 'Session' , suppressSuccessNotification: true, suppressErrorNotification: true },
     mutationFn: createPOSSession,
     onSuccess: (result) => {
       if (result.success && result.data) {
@@ -798,7 +794,7 @@ export function POSTerminalFinal({ organizationId, locationId, terminalId, userI
     },
     onError: (error) => {
       console.error("Session creation failed:", error)
-      toast({
+      notify({
         variant: "destructive",
         title: "Session Failed",
         description: "Failed to create POS session",
@@ -818,6 +814,10 @@ export function POSTerminalFinal({ organizationId, locationId, terminalId, userI
     } catch (error) {
       console.error("Failed to start new session:", error)
     }
+  }
+
+  if (isMissingOrganization) {
+    return <></>
   }
 
   return (

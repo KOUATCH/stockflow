@@ -1,5 +1,6 @@
 "use client"
 
+import { notify } from "@/lib/notifications/notify"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
 import { Calendar } from "@/components/ui/calendar"
@@ -10,15 +11,16 @@ import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Textarea } from "@/components/ui/textarea"
 import { useUpdatePurchaseOrder } from "@/hooks/useRecentPurchaseOrderQueries"
+import { getLocaleFromPathname, localizePath } from "@/i18n/routing"
 import { cn } from "@/lib/utils"
+import { DEFAULT_LOCALE } from "@/types/bilingual"
 import { PurchaseOrderWithRelations } from "@/types/purchase-orders-system-types"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { format } from "date-fns"
 import { ArrowLeft, CalendarIcon, CheckCircle, Plus, Save, Trash2 } from "lucide-react"
-import { useRouter } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 import { useEffect, useMemo, useState } from "react"
 import { useForm } from "react-hook-form"
-import { toast } from "sonner"
 import { z } from "zod"
 
 const lineItemSchema = z.object({
@@ -65,6 +67,9 @@ export function ModernEditPurchaseOrderForm({
   organizationId
 }: ModernEditPurchaseOrderFormProps) {
   const router = useRouter()
+  const pathname = usePathname()
+  const locale = getLocaleFromPathname(pathname) ?? DEFAULT_LOCALE
+  const localizedHref = (href: string) => localizePath(href, locale)
   const { mutate: updatePurchaseOrder, isPending } = useUpdatePurchaseOrder()
   const [currentStep, setCurrentStep] = useState(0)
 
@@ -174,15 +179,15 @@ export function ModernEditPurchaseOrderForm({
 
     updatePurchaseOrder(updateData, {
       onSuccess: () => {
-        toast.success("Purchase order updated successfully!")
-        router.push(`/dashboard/purchase-orders/${purchaseOrder.id}`)
+        notify.success("Purchase order updated successfully!")
+        router.push(localizedHref(`/dashboard/purchase-orders/${purchaseOrder.id}`))
       },
       onError: (error: any) => {
         if (error?.message?.includes("NEXT_REDIRECT")) {
-          toast.success("Purchase order updated successfully!")
-          router.push(`/dashboard/purchase-orders/${purchaseOrder.id}`)
+          notify.success("Purchase order updated successfully!")
+          router.push(localizedHref(`/dashboard/purchase-orders/${purchaseOrder.id}`))
         } else {
-          toast.error(error?.message || "Failed to update purchase order")
+          notify.error(error?.message || "Failed to update purchase order")
         }
       }
     })

@@ -29,7 +29,7 @@ import TextInput from "../FormInputs/TextInput";
 import FormFooter from "./FormFooter";
 type UserFormProps = {
   editingId?: "";
-  initialData?: User;
+  initialData?: User & { roleId?: string | null; roles?: Role[] };
   // initialData?: User | undefined | null;
   roles: Role[];
 };
@@ -45,10 +45,10 @@ export default function UserForm({
     formState: { errors },
   } = useForm<UserProps>({
     defaultValues: {
-      firstName: initialData?.firstName,
-      lastName: initialData?.lastName,
-      phone: initialData?.phone,
-      email: initialData?.email,
+      firstName: initialData?.firstName ?? "",
+      lastName: initialData?.lastName ?? "",
+      phone: initialData?.phone ?? "",
+      email: initialData?.email ?? "",
       // organizationName:initialData?.organizationName,
     },
   });
@@ -59,19 +59,19 @@ export default function UserForm({
   const initialImage = initialData?.image || "/placeholder.svg";
   const [imageUrl, setImageUrl] = useState(initialImage);
   const initialStatus = {
-    value: initialData?.status == true ? "true" : "false",
-    label: initialData?.status == true ? "Active" : "Disabled",
+    value: initialData?.isActive === false ? "false" : "true",
+    label: initialData?.isActive === false ? "Disabled" : "Active",
   };
-  const initialRoleId = initialData?.roleId;
+  const initialRoleId = initialData?.roleId ?? initialData?.roles?.[0]?.id;
   const initialRole = roles.find((item) => item.id === initialRoleId);
   const roleOptions = roles.map((role) => {
     return {
-      label: role.name,
+      label: role.nameEn || role.nameFr || role.code,
       value: role.id,
     };
   });
   const [role, setRole] = useState<any>({
-    label: initialRole?.name,
+    label: initialRole?.nameEn || initialRole?.nameFr || initialRole?.code,
     value: initialRole?.id,
   });
   const [status, setStatus] = useState<any>(initialStatus);

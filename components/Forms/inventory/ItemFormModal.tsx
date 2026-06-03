@@ -1,16 +1,21 @@
 "use client";
+
+import { notify } from "@/lib/notifications/notify"
 import SubmitButton from "@/components/FormInputs/SubmitButton";
 import TextInput from "@/components/FormInputs/TextInput";
 import Logo from "@/components/global/Logo";
 import { ItemCreateDTO } from "@/types/item";
+import { getLocaleFromPathname, localizePath } from "@/i18n/routing";
+import { DEFAULT_LOCALE } from "@/types/bilingual";
 import { Headset, Loader2, Mail, User, WarehouseIcon } from "lucide-react";
 import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
-import { toast } from "sonner";
-
-
 const ItemFormModal = (orgId: string) => {
+  const pathname = usePathname();
+  const locale = getLocaleFromPathname(pathname) ?? DEFAULT_LOCALE;
+  const localizedHref = (href: string) => localizePath(href, locale);
 
 
   const [loading, setLoading] = useState(false);
@@ -29,16 +34,16 @@ const ItemFormModal = (orgId: string) => {
       console.log({ res })
       if (res.status === 200) {
         setLoading(false);
-        toast.success("Item Created successfully", { description: "Your item has been created." });
+        notify.success("Item Created successfully", { description: "Your item has been created." });
         reset();
       } else {
         setLoading(false);
-        toast.error("Something went wrong", { description: "Error during Account creation, Please try again" });
+        notify.error("Something went wrong", { description: "Error during Account creation, Please try again" });
       }
     } catch (error) {
       setLoading(false);
       console.error("Network Error:", error);
-      toast.error("Its seems something is wrong, try again");
+      notify.error("Its seems something is wrong, try again");
     }
   }
   return (
@@ -130,7 +135,7 @@ const ItemFormModal = (orgId: string) => {
             <p className="mt-6 text-sm text-gray-500">
               Already Registered ?{" "}
               <Link
-                href="/login"
+                href={localizedHref("/login")}
                 className="font-semibold leading-6 text-rose-600 hover:text-rose-500"
               >
                 Login

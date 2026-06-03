@@ -19,6 +19,15 @@ export type UpdateInventoryParams = {
   }
 }
 
+type DecimalValue = Prisma.Decimal | number | string | null | undefined
+
+function toNumber(value: DecimalValue) {
+  if (value === null || value === undefined) return 0
+  if (typeof value === 'number') return value
+  if (typeof value === 'string') return Number(value) || 0
+  return value.toNumber()
+}
+
 // Overload 1: legacy positional signature
 export async function updateInventoryLevels(
   tx: Prisma.TransactionClient,
@@ -73,14 +82,14 @@ export async function updateInventoryLevels(
     where: { itemId_locationId: { itemId, locationId } },
   })
 
-  const prevOnHand = level?.quantityOnHand ?? 0
+  const prevOnHand = toNumber(level?.quantityOnHand)
   const newOnHand = prevOnHand + deltaQty
   if (newOnHand < 0) {
     throw new Error('Inventory on hand would go negative')
   }
 
   // Weighted average cost
-  const prevAvg = level?.averageCost ?? 0
+  const prevAvg = toNumber(level?.averageCost)
   const prevValue = prevAvg * prevOnHand
   const inboundValue = unitCost * deltaQty
   const newAvg = newOnHand > 0 ? (prevValue + inboundValue) / newOnHand : 0
@@ -104,9 +113,9 @@ export async function updateInventoryLevels(
     update: {
       quantityOnHand: newOnHand,
       quantityAvailable:
-        (level?.quantityReserved ?? 0) > newOnHand
+        toNumber(level?.quantityReserved) > newOnHand
           ? 0
-          : newOnHand - (level?.quantityReserved ?? 0),
+          : newOnHand - toNumber(level?.quantityReserved),
       averageCost: +newAvg.toFixed(4),
       totalValue: +newTotalValue.toFixed(2),
       lastTransactionAt: new Date(),

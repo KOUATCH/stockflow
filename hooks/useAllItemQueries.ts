@@ -1,14 +1,15 @@
-import createActionItem from "@/actions/itemsShow/createActionItem"
-import deleteItem from "@/actions/itemsShow/deleteItem"
-import getOrgItems from "@/actions/itemsShow/getOrgItems"
-import getOrgItemsWithInventoryLevels from "@/actions/itemsShow/getOrgItemsWithInventoryLevels"
-import getOrgItemsWithInventoryLevelsLocation from "@/actions/itemsShow/getOrgItemsWithInventoryLevelsLocation"
-import updateItemBasicInfoById from "@/actions/itemsShow/updateItemBasicInfoById"
-import updateItemById from "@/actions/itemsShow/updateItemById"
-import updateItemDetailsById from "@/actions/itemsShow/updateItemItemDetailsById"
-import updateItemPricingById from "@/actions/itemsShow/updateItemPricingById"
-import updateItemRelationsById from "@/actions/itemsShow/updateItemRelationsById"
-import updateItemStockById from "@/actions/itemsShow/updateItemStockById"
+import { notify } from "@/lib/notifications/notify"
+import { createActionItem } from "@/actions/itemsShow/createActionItem"
+import { deleteItem } from "@/actions/itemsShow/deleteItem"
+import { getOrgItems } from "@/actions/itemsShow/getOrgItems"
+import { getOrgItemsWithInventoryLevels } from "@/actions/itemsShow/getOrgItemsWithInventoryLevels"
+import { getOrgItemsWithInventoryLevelsLocation } from "@/actions/itemsShow/getOrgItemsWithInventoryLevelsLocation"
+import { updateItemBasicInfoById } from "@/actions/itemsShow/updateItemBasicInfoById"
+import { updateItemById } from "@/actions/itemsShow/updateItemById"
+import { updateItemDetailsById } from "@/actions/itemsShow/updateItemItemDetailsById"
+import { updateItemPricingById } from "@/actions/itemsShow/updateItemPricingById"
+import { updateItemRelationsById } from "@/actions/itemsShow/updateItemRelationsById"
+import { updateItemStockById } from "@/actions/itemsShow/updateItemStockById"
 import type {
   ItemCreateDTO,
   ItemDTO,
@@ -20,8 +21,6 @@ import type {
   UpdateItemStockPayload,
 } from "@/types/itemTypes"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { toast } from "sonner"
-
 // Query keys for caching
 export const ItemKeys = {
   all: ["items"] as const,
@@ -48,7 +47,7 @@ export const useOrgItemsNew = (organizationId: string, options?: { enabled?: boo
         return result
       } catch (error) {
         console.error("Failed to fetch organization items:", error)
-        toast.error("Failed to load items. Please try again.")
+        notify.error("Failed to load items. Please try again.")
         throw error // Re-throw to let React Query handle it
       }
     },
@@ -67,11 +66,11 @@ export const useOrgItemsWithInventoryLevelsFirst = (organizationId: string, loca
         throw new Error("Organization ID is required")
       }
       try {
-        const result = await getOrgItemsWithInventoryLevelsLocation(organizationId, locationId  )
+        const result = await getOrgItemsWithInventoryLevelsLocation({ orgId: organizationId, locationId })
         return result
       } catch (error) {
         console.error("Failed to fetch organization items:", error)
-        toast.error("Failed to load items. Please try again.")
+        notify.error("Failed to load items. Please try again.")
         throw error // Re-throw to let React Query handle it
       }
     },
@@ -94,7 +93,7 @@ export const useOrgItemsWithInventoryLevels = (organizationId: string, options?:
         return result
       } catch (error) {
         console.error("Failed to fetch organization items:", error)
-        toast.error("Failed to load items. Please try again.")
+        notify.error("Failed to load items. Please try again.")
         throw error
       }
     },
@@ -114,11 +113,11 @@ export const useOrgItemsWithInventoryLevelsLocation = (organizationId: string, l
         throw new Error("Organization ID is required")
       }
       try {
-        const result = await getOrgItemsWithInventoryLevelsLocation(organizationId, locationId  )
+        const result = await getOrgItemsWithInventoryLevelsLocation({ orgId: organizationId, locationId })
         return result
       } catch (error) {
         console.error("Failed to fetch organization items:", error)
-        toast.error("Failed to load items. Please try again.")
+        notify.error("Failed to load items. Please try again.")
         throw error
       }
     },
@@ -145,7 +144,7 @@ export const useOrgItemsWithInventoryLevelsLocation = (organizationId: string, l
       
 //       // Handle the server action response structure
 //       if (!result.success) {
-//         // Don't show toast here - let the onError handle it
+//         // Don't show notification here - let the onError handle it
 //         throw new Error(result.error || "Failed to fetch items");
 //       }
       
@@ -174,9 +173,10 @@ export const useOrgItemsWithInventoryLevelsLocation = (organizationId: string, l
 export function useCreateAnItem() {
   const queryClient = useQueryClient()
   return useMutation({
+    meta: { operation: 'create', entity: 'Item' , suppressSuccessNotification: true, suppressErrorNotification: true },
     mutationFn: async (data: ItemCreateDTO) => await createActionItem(data),
     onSuccess: (_data, variables) => {
-      toast.success("Item added successfully")
+      notify.success("Item added successfully")
       if (variables.organizationId) {
         queryClient.invalidateQueries({ queryKey: ItemKeys.orgItems(variables.organizationId) })
       } else {
@@ -184,7 +184,7 @@ export function useCreateAnItem() {
       }
     },
     onError: (error: Error) => {
-      toast.error("Failed to add Item", {
+      notify.error("Failed to add Item", {
         description: error.message || "Unknown error occurred",
       })
     },
@@ -194,6 +194,7 @@ export function useCreateAnItem() {
 export function useDeleteItem() {
   const queryClient = useQueryClient()
   return useMutation({
+    meta: { operation: 'delete', entity: 'Item' , suppressSuccessNotification: true, suppressErrorNotification: true },
     mutationFn: async ({ id, organizationId }: { id: string; organizationId?: string }) => await deleteItem(id),
     onMutate: async ({ id, organizationId }) => {
       const queryKeys: Array<readonly unknown[]> = [ItemKeys.lists()]
@@ -238,10 +239,10 @@ export function useDeleteItem() {
       return { previousData, queryKeys }
     },
     onSuccess: () => {
-      toast.success("Item deleted successfully")
+      notify.success("Item deleted successfully")
     },
     onError: (error: Error, _variables, context) => {
-      toast.error("Failed to delete Item", {
+      notify.error("Failed to delete Item", {
         description: error.message || "Unknown error occurred",
       })
       if (context?.previousData && context?.queryKeys) {
@@ -267,7 +268,8 @@ export function useDeleteItem() {
 export function useUpdateAnItem() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: async ({ id, data }: { id: string; data: UpdateItemPayload }) => updateItemById(id, data),
+    meta: { operation: 'update', entity: 'Item' , suppressSuccessNotification: true, suppressErrorNotification: true },
+    mutationFn: async ({ id, data }: { id: string; data: UpdateItemPayload }) => updateItemById({ id, data }),
     onMutate: async (variables) => {
       await queryClient.cancelQueries({ queryKey: ItemKeys.detail(variables.id) })
       await queryClient.cancelQueries({ queryKey: ItemKeys.lists() })
@@ -303,7 +305,7 @@ export function useUpdateAnItem() {
       return { previousItemDetail, previousItemsList, previousOrgItems }
     },
     onError: (error, variables, context) => {
-      toast.error("Failed to update Item", {
+      notify.error("Failed to update Item", {
         description: error.message || "Unknown error occurred",
       })
       if (context?.previousItemDetail) {
@@ -317,7 +319,7 @@ export function useUpdateAnItem() {
       }
     },
     onSuccess: (updatedItem, variables) => {
-      toast.success("Item updated successfully")
+      notify.success("Item updated successfully")
       queryClient.setQueryData(ItemKeys.detail(variables.id), (oldData: UpdateItemPayload | undefined) => {
         return { ...oldData, ...updatedItem }
       })
@@ -344,8 +346,9 @@ export function useUpdateAnItem() {
 export function useUpdateItemBasicInfo() {
   const queryClient = useQueryClient()
   return useMutation({
+    meta: { operation: 'update', entity: 'Item Basic Info' , suppressSuccessNotification: true, suppressErrorNotification: true },
     mutationFn: async ({ id, data }: { id: string; data: UpdateItemBasicInfoPayload }) =>
-      updateItemBasicInfoById(id, data),
+      updateItemBasicInfoById({ id, data }),
     onMutate: async (variables) => {
       await queryClient.cancelQueries({ queryKey: ItemKeys.detail(variables.id) })
       await queryClient.cancelQueries({ queryKey: ItemKeys.lists() })
@@ -381,7 +384,7 @@ export function useUpdateItemBasicInfo() {
       return { previousItemDetail, previousItemsList, previousOrgItems }
     },
     onError: (error, variables, context) => {
-      toast.error("Failed to update item basic info", {
+      notify.error("Failed to update item basic info", {
         description: error.message || "Unknown error occurred",
       })
       if (context?.previousItemDetail) {
@@ -395,7 +398,7 @@ export function useUpdateItemBasicInfo() {
       }
     },
     onSuccess: (updatedItem, variables) => {
-      toast.success("Item basic info updated successfully")
+      notify.success("Item basic info updated successfully")
       queryClient.setQueryData(ItemKeys.detail(variables.id), (oldData: ItemDTO | undefined) => {
         return { ...oldData, ...updatedItem }
       })
@@ -422,7 +425,8 @@ export function useUpdateItemBasicInfo() {
 export function useUpdateItemDetails() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: async ({ id, data }: { id: string; data: UpdateItemDetailsPayload }) => updateItemDetailsById(id, data),
+    meta: { operation: 'update', entity: 'Item Details' , suppressSuccessNotification: true, suppressErrorNotification: true },
+    mutationFn: async ({ id, data }: { id: string; data: UpdateItemDetailsPayload }) => updateItemDetailsById({ id, data }),
     onMutate: async (variables) => {
       await queryClient.cancelQueries({ queryKey: ItemKeys.detail(variables.id) })
       await queryClient.cancelQueries({ queryKey: ItemKeys.lists() })
@@ -458,7 +462,7 @@ export function useUpdateItemDetails() {
       return { previousItemDetail, previousItemsList, previousOrgItems }
     },
     onError: (error, variables, context) => {
-      toast.error("Failed to update item details", {
+      notify.error("Failed to update item details", {
         description: error.message || "Unknown error occurred",
       })
       if (context?.previousItemDetail) {
@@ -472,7 +476,7 @@ export function useUpdateItemDetails() {
       }
     },
     onSuccess: (updatedItem, variables) => {
-      toast.success("Item details updated successfully")
+      notify.success("Item details updated successfully")
       queryClient.setQueryData(ItemKeys.detail(variables.id), (oldData: ItemDTO | undefined) => {
         return { ...oldData, ...updatedItem }
       })
@@ -499,7 +503,8 @@ export function useUpdateItemDetails() {
 export function useUpdateItemStock() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: async ({ id, data }: { id: string; data: UpdateItemStockPayload }) => updateItemStockById(id, data),
+    meta: { operation: 'update', entity: 'Item Stock' , suppressSuccessNotification: true, suppressErrorNotification: true },
+    mutationFn: async ({ id, data }: { id: string; data: UpdateItemStockPayload }) => updateItemStockById({ id, data }),
     onMutate: async (variables) => {
       await queryClient.cancelQueries({ queryKey: ItemKeys.detail(variables.id) })
       await queryClient.cancelQueries({ queryKey: ItemKeys.lists() })
@@ -535,7 +540,7 @@ export function useUpdateItemStock() {
       return { previousItemDetail, previousItemsList, previousOrgItems }
     },
     onError: (error, variables, context) => {
-      toast.error("Failed to update item stock", {
+      notify.error("Failed to update item stock", {
         description: error.message || "Unknown error occurred",
       })
       if (context?.previousItemDetail) {
@@ -549,7 +554,7 @@ export function useUpdateItemStock() {
       }
     },
     onSuccess: (updatedItem, variables) => {
-      toast.success("Item stock updated successfully")
+      notify.success("Item stock updated successfully")
       queryClient.setQueryData(ItemKeys.detail(variables.id), (oldData: ItemDTO | undefined) => {
         return { ...oldData, ...updatedItem }
       })
@@ -576,7 +581,8 @@ export function useUpdateItemStock() {
 export function useUpdateItemPricing() {
   const queryClient = useQueryClient()
   return useMutation({
-    mutationFn: async ({ id, data }: { id: string; data: UpdateItemPricingPayload }) => updateItemPricingById(id, data),
+    meta: { operation: 'update', entity: 'Item Pricing' , suppressSuccessNotification: true, suppressErrorNotification: true },
+    mutationFn: async ({ id, data }: { id: string; data: UpdateItemPricingPayload }) => updateItemPricingById({ id, data }),
     onMutate: async (variables) => {
       await queryClient.cancelQueries({ queryKey: ItemKeys.detail(variables.id) })
       await queryClient.cancelQueries({ queryKey: ItemKeys.lists() })
@@ -612,7 +618,7 @@ export function useUpdateItemPricing() {
       return { previousItemDetail, previousItemsList, previousOrgItems }
     },
     onError: (error, variables, context) => {
-      toast.error("Failed to update item pricing", {
+      notify.error("Failed to update item pricing", {
         description: error.message || "Unknown error occurred",
       })
       if (context?.previousItemDetail) {
@@ -626,7 +632,7 @@ export function useUpdateItemPricing() {
       }
     },
     onSuccess: (updatedItem, variables) => {
-      toast.success("Item pricing updated successfully")
+      notify.success("Item pricing updated successfully")
       queryClient.setQueryData(ItemKeys.detail(variables.id), (oldData: ItemDTO | undefined) => {
         return { ...oldData, ...updatedItem }
       })
@@ -654,8 +660,9 @@ export function useUpdateItemRelations() {
   console.log("running the update item relations ")
   const queryClient = useQueryClient()
   return useMutation({
+    meta: { operation: 'update', entity: 'Item Relations' , suppressSuccessNotification: true, suppressErrorNotification: true },
     mutationFn: async ({ id, data }: { id: string; data: UpdateItemRelationsPayload }) =>
-      updateItemRelationsById(id, data),
+      updateItemRelationsById({ id, data }),
     onMutate: async (variables) => {
       await queryClient.cancelQueries({ queryKey: ItemKeys.detail(variables.id) })
       await queryClient.cancelQueries({ queryKey: ItemKeys.lists() })
@@ -691,7 +698,7 @@ export function useUpdateItemRelations() {
       return { previousItemDetail, previousItemsList, previousOrgItems }
     },
     onError: (error, variables, context) => {
-      toast.error("Failed to update item relations", {
+      notify.error("Failed to update item relations", {
         description: error.message || "Unknown error occurred",
       })
       if (context?.previousItemDetail) {
@@ -705,7 +712,7 @@ export function useUpdateItemRelations() {
       }
     },
     onSuccess: (updatedItem, variables) => {
-      toast.success("Item relations updated successfully")
+      notify.success("Item relations updated successfully")
       queryClient.setQueryData(ItemKeys.detail(variables.id), (oldData: ItemDTO | undefined) => {
         return { ...oldData, ...updatedItem }
       })

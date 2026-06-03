@@ -68,15 +68,15 @@ export interface InventoryLevel {
   lastTransactionAt?: Date | null;
   createdAt: Date;
   updatedAt: Date;
-  unitCost:number;
-  maxStockLevel:number;
+  unitCost?: number;
+  maxStockLevel?: number;
   
   item?: {
     id: string;
     name: string;
     sku: string;
     slug: string;
-    imageUrls: string;
+    imageUrls: string[];
     costPrice: number;
     sellingPrice: number;
     thumbnail?: string | null | undefined ;
@@ -143,14 +143,16 @@ export interface Location {
 
 // Extended ItemCreateDTO to include inventory data
 export interface ItemCreateWithInventoryDTO {
-  name: string;
+  nameEn: string;
+  nameFr?: string | null;
   sku?: string;
   slug?: string;
   costPrice: number;
   sellingPrice: number;
-  imageUrls?: string[];
+  imageUrls?: string;
   thumbnail?: string | null;
-  description?: string | null;
+  descriptionEn?: string | null;
+  descriptionFr?: string | null;
   barcode?: string | null;
   
   // Initial inventory data
@@ -172,6 +174,26 @@ export interface StockAdjustmentData {
   expiryDate?: Date;
   referenceType?: TransactionReferenceType;
   referenceNumber?: string;
+}
+
+export interface CreateInventoryLevelData {
+  itemId: string;
+  locationId: string;
+  quantityOnHand: number;
+  quantityReserved?: number;
+  quantityInTransit?: number;
+  quantityOnOrder?: number;
+  averageCost?: number;
+  reorderPoint?: number;
+}
+
+export interface UpdateInventoryLevelData {
+  quantityOnHand?: number;
+  quantityReserved?: number;
+  quantityInTransit?: number;
+  quantityOnOrder?: number;
+  averageCost?: number;
+  reorderPoint?: number;
 }
 
 export interface ItemWithInventory extends ItemDTO {

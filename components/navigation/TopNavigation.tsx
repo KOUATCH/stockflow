@@ -21,6 +21,8 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet";
 import { cn } from "@/lib/utils";
+import { getLocaleFromPathname, localizePath } from "@/i18n/routing";
+import { DEFAULT_LOCALE } from "@/types/bilingual";
 import {
   Bell,
   Building2,
@@ -102,6 +104,10 @@ const SystemStatus = () => {
 
 // Quick Actions Menu
 const QuickActionsMenu = () => {
+  const pathname = usePathname();
+  const locale = getLocaleFromPathname(pathname) ?? DEFAULT_LOCALE;
+  const localizedHref = (href: string) => localizePath(href, locale);
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -117,7 +123,7 @@ const QuickActionsMenu = () => {
         <ScrollArea className="max-h-80">
           <div className="grid gap-2 p-2">
             {quickActions.map((action, index) => (
-              <Link key={index} href={action.href}>
+              <Link key={index} href={localizedHref(action.href)}>
                 <div className="flex items-center gap-3 p-3 rounded-lg hover:bg-muted transition-colors cursor-pointer">
                   <div className={cn("p-2 rounded-md text-white", action.color)}>
                     <action.icon className="h-4 w-4" />
@@ -182,7 +188,7 @@ const GlobalSearch = () => {
         {searchTerm && (
           <div className="absolute top-full left-0 right-0 mt-2 bg-background border rounded-lg shadow-lg z-50 max-h-80 overflow-y-auto">
             <div className="p-4 text-sm text-muted-foreground">
-              Search results for "{searchTerm}" would appear here...
+              Search results for &quot;{searchTerm}&quot; would appear here...
             </div>
           </div>
         )}
@@ -268,6 +274,8 @@ export default function TopNavigation({
   showMobileMenu = true,
 }: TopNavigationProps) {
   const pathname = usePathname();
+  const locale = getLocaleFromPathname(pathname) ?? DEFAULT_LOCALE;
+  const localizedHref = (href: string) => localizePath(href, locale);
   const { info } = useNotifications();
 
   // Get page title based on current pathname
@@ -315,7 +323,7 @@ export default function TopNavigation({
           {/* Desktop Logo (only show if no sidebar) */}
           {!showMobileMenu && (
             <div className="hidden md:block">
-              <Logo href="/dashboard" />
+              <Logo href={localizedHref("/dashboard")} />
             </div>
           )}
 
@@ -360,17 +368,17 @@ export default function TopNavigation({
               <DropdownMenuLabel>Quick Settings</DropdownMenuLabel>
               <DropdownMenuSeparator />
               <DropdownMenuItem asChild>
-                <Link href="/dashboard/settings/company">
+                <Link href={localizedHref("/dashboard/settings/company")}>
                   Company Settings
                 </Link>
               </DropdownMenuItem>
               <DropdownMenuItem asChild>
-                <Link href="/dashboard/settings/locations">
+                <Link href={localizedHref("/dashboard/settings/locations")}>
                   Locations
                 </Link>
               </DropdownMenuItem>
               <DropdownMenuItem asChild>
-                <Link href="/dashboard/settings/tax-rates">
+                <Link href={localizedHref("/dashboard/settings/tax-rates")}>
                   Tax Rates
                 </Link>
               </DropdownMenuItem>

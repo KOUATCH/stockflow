@@ -95,8 +95,7 @@ type ReconciliationForm = z.infer<typeof reconciliationSchema>
 type CreateDrawerForm = z.infer<typeof createDrawerSchema>
 
 export function ComprehensiveCashDrawerDashboard() {
-  const { data: session } = useSession()
-  const user = session?.user
+  const { user } = useClientAuth()
   const userId = user?.id || ""
   const organizationId = user?.organizationId || ""
 
@@ -122,7 +121,8 @@ export function ComprehensiveCashDrawerDashboard() {
   }, [])
 
   // Enhanced data fetching hooks
-  const { drawers, stats, isLoading, refetch } = useCashDrawerStatus(organizationId)
+  const { drawers: cashDrawerRows = [], stats, isLoading, refetch } = useCashDrawerStatus(organizationId)
+  const drawers = cashDrawerRows ?? []
   const { data: transactionsData } = useCashDrawerTransactions(
     selectedDrawerId,
     transactionPage,
@@ -307,7 +307,7 @@ export function ComprehensiveCashDrawerDashboard() {
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={refetch}
+                      onClick={() => void refetch()}
                       disabled={isLoading}
                       className="bg-white/90 dark:bg-slate-800/90 backdrop-blur-sm border-emerald-200 dark:border-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-900/30 transition-all duration-300"
                     >
@@ -1040,7 +1040,8 @@ export function ComprehensiveCashDrawerDashboard() {
                                     className="h-12 bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 shadow-lg hover:shadow-xl transition-all duration-300 font-bold text-white"
                                     onClick={() => {
                                       setSelectedDrawerId(drawer.id)
-                                      setIsOpenDialogOpen(true)
+                                      setOperationType("add")
+                                      setOperationDialogOpen(true)
                                     }}
                                   >
                                     <div className="flex flex-col items-center gap-1">
@@ -1059,7 +1060,7 @@ export function ComprehensiveCashDrawerDashboard() {
                                     className="h-12 bg-white/90 dark:bg-slate-800/90 border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-700 font-bold"
                                     onClick={() => {
                                       setSelectedDrawerId(drawer.id)
-                                      setIsCloseDialogOpen(true)
+                                      setReconcileDialogOpen(true)
                                     }}
                                   >
                                     <div className="flex flex-col items-center gap-1">

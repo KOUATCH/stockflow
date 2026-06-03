@@ -1,6 +1,7 @@
 "use server";
 
 import { db } from "@/prisma/db";
+import { withDisplayRoleName } from "./role-utils";
 
 
 export async function getRoleById(id: string) {
@@ -13,7 +14,7 @@ export async function getRoleById(id: string) {
       throw new Error("Role not found");
     }
 
-    return { success: true, data: role };
+    return { success: true, data: withDisplayRoleName(role) };
   } catch (error) {
     console.error("Error fetching role:", error);
     return {

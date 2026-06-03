@@ -1,5 +1,6 @@
 "use client"
 
+import { notify } from "@/lib/notifications/notify"
 import {
   getInventoryTransactions,
   getStockMovementSummary,
@@ -7,8 +8,6 @@ import {
 } from "@/actions/inventory/inventoryMovementActions"
 import type { TransactionType } from "@/types/inventoryMovementTypes"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { toast } from "sonner"
-
 // ============================================================================
 // QUERY KEYS
 // ============================================================================
@@ -18,6 +17,16 @@ export const InventoryMovementKeys = {
     [...InventoryMovementKeys.all, "transactions", organizationId, filters] as const,
   summary: (organizationId: string, filters?: any) =>
     [...InventoryMovementKeys.all, "summary", organizationId, filters] as const,
+}
+
+function getActionErrorMessage(error: unknown, fallback: string) {
+  if (!error) return fallback
+  if (typeof error === "string") return error
+  if (typeof error === "object") {
+    const details = error as { userMessage?: string; message?: string }
+    return details.userMessage || details.message || fallback
+  }
+  return fallback
 }
 
 // ============================================================================
@@ -40,7 +49,11 @@ export function useInventoryTransactions(
 ) {
   return useQuery({
     queryKey: InventoryMovementKeys.transactions(organizationId!, filters),
-    queryFn: () => getInventoryTransactions(organizationId!, filters),
+    queryFn: async () => {
+      const response = await getInventoryTransactions(organizationId!, filters)
+      if (!response.success) throw new Error(getActionErrorMessage(response.error, "Failed to fetch inventory transactions"))
+      return response.data ?? []
+    },
     enabled: !!organizationId,
     placeholderData: (previousData) => previousData,
   })
@@ -60,14 +73,17 @@ export function useStockMovementSummary(
 ) {
   return useQuery({
     queryKey: InventoryMovementKeys.summary(organizationId!, filters),
-    queryFn: () =>
-      getStockMovementSummary(
-        organizationId!,
-        filters?.itemId,
-        filters?.locationId,
-        filters?.dateFrom,
-        filters?.dateTo,
-      ),
+    queryFn: async () => {
+      const response = await getStockMovementSummary({
+        organizationId: organizationId!,
+        itemId: filters?.itemId,
+        locationId: filters?.locationId,
+        dateFrom: filters?.dateFrom,
+        dateTo: filters?.dateTo,
+      })
+      if (!response.success) throw new Error(getActionErrorMessage(response.error, "Failed to fetch stock movement summary"))
+      return response.data
+    },
     enabled: !!organizationId,
   })
 }
@@ -83,6 +99,7 @@ export function useInventoryReservation() {
   const queryClient = useQueryClient()
 
   return useMutation({
+    meta: { operation: 'reserve', entity: 'Inventory', suppressSuccessNotification: true, suppressErrorNotification: true },
     mutationFn: ({
       itemId,
       locationId,
@@ -99,12 +116,12 @@ export function useInventoryReservation() {
       expiresAt?: Date
     }) => reserveInventory(itemId, locationId, quantity, reason, organizationId, expiresAt),
     onSuccess: (response, variables) => {
-      toast.success(response.message || "Inventory reserved successfully")
+      notify.success(response.data?.message || "Inventory reserved successfully")
       queryClient.invalidateQueries({ queryKey: InventoryMovementKeys.all })
       queryClient.invalidateQueries({ queryKey: ["inventory"] })
     },
     onError: (error: Error) => {
-      toast.error(error.message || "Failed to reserve inventory")
+      notify.error(error.message || "Failed to reserve inventory")
     },
   })
 }

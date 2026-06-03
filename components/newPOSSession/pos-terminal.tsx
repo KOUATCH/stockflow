@@ -93,7 +93,7 @@ const getCategoryIcon = (categoryName: string) => {
   return CATEGORY_ICONS[iconKey] || CATEGORY_ICONS.default
 }
 
-export function pOSStation({ organizationId, locationId, terminalId, userId }: pOSStationProps): ReactElement {
+export function POSStation({ organizationId, locationId, terminalId, userId }: pOSStationProps): ReactElement {
   // Unified session management
   const {
     currentSession,
@@ -923,5 +923,5 @@ export function pOSStation({ organizationId, locationId, terminalId, userId }: p
   )
 }
 
-export { pOSStation as pOSStationRecent }
-export default pOSStation
+export { POSStation as pOSStation, POSStation as pOSStationRecent }
+export default POSStation

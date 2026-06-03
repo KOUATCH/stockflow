@@ -1,16 +1,15 @@
-
+import { inventoryAction } from "@/lib/error-handling";
+import type { ServerActionResult } from "@/lib/error-handling/types";
 import { updateInventoryLevels } from "@/lib/inventory/update-inventory-levels"
 import { itemStandardInclude } from "@/lib/item/includes"
-import { ActionResult, ItemWithRelations, revalidateItems, updateStockSchema } from "@/lib/item/schemas"
+import { ItemWithRelations, updateStockSchema } from "@/lib/item/schemas"
+import { revalidateItem } from "@/lib/item/revalidation"
 import { db } from "@/prisma/db"
 import { Prisma } from "@prisma/client"
 
-
 // Update: Stock policy + optional inventory adjustment
-export async function updateItemStockAction(
-  input: unknown
-): Promise<ActionResult<ItemWithRelations>> {
-  try {
+export const updateItemStockAction = inventoryAction(
+  async (input: unknown): Promise<ServerActionResult<ItemWithRelations>> => {
     const data = updateStockSchema.parse(input)
 
     const updated = await db.$transaction(async (tx) => {
@@ -19,7 +18,6 @@ export async function updateItemStockAction(
         data: {
           minStockLevel: data.minStockLevel ?? undefined,
           maxStockLevel: data.maxStockLevel ?? undefined,
-          unitOfMeasure: data.unitOfMeasure ?? undefined,
         },
         include: itemStandardInclude,
       })
@@ -51,18 +49,16 @@ export async function updateItemStockAction(
       return updatedItem
     })
 
-    revalidateItems(updated.id, data.organizationId)
-    return { success: true, data: updated, message: 'Stock updated' }
-  } catch (error) {
-    console.error('updateItemStockAction error:', error)
-    const message =
-      error instanceof Prisma.PrismaClientKnownRequestError
-        ? error.code === 'P2003'
-          ? 'Related record not found'
-          : `Database error: ${error.code}`
-        : error instanceof Error
-        ? error.message
-        : 'Failed to update stock'
-    return { success: false, error: message }
+    revalidateItem(updated.id, data.organizationId)
+    return { success: true, data: updated }
+  },
+  {
+    actionName: 'updateItemStockAction',
+    component: 'InventoryManagement',
+    businessContext: {
+      domain: 'inventory',
+      operation: 'update',
+      resourceType: 'item'
+    }
   }
-}
+)

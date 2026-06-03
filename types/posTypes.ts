@@ -1,3 +1,5 @@
+import type { CashDrawerTransactionType } from "@prisma/client"
+
 export interface pOSStationDTO {
   id: string
   stationNumber: string
@@ -81,7 +83,7 @@ export interface cashDrawerTransactionDTO {
   id: string
   cashDrawerId: string
   sessionId?: string
-  type: cashDrawerTransactionType
+  type: CashDrawerTransactionType
   amount: number
   reason?: string
   notes?: string
@@ -96,14 +98,7 @@ export interface cashDrawerTransactionDTO {
   createdAt: Date
 }
 
-export type cashDrawerTransactionType = 
-  | "OPENING_BALANCE"
-  | "SALE"
-  | "RETURN"
-  | "CASH_IN"
-  | "CASH_OUT"
-  | "CLOSING_BALANCE"
-  | "RECONCILIATION"
+// Using CashDrawerTransactionType from @prisma/client instead of custom type
 
 export interface PaymentDTO {
   id: string
@@ -186,7 +181,7 @@ export interface ClosePOSSessionPayload {
 export interface CashDrawerOperationPayload {
   cashDrawerId: string
   sessionId?: string
-  type: cashDrawerTransactionType
+  type: CashDrawerTransactionType
   amount: number
   reason?: string
   notes?: string

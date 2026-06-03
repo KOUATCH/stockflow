@@ -4,10 +4,12 @@ import { db } from "@/prisma/db";
 const getOrgProducts=async(organizationId:string)=> {
 
   try {
-    const organizationProducts = await db.product.findMany({
+    const organizationProducts = await db.item.findMany({
     where:{
-      organizationId:organizationId  
+      organizationId:organizationId,
+      deletedAt: null,
     },
+    orderBy: { createdAt: "desc" },
    
     });
      if (!organizationProducts) {

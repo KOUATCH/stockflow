@@ -1,6 +1,6 @@
 "use client"
 
-import { toast } from "@/hooks/use-toast"
+import { notify } from "@/lib/notifications/notify"
 import type { CustomerWithStats } from "@/types/customerTypes"
 import { useMemo, useState } from "react"
 import { CustomerFiltersComponent, type CustomerFilters } from "./customerFilters"
@@ -98,7 +98,7 @@ export function CustomerTableWithFilters({ customers }: CustomerTableWithFilters
     link.click()
     document.body.removeChild(link)
 
-    toast({
+    notify({
       title: "Export completed",
       description: `Exported ${filteredCustomers.length} customers to CSV file.`,
     })

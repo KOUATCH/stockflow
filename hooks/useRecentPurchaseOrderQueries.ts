@@ -1,5 +1,6 @@
 "use client";
 
+import { notify } from "@/lib/notifications/notify"
 import {
   approvePurchaseOrder,
   bulkUpdatePurchaseOrderStatus,
@@ -24,8 +25,6 @@ import { PurchaseOrder, PurchaseOrderStatus } from "@prisma/client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useSearchParams } from "next/navigation";
 import { useCallback, useMemo } from "react";
-import { toast } from "sonner";
-
 // Types
 interface BulkDeletePurchaseOrdersResponseData {
   deletedCount: number;
@@ -89,7 +88,10 @@ export function usePurchaseOrders(
       if (!organizationId) {
         throw new Error("Organization ID is required");
       }
-      const result = await getOrgPurchaseOrders(organizationId);
+      const result = await getOrgPurchaseOrders(organizationId, filters);
+      if (!result.success) {
+        throw new Error(result.error || "Failed to fetch purchase orders");
+      }
 
       // Transform the result to match PaginatedPurchaseOrdersResponse if needed
       if ('data' in result && Array.isArray(result.data)) {
@@ -233,15 +235,15 @@ const handleMutationError = (error: QueryError) => {
   // Log error for debugging
   console.error("Purchase Order Mutation Error:", error);
 
-  // Show user-friendly toast
+  // Show user-friendly notification
   if (error?.statusCode === 403) {
-    toast.error("You don't have permission to perform this action");
+    notify.error("You don't have permission to perform this action");
   } else if (error?.statusCode === 404) {
-    toast.error("The requested resource was not found");
+    notify.error("The requested resource was not found");
   } else if (error?.statusCode === 409) {
-    toast.error("This action conflicts with the current state");
+    notify.error("This action conflicts with the current state");
   } else {
-    toast.error(message);
+    notify.error(message);
   }
 };
 
@@ -254,7 +256,7 @@ const getBaseMutationOptions = <TData extends { data?: any; message?: string }>(
   onSuccess: (data: TData, variables: BaseMutationVariables) => {
     // Show success message
     if (data?.message) {
-      toast.success(data.message);
+      notify.success(data.message);
     }
 
     // Invalidate relevant queries with granular control
@@ -262,9 +264,7 @@ const getBaseMutationOptions = <TData extends { data?: any; message?: string }>(
 
     if (organizationId) {
       // Invalidate organization-specific queries
-      queryClient.invalidateQueries({
-        queryKey: purchaseOrderKeys.list(organizationId)
-      });
+      queryClient.invalidateQueries({ queryKey: purchaseOrderKeys.lists() });
       queryClient.invalidateQueries({
         queryKey: purchaseOrderKeys.summary(organizationId)
       });
@@ -294,6 +294,7 @@ export function useCreatePurchaseOrder() {
     QueryError,
     CreatePurchaseOrderPayload & BaseMutationVariables
   >({
+    meta: { operation: 'create', entity: 'Purchase Order' },
     mutationFn: async (payload) => {
       if (!payload.organizationId) {
         throw new Error("Organization ID is required");
@@ -315,6 +316,7 @@ export function useUpdatePurchaseOrder() {
     QueryError,
     UpdatePurchaseOrderDTO & BaseMutationVariables
   >({
+    meta: { operation: 'update', entity: 'Purchase Order' },
     mutationFn: async (payload) => {
       if (!payload.id || !payload.organizationId) {
         throw new Error("Purchase order ID and organization ID are required");
@@ -388,14 +390,10 @@ export function useDeletePurchaseOrder() {
       });
 
       // Show success message
-      if (data?.success) {
-        toast.success(data.success);
-      }
+      notify.success(data?.message || "Purchase order deleted successfully");
 
       // Invalidate lists
-      queryClient.invalidateQueries({
-        queryKey: purchaseOrderKeys.list(variables.organizationId),
-      });
+      queryClient.invalidateQueries({ queryKey: purchaseOrderKeys.lists() });
       queryClient.invalidateQueries({
         queryKey: purchaseOrderKeys.summary(variables.organizationId),
       });
@@ -499,11 +497,16 @@ export function useReceiveItems() {
     QueryError,
     GoodsReceiptPayload
   >({
+    meta: { operation: 'receive', entity: 'Items' },
     mutationFn: async (payload) => {
       if (!payload.organizationId || !payload.id) {
         throw new Error("Organization ID and purchase order ID are required");
       }
-      return await receiveItems(payload);
+      const result = await receiveItems(payload);
+      if (!result.success) {
+        throw new Error(result.error || "Failed to receive items");
+      }
+      return result;
     },
     onSuccess: (data, variables) => {
       // Additional cache invalidation for goods receipts
@@ -558,13 +561,11 @@ export function useBulkUpdatePurchaseOrderStatus() {
 
       // Show success message with count
       if (data?.data?.updated?.length) {
-        toast.success(`Updated ${data.data.updated.length} purchase order(s)`);
+        notify.success(`Updated ${data.data.updated.length} purchase order(s)`);
       }
 
       // Invalidate lists
-      queryClient.invalidateQueries({
-        queryKey: purchaseOrderKeys.list(variables.organizationId),
-      });
+      queryClient.invalidateQueries({ queryKey: purchaseOrderKeys.lists() });
       queryClient.invalidateQueries({
         queryKey: purchaseOrderKeys.summary(variables.organizationId),
       });
@@ -640,7 +641,7 @@ export function useBulkDeletePurchaseOrders() {
       // Show detailed success message
       if (data?.data) {
         const { deletedCount, failedCount } = data.data;
-        toast.success(
+        notify.success(
           `Deleted ${deletedCount} purchase order(s)${
             failedCount ? `, ${failedCount} failed` : ""
           }`,
@@ -648,9 +649,7 @@ export function useBulkDeletePurchaseOrders() {
       }
 
       // Invalidate lists
-      queryClient.invalidateQueries({
-        queryKey: purchaseOrderKeys.list(variables.organizationId),
-      });
+      queryClient.invalidateQueries({ queryKey: purchaseOrderKeys.lists() });
       queryClient.invalidateQueries({
         queryKey: purchaseOrderKeys.summary(variables.organizationId),
       });

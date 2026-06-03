@@ -1,5 +1,6 @@
 "use client"
 
+import { notify } from "@/lib/notifications/notify"
 import {
   approvePurchaseOrder,
   bulkUpdatePurchaseOrderStatus,
@@ -11,8 +12,6 @@ import {
 } from "@/actions/purchaseOrderWorkflow/purchaseOrderWorkflowActions"
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { toast } from "sonner"
-
 export type PurchaseOrderStatus =
   | "DRAFT"
   | "SUBMITTED"
@@ -102,70 +101,75 @@ export function usePurchaseOrderWorkflow(id: string, organizationId?: string, cu
 
   // Submit purchase order
   const submitMutation = useMutation({
+    meta: { operation: 'submit', entity: 'Purchase Order', suppressSuccessNotification: true, suppressErrorNotification: true },
     mutationFn: async () => {
       const res = await submitPurchaseOrder(id, organizationId!)
       if (!res.success) throw new Error(res.error || "Failed to submit purchase order")
       return res.data!
     },
     onSuccess: () => {
-      toast.success("Purchase order submitted successfully")
+      notify.success("Purchase order submitted successfully")
       invalidateQueries()
     },
     onError: (error) => {
-      toast.error(`Failed to submit: ${error.message}`)
+      notify.error(`Failed to submit: ${error.message}`)
     },
   })
 
   // Approve purchase order
   const approveMutation = useMutation({
+    meta: { operation: 'approve', entity: 'Purchase Order', suppressSuccessNotification: true, suppressErrorNotification: true },
     mutationFn: async (approvedById: string) => {
       const res = await approvePurchaseOrder(id, organizationId!, approvedById)
       if (!res.success) throw new Error(res.error || "Failed to approve purchase order")
       return res.data!
     },
     onSuccess: () => {
-      toast.success("Purchase order approved successfully")
+      notify.success("Purchase order approved successfully")
       invalidateQueries()
     },
     onError: (error) => {
-      toast.error(`Failed to approve: ${error.message}`)
+      notify.error(`Failed to approve: ${error.message}`)
     },
   })
 
   // Cancel purchase order
   const cancelMutation = useMutation({
+    meta: { operation: 'cancel', entity: 'Purchase Order', suppressSuccessNotification: true, suppressErrorNotification: true },
     mutationFn: async (reason?: string) => {
       const res = await cancelPurchaseOrder(id, organizationId!, reason)
       if (!res.success) throw new Error(res.error || "Failed to cancel purchase order")
       return res.data!
     },
     onSuccess: () => {
-      toast.success("Purchase order cancelled successfully")
+      notify.success("Purchase order cancelled successfully")
       invalidateQueries()
     },
     onError: (error) => {
-      toast.error(`Failed to cancel: ${error.message}`)
+      notify.error(`Failed to cancel: ${error.message}`)
     },
   })
 
   // Close purchase order
   const closeMutation = useMutation({
+    meta: { operation: 'close', entity: 'Purchase Order', suppressSuccessNotification: true, suppressErrorNotification: true },
     mutationFn: async () => {
       const res = await closePurchaseOrder(id)
       if (!res.success) throw new Error(res.error || "Failed to close purchase order")
       return res.data!
     },
     onSuccess: () => {
-      toast.success("Purchase order closed successfully")
+      notify.success("Purchase order closed successfully")
       invalidateQueries()
     },
     onError: (error) => {
-      toast.error(`Failed to close: ${error.message}`)
+      notify.error(`Failed to close: ${error.message}`)
     },
   })
 
   // Receive items (with inventory integration)
   const receiveMutation = useMutation({
+    meta: { operation: 'receive', entity: 'Purchase Order Items', suppressSuccessNotification: true, suppressErrorNotification: true },
     mutationFn: async (lines: { lineId: string; quantity: number }[]) => {
       if (!currentUserId) {
         throw new Error(`ReceivedBy: ${currentUserId} is required to receive items`)
@@ -185,16 +189,17 @@ export function usePurchaseOrderWorkflow(id: string, organizationId?: string, cu
     },
     onSuccess: (data) => {
       const receivedCount = data.lines?.filter((line: any) => line.receivedQuantity > 0).length || 0
-      toast.success(`Successfully received ${receivedCount} item(s) and updated inventory`)
+      notify.success(`Successfully received ${receivedCount} item(s) and updated inventory`)
       invalidateQueries()
     },
     onError: (error) => {
-      toast.error(`Failed to receive items: ${error.message}`)
+      notify.error(`Failed to receive items: ${error.message}`)
     },
   })
 
   // Bulk status update
   const bulkStatusMutation = useMutation({
+    meta: { operation: 'update', entity: 'Purchase Orders', suppressSuccessNotification: true, suppressErrorNotification: true },
     mutationFn: async ({ ids, status }: { ids: string[]; status: PurchaseOrderStatus }) => {
       const res = await bulkUpdatePurchaseOrderStatus({
         organizationId: organizationId!,
@@ -209,16 +214,16 @@ export function usePurchaseOrderWorkflow(id: string, organizationId?: string, cu
       const failedCount = data.failed?.length || 0
 
       if (successCount > 0) {
-        toast.success(`Successfully updated ${successCount} purchase order(s)`)
+        notify.success(`Successfully updated ${successCount} purchase order(s)`)
       }
       if (failedCount > 0) {
-        toast.error(`Failed to update ${failedCount} purchase order(s)`)
+        notify.error(`Failed to update ${failedCount} purchase order(s)`)
       }
 
       invalidateQueries()
     },
     onError: (error) => {
-      toast.error(`Bulk update failed: ${error.message}`)
+      notify.error(`Bulk update failed: ${error.message}`)
     },
   })
 

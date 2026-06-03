@@ -1,4 +1,6 @@
 "use client";
+
+import { notify } from "@/lib/notifications/notify"
 import createBrand from "@/actions/brands/createBrands";
 import updateBrandById from "@/actions/brands/updateBrandById";
 import TextArea from "@/components/FormInputs/TextAreaInput";
@@ -13,16 +15,15 @@ import {
   DialogTrigger
 } from "@/components/ui/dialog";
 import { generateSlug } from "@/lib/generateSlug";
-import { BrandCreateDTO } from "@/types/brand";
+import type { BrandCreateDTO, BrandDTO } from "@/types/brand";
 import { CheckCircle2, LayoutGrid, Loader2 } from "lucide-react";
-import router from "next/router";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
-import { toast } from "sonner";
-
+type BrandFormValues = BrandCreateDTO & { slug?: string };
 type BrandsFormProps = {
   editingId?: string | undefined;
-  initialData?: BrandCreateDTO | undefined | null;
+  initialData?: Partial<BrandDTO> | undefined | null;
   organizationId: string;
 };
 const BrandForm = ({
@@ -32,14 +33,16 @@ const BrandForm = ({
 }: BrandsFormProps) => {
 
   const [loading, setLoading] = useState(false);
+  const router = useRouter();
   const {
     handleSubmit,
     register,
     reset,
     formState: { errors },
-  } = useForm<BrandCreateDTO>({
+  } = useForm<BrandFormValues>({
     defaultValues: {
-      brandName: initialData?.brandName || "",
+      brandName: initialData?.brandName || initialData?.nameEn || "",
+      nameEn: initialData?.nameEn || initialData?.brandName || "",
       slug: initialData?.slug || "",
       organizationId: organizationId,
 
@@ -48,36 +51,41 @@ const BrandForm = ({
 
 
 
-  async function onSubmit(data: BrandCreateDTO) {
+  async function onSubmit(data: BrandFormValues) {
     setLoading(true);
 
     try {
-      data.slug = generateSlug(data.brandName || "").toLowerCase();
+      const brandName = data.brandName || data.nameEn || "";
+      const slug = generateSlug(brandName).toLowerCase();
+      const payload: BrandCreateDTO = {
+        brandName,
+        nameEn: brandName,
+        organizationId: data.organizationId ?? organizationId,
+      };
+
       if (editingId) {
         await updateBrandById(editingId, {
           id: editingId,
-          brandName: data.brandName,
-          slug: data.slug,
-          organizationId: data.organizationId,
-          createdAt: initialData?.createdAt ?? new Date(),
+          ...payload,
+          slug,
         });
         setLoading(false);
         // Toast
-        toast.success("Updated Successfully!");
+        notify.success("Updated Successfully!");
         //reset
         reset();
         //router
         router.push("/dashboard/brands");
       } else {
-        const res = await createBrand(data);
+        const res = await createBrand(payload);
         if (res.success === false) {
           setLoading(false);
           console.log("Error:", { description: res.error });
-          toast.error("Error", { description: "Brand not created" });
+          notify.error("Error", { description: "Brand not created" });
           return;
         }
         setLoading(false);
-        toast.success("Brand Created successfully", { description: "Brand created" });
+        notify.success("Brand Created successfully", { description: "Brand created" });
         // window.location.reload();
         // reset()
 

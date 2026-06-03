@@ -5,9 +5,9 @@ const prisma = new PrismaClient()
 
 async function migratePasswords() {
   try {
-    console.log('🔄 Starting password migration to Argon2...')
+    console.log('🔄 Starting password migration to Argon2id...')
 
-    // Find all users with bcrypt passwords (not starting with $argon2)
+    // Find all users with legacy password hashes (not starting with $argon2)
     const usersToMigrate = await prisma.user.findMany({
       where: {
         AND: [
@@ -34,9 +34,9 @@ async function migratePasswords() {
     const tempPassword = 'TempPassword2024!' // Users will need to reset this
     const hashedTempPassword = await hashPassword(tempPassword)
 
-    console.log('🔒 Generated temporary Argon2 password hash')
+    console.log('🔒 Generated temporary Argon2id password hash')
 
-    // Update all users to use the new argon2 hash
+    // Update all users to use the new Argon2id hash
     const updateResult = await prisma.user.updateMany({
       where: {
         id: {
@@ -50,7 +50,7 @@ async function migratePasswords() {
       }
     })
 
-    console.log(`✅ Successfully migrated ${updateResult.count} user passwords to Argon2`)
+    console.log(`✅ Successfully migrated ${updateResult.count} user passwords to Argon2id`)
 
     // Log the migrated users for reference
     console.log('📋 Migrated users (they will need to reset their passwords):')

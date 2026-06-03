@@ -12,7 +12,8 @@ export const supplierInclude = {
       item: {
         select: {
           id: true,
-          name: true,
+          nameEn: true,
+          nameFr: true,
           sku: true,
           costPrice: true,
           isActive: true,

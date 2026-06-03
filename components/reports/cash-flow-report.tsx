@@ -189,7 +189,7 @@ export function CashFlowReportComponent({ report }: CashFlowReportProps) {
                 <div className="flex-1">
                   <div className="font-medium">{drawer.sessionNumber}</div>
                   <div className="text-sm text-muted-foreground">
-                    {drawer.terminalName} • {drawer.cashierName}
+                    {drawer.stationName} • {drawer.cashierName}
                   </div>
                 </div>
 

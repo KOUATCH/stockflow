@@ -5,6 +5,16 @@
 import { db } from "@/prisma/db"
 import { revalidatePath } from "next/cache"
 
+type DecimalLike = { toNumber?: () => number; toString: () => string } | number | string | null | undefined
+
+function toNumber(value: DecimalLike): number {
+  if (value == null) return 0
+  if (typeof value === "number") return value
+  if (typeof value === "string") return Number(value) || 0
+  if (typeof value.toNumber === "function") return value.toNumber()
+  return Number(value.toString()) || 0
+}
+
 export interface TerminalInfo {
   id: string
   name: string
@@ -60,64 +70,59 @@ export interface SessionInfo {
 export async function getTerminals(
   locationId: string,
   organizationId: string
-): Promise<{ success: boolean; terminals?: TerminalInfo[]; error?: string }> {
-  try {
-    const terminals = await db.pOSStation.findMany({
-      where: {
-        locationId,
-        organizationId,
-      },
-      include: {
-        location: {
-          select: {
-            name: true,
-            code: true,
-          },
+): Promise<TerminalInfo[]> {
+  const terminals = await db.pOSStation.findMany({
+    where: {
+      locationId,
+      organizationId,
+    },
+    include: {
+      location: {
+        select: {
+          name: true,
+          code: true,
         },
-        currentSession: {
-          include: {
-            user: {
-              select: {
-                firstName: true,
-                lastName: true,
-              },
+      },
+      currentSession: {
+        include: {
+          user: {
+            select: {
+              firstName: true,
+              lastName: true,
             },
           },
         },
       },
-      orderBy: {
-        name: 'asc',
+    },
+    orderBy: {
+      name: 'asc',
+    },
+  })
+
+  const terminalInfo: TerminalInfo[] = terminals.map(terminal => ({
+    id: terminal.id,
+    name: terminal.name,
+    stationNumber: terminal.terminalNumber,
+    isActive: terminal.isActive,
+    hasCashDrawer: terminal.hasCashDrawer,
+    locationId: terminal.locationId,
+    location: terminal.location,
+    currentSessionId: terminal.currentSessionId ?? undefined,
+    currentSession: terminal.currentSession ? {
+      id: terminal.currentSession.id,
+      sessionNumber: terminal.currentSession.sessionNumber,
+      userId: terminal.currentSession.userId,
+      user: {
+        firstName: terminal.currentSession.user.firstName !== null ? terminal.currentSession.user.firstName : "",
+        lastName: terminal.currentSession.user.lastName !== null ? terminal.currentSession.user.lastName : "",
       },
-    })
+      status: terminal.currentSession.status,
+      startTime: terminal.currentSession.startTime,
+      openingBalance: toNumber(terminal.currentSession.openingBalance),
+    } : undefined,
+  }))
 
-    const terminalInfo: TerminalInfo[] = terminals.map(terminal => ({
-      id: terminal.id,
-      name: terminal.name,
-      stationNumber: terminal.stationNumber,
-      isActive: terminal.isActive,
-      hasCashDrawer: terminal.hasCashDrawer,
-      locationId: terminal.locationId,
-      location: terminal.location,
-      currentSessionId: terminal.currentSessionId ?? undefined,
-      currentSession: terminal.currentSession ? {
-        id: terminal.currentSession.id,
-        sessionNumber: terminal.currentSession.sessionNumber,
-        userId: terminal.currentSession.userId,
-        user: {
-          firstName: terminal.currentSession.user.firstName !== null ? terminal.currentSession.user.firstName : "",
-          lastName: terminal.currentSession.user.lastName !== null ? terminal.currentSession.user.lastName : "",
-        },
-        status: terminal.currentSession.status,
-        startTime: terminal.currentSession.startTime,
-        openingBalance: terminal.currentSession.openingBalance,
-      } : undefined,
-    }))
-
-    return { success: true, terminals: terminalInfo }
-  } catch (error) {
-    console.error("Error fetching terminals:", error)
-    return { success: false, error: "Failed to fetch terminals" }
-  }
+  return terminalInfo
 }
 
 // Get available terminals (not in use)
@@ -149,7 +154,7 @@ export async function getAvailableTerminals(
     const terminalInfo: TerminalInfo[] = terminals.map(terminal => ({
       id: terminal.id,
       name: terminal.name,
-      stationNumber: terminal.stationNumber,
+      stationNumber: terminal.terminalNumber,
       isActive: terminal.isActive,
       hasCashDrawer: terminal.hasCashDrawer,
       locationId: terminal.locationId,
@@ -178,7 +183,7 @@ export async function detectTerminal(
         isActive: true,
         OR: [
           { name: { contains: identifier, mode: 'insensitive' } },
-          { stationNumber: { contains: identifier, mode: 'insensitive' } },
+          { terminalNumber: { contains: identifier, mode: 'insensitive' } },
         ],
       },
       include: {
@@ -208,7 +213,7 @@ export async function detectTerminal(
     const terminalInfo: TerminalInfo = {
       id: terminal.id,
       name: terminal.name,
-      stationNumber: terminal.stationNumber,
+      stationNumber: terminal.terminalNumber,
       isActive: terminal.isActive,
       hasCashDrawer: terminal.hasCashDrawer,
       locationId: terminal.locationId,
@@ -224,7 +229,7 @@ export async function detectTerminal(
         },
         status: terminal.currentSession.status,
         startTime: terminal.currentSession.startTime,
-        openingBalance: terminal.currentSession.openingBalance,
+        openingBalance: toNumber(terminal.currentSession.openingBalance),
       } : undefined,
     }
 
@@ -246,10 +251,10 @@ export async function getUserActiveSession(
         status: "ACTIVE",
       },
       include: {
-        station: {
+        terminal: {
           select: {
             name: true,
-            stationNumber: true,
+            terminalNumber: true,
           },
         },
         user: {
@@ -272,19 +277,22 @@ export async function getUserActiveSession(
       status: session.status,
       startTime: session.startTime,
       endTime: session.endTime ?? undefined,
-      stationId: session?.stationId,
-      station: session.station,
+      stationId: session.terminalId,
+      station: {
+        name: session.terminal.name,
+        stationNumber: session.terminal.terminalNumber,
+      },
       userId: session.userId,
       user: {
         firstName: session.user.firstName ?? "",
         lastName: session.user.lastName ?? "",
         email: session.user.email,
       },
-      openingBalance: session.openingBalance,
-      closingBalance: session.closingBalance !== null ? session.closingBalance : undefined,
-      expectedBalance: session.expectedBalance !== null ? session.expectedBalance : undefined,
-      variance: session.variance !== null ? session.variance : undefined,
-      totalSales: session.totalSales,
+      openingBalance: toNumber(session.openingBalance),
+      closingBalance: session.closingBalance !== null ? toNumber(session.closingBalance) : undefined,
+      expectedBalance: session.expectedBalance !== null ? toNumber(session.expectedBalance) : undefined,
+      variance: session.variance !== null ? toNumber(session.variance) : undefined,
+      totalSales: toNumber(session.totalSales),
       transactionCount: session.transactionCount,
     }
 
@@ -329,7 +337,7 @@ export async function getTerminalStatus(
     const terminalInfo: TerminalInfo = {
       id: terminal.id,
       name: terminal.name,
-      stationNumber: terminal.stationNumber,
+      stationNumber: terminal.terminalNumber,
       isActive: terminal.isActive,
       hasCashDrawer: terminal.hasCashDrawer,
       locationId: terminal.locationId,
@@ -345,7 +353,7 @@ export async function getTerminalStatus(
         },
         status: terminal.currentSession.status,
         startTime: terminal.currentSession.startTime,
-        openingBalance: terminal.currentSession.openingBalance,
+        openingBalance: toNumber(terminal.currentSession.openingBalance),
       } : undefined,
     }
 
@@ -366,7 +374,7 @@ export async function forceCloseSession(
     const session = await db.pOSSession.findUnique({
       where: { id: sessionId },
       include: {
-        station: true,
+        terminal: true,
       },
     })
 
@@ -385,7 +393,7 @@ export async function forceCloseSession(
 
     // Clear station's current session
     await db.pOSStation.update({
-      where: { id: session.stationId },
+      where: { id: session.terminalId },
       data: {
         currentSessionId: null,
       },
@@ -398,305 +406,3 @@ export async function forceCloseSession(
     return { success: false, error: "Failed to force close session" }
   }
 }
-
-// ===== TANSTACK QUERY HOOKS =====
-// File: lib/hooks/use-pos-terminal.ts
-
-"use client"
-
-
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { toast } from "sonner"
-import { closePosSession, openPosSession } from "../cashSystem/cash-drawer/cashDrawerAllActions"
-
-// Get all terminals for location
-export function useTerminals(locationId: string, organizationId: string) {
-  return useQuery({
-    queryKey: ["terminals", locationId, organizationId],
-    queryFn: async () => {
-      const result = await getTerminals(locationId, organizationId)
-      if (!result.success) {
-        throw new Error(result.error)
-      }
-      return result.terminals!
-    },
-    enabled: !!locationId && !!organizationId,
-    staleTime: 30000, // 30 seconds
-    refetchInterval: 60000, // Refetch every minute
-  })
-}
-
-// Get available terminals
-export function useAvailableTerminals(locationId: string, organizationId: string) {
-  return useQuery({
-    queryKey: ["available-terminals", locationId, organizationId],
-    queryFn: async () => {
-      const result = await getAvailableTerminals(locationId, organizationId)
-      if (!result.success) {
-        throw new Error(result.error)
-      }
-      return result.terminals!
-    },
-    enabled: !!locationId && !!organizationId,
-    staleTime: 10000, // 10 seconds
-    refetchInterval: 30000, // Refetch every 30 seconds
-  })
-}
-
-// Auto-detect terminal
-export function useDetectTerminal(
-  locationId: string, 
-  organizationId: string,
-  enabled: boolean = true
-) {
-  return useQuery({
-    queryKey: ["detect-terminal", locationId, organizationId],
-    queryFn: async () => {
-      // Get device identifier (hostname, IP, etc.)
-      const identifier = window?.location?.hostname || "unknown"
-      
-      const result = await detectTerminal(locationId, organizationId, identifier)
-      if (!result.success) {
-        throw new Error(result.error)
-      }
-      return result.terminal!
-    },
-    enabled: enabled && !!locationId && !!organizationId,
-    retry: 1,
-    staleTime: 300000, // 5 minutes (terminals don't change often)
-  })
-}
-
-// Get user's active session
-export function useActiveSession(userId: string) {
-  return useQuery({
-    queryKey: ["active-session", userId],
-    queryFn: async () => {
-      const result = await getUserActiveSession(userId)
-      if (!result.success) {
-        throw new Error(result.error)
-      }
-      return result.session
-    },
-    enabled: !!userId,
-    staleTime: 5000, // 5 seconds
-    refetchInterval: 10000, // Refetch every 10 seconds
-  })
-}
-
-// Get terminal status
-export function useTerminalStatus(terminalId: string) {
-  return useQuery({
-    queryKey: ["terminal-status", terminalId],
-    queryFn: async () => {
-      const result = await getTerminalStatus(terminalId)
-      if (!result.success) {
-        throw new Error(result.error)
-      }
-      return result.terminal!
-    },
-    enabled: !!terminalId,
-    staleTime: 30000, // 30 seconds
-    refetchInterval: 60000, // Refetch every minute
-  })
-}
-
-// Start POS session mutation
-export function useStartSession() {
-  const queryClient = useQueryClient()
-
-  return useMutation({
-    mutationFn: async (data: {
-      terminalId: string
-      userId: string
-      locationId: string
-      organizationId: string
-      openingBalance: number
-    }) => {
-      const result = await openPosSession(
-        data.terminalId,
-        data.userId,
-        data.locationId,
-        data.organizationId,
-        data.openingBalance
-      )
-      if (!result.success) {
-        throw new Error(result.error)
-      }
-      return result.sessionId!
-    },
-    onSuccess: (sessionId, variables) => {
-      toast.success("Session started successfully")
-      
-      // Invalidate relevant queries
-      queryClient.invalidateQueries({ queryKey: ["terminals"] })
-      queryClient.invalidateQueries({ queryKey: ["available-terminals"] })
-      queryClient.invalidateQueries({ queryKey: ["active-session", variables.userId] })
-      queryClient.invalidateQueries({ queryKey: ["terminal-status", variables.terminalId] })
-    },
-    onError: (error) => {
-      toast.error(`Failed to start session: ${error.message}`)
-    },
-  })
-}
-
-// Close POS session mutation
-export function useCloseSession() {
-  const queryClient = useQueryClient()
-
-  return useMutation({
-    mutationFn: async (data: {
-      sessionId: string
-      actualBalance: number
-      notes?: string
-    }) => {
-      const result = await closePosSession(
-        data.sessionId,
-        data.actualBalance,
-        data.notes
-      )
-      if (!result.success) {
-        throw new Error(result.error)
-      }
-      return result
-    },
-    onSuccess: () => {
-      toast.success("Session closed successfully")
-      
-      // Invalidate all session-related queries
-      queryClient.invalidateQueries({ queryKey: ["terminals"] })
-      queryClient.invalidateQueries({ queryKey: ["available-terminals"] })
-      queryClient.invalidateQueries({ queryKey: ["active-session"] })
-      queryClient.invalidateQueries({ queryKey: ["terminal-status"] })
-    },
-    onError: (error) => {
-      toast.error(`Failed to close session: ${error.message}`)
-    },
-  })
-}
-
-// Force close session (admin)
-export function useForceCloseSession() {
-  const queryClient = useQueryClient()
-
-  return useMutation({
-    mutationFn: async (data: {
-      sessionId: string
-      adminUserId: string
-      reason: string
-    }) => {
-      const result = await forceCloseSession(
-        data.sessionId,
-        data.adminUserId,
-        data.reason
-      )
-      if (!result.success) {
-        throw new Error(result.error)
-      }
-      return result
-    },
-    onSuccess: () => {
-      toast.success("Session force closed")
-      
-      // Invalidate all queries
-      queryClient.invalidateQueries()
-    },
-    onError: (error) => {
-      toast.error(`Failed to force close session: ${error.message}`)
-    },
-  })
-}
-
-// ===== USAGE EXAMPLES =====
-
-// Example Component: Terminal Selector
-/*
-"use client"
-
-import { useAvailableTerminals, useDetectTerminal, useStartSession } from "@/lib/hooks/use-pos-terminal"
-import { useUser } from "@/lib/hooks/use-user"
-import { useState } from "react"
-
-export function TerminalSelector({ locationId, organizationId }: { 
-  locationId: string, 
-  organizationId: string 
-}) {
-  const { user } = useUser()
-  const [selectedTerminal, setSelectedTerminal] = useState<string>("")
-  const [openingBalance, setopeningBalance] = useState<number>(0)
-
-  // Try to auto-detect terminal first
-  const { data: detectedTerminal, isLoading: detecting } = useDetectTerminal(
-    locationId, 
-    organizationId
-  )
-
-  // Get available terminals for manual selection
-  const { data: availableTerminals, isLoading: loadingTerminals } = useAvailableTerminals(
-    locationId, 
-    organizationId
-  )
-
-  const startSession = useStartSession()
-
-  const handleStartSession = () => {
-    const terminalId = detectedTerminal?.id || selectedTerminal
-    if (!terminalId || !user) return
-
-    startSession.mutate({
-      terminalId,
-      userId: user.id,
-      locationId,
-      organizationId,
-      openingBalance: openingBalance,
-    })
-  }
-
-  if (detecting || loadingTerminals) {
-    return <div>Loading terminals...</div>
-  }
-
-  return (
-    <div className="space-y-4">
-      {detectedTerminal ? (
-        <div>
-          <h3>Detected Terminal: {detectedTerminal.name}</h3>
-          <p>Terminal #{detectedTerminal.stationNumber}</p>
-        </div>
-      ) : (
-        <div>
-          <label>Select Terminal:</label>
-          <select 
-            value={selectedTerminal} 
-            onChange={(e) => setSelectedTerminal(e.target.value)}
-          >
-            <option value="">Choose terminal...</option>
-            {availableTerminals?.map(terminal => (
-              <option key={terminal.id} value={terminal.id}>
-                {terminal.name} (#{terminal.stationNumber})
-              </option>
-            ))}
-          </select>
-        </div>
-      )}
-
-      <div>
-        <label>Opening Cash Amount:</label>
-        <input 
-          type="number" 
-          value={openingBalance} 
-          onChange={(e) => setopeningBalance(Number(e.target.value))}
-          step="0.01"
-        />
-      </div>
-
-      <button 
-        onClick={handleStartSession}
-        disabled={(!detectedTerminal && !selectedTerminal) || startSession.isPending}
-      >
-        {startSession.isPending ? "Starting..." : "Start Session"}
-      </button>
-    </div>
-  )
-}
-*/

@@ -61,10 +61,13 @@ export const usePermissions = useAuth
 export async function signOut(options?: { redirectTo?: string; redirect?: boolean }) {
   const { signOut: nextSignOut } = await import("next-auth/react")
 
-  return nextSignOut({
-    callbackUrl: options?.redirectTo || "/login",
-    redirect: options?.redirect !== false
-  })
+  const callbackUrl = options?.redirectTo || "/login"
+
+  if (options?.redirect === false) {
+    return nextSignOut({ callbackUrl, redirect: false })
+  }
+
+  return nextSignOut({ callbackUrl, redirect: true })
 }
 
 export default useAuth

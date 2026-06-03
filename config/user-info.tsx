@@ -1,9 +1,10 @@
 "use client"
 
-import { useAuth } from "./auth-provider"
+import { useSession } from "next-auth/react"
 
 export function UserInfo() {
-  const { user } = useAuth()
+  const { data: session } = useSession()
+  const user = session?.user
 
   return (
     <div className="flex items-center space-x-4">

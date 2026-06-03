@@ -9,7 +9,7 @@ const baseUrl = process.env.NEXT_PUBLIC_BASE_URL;
 
 const DEFAULT_USER_ROLE = {
   name: "User",
-  name: "user",
+  code: "user",
   description: "Default user role with basic permissions",
   permissions: [
     "dashboard.read",
@@ -21,7 +21,7 @@ const DEFAULT_USER_ROLE = {
 
 const ADMIN_USER_ROLE = {
   name: "Admin",
-  name: "admin",
+  code: "admin",
   description: "Default Admin role with all permissions",
   permissions: adminPermissions
 };
@@ -34,10 +34,15 @@ export async function getAllMembers() {
     const members = await db.user.findMany({
       select: {
         id: true,
-        name: true,
+        firstName: true,
+        lastName: true,
+        email: true,
       },
     });
-    return members;
+    return members.map((member) => ({
+      id: member.id,
+      name: [member.firstName, member.lastName].filter(Boolean).join(" ") || member.email,
+    }));
   } catch (error) {
     console.error("Error fetching the count:", error);
     return 0;

@@ -1,6 +1,8 @@
 "use server"
 
 import { getAuthenticatedUser } from "@/lib/auth-server"
+import { inventoryAction, type ServerActionResult } from '@/lib/error-handling'
+import { db } from "@/prisma/db"
 import {
   AdjustmentStatus,
   type CreateItemRequest,
@@ -102,12 +104,21 @@ export interface InventoryStatsResponse {
   error?: string | null
 }
 
+function toNumber(value: any): number {
+  if (value === null || value === undefined) return 0
+  if (typeof value === "number") return value
+  if (typeof value === "string") return Number(value) || 0
+  if (typeof value.toNumber === "function") return value.toNumber()
+  return Number(value) || 0
+}
+
 // ===== ITEMS =====
-export async function getItems(
-  organizationId: string,
-  filters?: InventoryFilters,
-): Promise<InventoryResponse<ItemWithRelations[]>> {
-  try {
+export const getItems = inventoryAction(
+  async (input: {
+    organizationId: string;
+    filters?: InventoryFilters;
+  }): Promise<ServerActionResult<ItemWithRelations[]>> => {
+    const { organizationId, filters } = input;
     // Mock implementation - replace with actual database query
     const mockItems: ItemWithRelations[] = [
       {
@@ -213,31 +224,45 @@ export async function getItems(
     }
 
     return { success: true, data: filteredItems }
-  } catch (error) {
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : "Failed to fetch items",
-      data: [],
+  },
+  {
+    actionName: 'getItems',
+    component: 'InventoryManagement',
+    businessContext: {
+      domain: 'inventory',
+      operation: 'read',
+      resourceType: 'items',
+      criticalOperation: false
     }
   }
-}
+)
 
-export async function getItem(id: string): Promise<InventoryResponse<ItemWithRelations | null>> {
-  try {
-    const items = await getItems("org_1") // Mock organization ID
-    const item = items.data.find((item) => item.id === id)
+export const getItem = inventoryAction(
+  async (input: { id: string }): Promise<ServerActionResult<ItemWithRelations | null>> => {
+    const { id } = input;
+    const user = await getAuthenticatedUser()
+    const items = await getItems({ organizationId: user.organizationId })
+    const item = items.data?.find((item) => item.id === id)
     return { success: true, data: item || null }
-  } catch (error) {
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : "Failed to fetch item",
-      data: null,
+  },
+  {
+    actionName: 'getItem',
+    component: 'InventoryManagement',
+    businessContext: {
+      domain: 'inventory',
+      operation: 'read',
+      resourceType: 'item',
+      criticalOperation: false
     }
   }
-}
+)
 
-export async function createItem(organizationId: string, data: CreateItemRequest): Promise<InventoryResponse<Item>> {
-  try {
+export const createItem = inventoryAction(
+  async (input: {
+    organizationId: string;
+    data: CreateItemRequest;
+  }): Promise<ServerActionResult<Item>> => {
+    const { organizationId, data } = input;
     const newItem: Item = {
       id: `item_${Date.now()}`,
       name: data.name,
@@ -278,24 +303,105 @@ export async function createItem(organizationId: string, data: CreateItemRequest
     }
 
     return { success: true, data: newItem }
-  } catch (error) {
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : "Failed to create item",
-      data: {} as Item,
+  },
+  {
+    actionName: 'createItem',
+    component: 'InventoryManagement',
+    businessContext: {
+      domain: 'inventory',
+      operation: 'create',
+      resourceType: 'item',
+      criticalOperation: false
     }
   }
-}
+)
 
 // ===== INVENTORY LEVELS =====
-export async function getInventoryLevels(
-  organizationId: string,
-  filters?: InventoryFilters,
-): Promise<InventoryResponse<InventoryLevelWithRelations[]>> {
-  try {
+export const getInventoryLevels = inventoryAction(
+  async (input: {
+    organizationId: string;
+    filters?: InventoryFilters;
+  }): Promise<ServerActionResult<InventoryLevelWithRelations[]>> => {
+    const { organizationId, filters } = input;
 
-    // Apply filters
-    let filteredLevels = mockLevels
+    const levels = await db.inventoryLevel.findMany({
+      where: {
+        ...(filters?.locationId && { locationId: filters.locationId }),
+        item: {
+          organizationId,
+          deletedAt: null,
+          ...(filters?.categoryId && { categoryId: filters.categoryId }),
+          ...(filters?.brandId && { brandId: filters.brandId }),
+          ...(filters?.search && {
+            OR: [
+              { nameEn: { contains: filters.search, mode: "insensitive" } },
+              { nameFr: { contains: filters.search, mode: "insensitive" } },
+              { sku: { contains: filters.search, mode: "insensitive" } },
+            ],
+          }),
+        },
+      },
+      include: {
+        item: {
+          select: {
+            id: true,
+            nameEn: true,
+            nameFr: true,
+            sku: true,
+            unit: {
+              select: {
+                nameEn: true,
+                nameFr: true,
+                symbol: true,
+              },
+            },
+          },
+        },
+        location: {
+          select: {
+            id: true,
+            name: true,
+          },
+        },
+      },
+      orderBy: {
+        updatedAt: "desc",
+      },
+    })
+
+    let filteredLevels: InventoryLevelWithRelations[] = levels.map((level) => ({
+      id: level.id,
+      itemId: level.itemId,
+      locationId: level.locationId,
+      reorderPoint: toNumber(level.reorderPoint),
+      location: {
+        id: level.location.id,
+        name: level.location.name,
+      },
+      quantityOnHand: toNumber(level.quantityOnHand),
+      quantityReserved: toNumber(level.quantityReserved),
+      quantityAvailable: toNumber(level.quantityAvailable),
+      quantityInTransit: toNumber(level.quantityInTransit),
+      quantityOnOrder: toNumber(level.quantityOnOrder),
+      averageCost: toNumber(level.averageCost),
+      totalValue: toNumber(level.totalValue),
+      lastCountDate: level.lastCountDate,
+      lastTransactionAt: level.lastTransactionAt,
+      createdAt: level.createdAt,
+      updatedAt: level.updatedAt,
+      item: {
+        id: level.item.id,
+        name: level.item.nameEn ?? level.item.nameFr ?? "",
+        sku: level.item.sku,
+        unit: level.item.unit
+          ? {
+              name: level.item.unit.nameEn ?? level.item.unit.nameFr ?? level.item.unit.symbol,
+              abbreviation: level.item.unit.symbol,
+            }
+          : undefined,
+      },
+    }))
+
     if (filters?.locationId) {
       filteredLevels = filteredLevels.filter((level) => level.locationId === filters.locationId)
     }
@@ -307,19 +413,24 @@ export async function getInventoryLevels(
     }
 
     return { success: true, data: filteredLevels }
-  } catch (error) {
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : "Failed to fetch inventory levels",
-      data: [],
+  },
+  {
+    actionName: 'getInventoryLevels',
+    component: 'InventoryManagement',
+    businessContext: {
+      domain: 'inventory',
+      operation: 'read',
+      resourceType: 'inventory_levels',
+      criticalOperation: false
     }
   }
-}
+)
 
-export async function updateInventoryLevel(
-  data: UpdateInventoryLevelRequest,
-): Promise<InventoryResponse<InventoryTransaction>> {
-  try {
+export const updateInventoryLevel = inventoryAction(
+  async (input: {
+    data: UpdateInventoryLevelRequest;
+  }): Promise<ServerActionResult<InventoryTransaction>> => {
+    const { data } = input;
 
     const user = await getAuthenticatedUser()
     const userOrgId = user.organizationId
@@ -347,19 +458,24 @@ export async function updateInventoryLevel(
     }
 
     return { success: true, data: transaction }
-  } catch (error) {
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : "Failed to update inventory level",
-      data: {} as InventoryTransaction,
+  },
+  {
+    actionName: 'updateInventoryLevel',
+    component: 'InventoryManagement',
+    businessContext: {
+      domain: 'inventory',
+      operation: 'update',
+      resourceType: 'inventory_level',
+      criticalOperation: true
     }
   }
-}
+)
 
-export async function reserveInventory(
-  data: ReserveInventoryRequest,
-): Promise<InventoryResponse<InventoryTransaction[]>> {
-  try {
+export const reserveInventory = inventoryAction(
+  async (input: {
+    data: ReserveInventoryRequest;
+  }): Promise<ServerActionResult<InventoryTransaction[]>> => {
+    const { data } = input;
     const transactions: InventoryTransaction[] = data.reservations.map((reservation, index) => ({
       id: `trans_${Date.now()}_${index}`,
       type: TransactionType.RESERVATION,
@@ -386,19 +502,24 @@ export async function reserveInventory(
     }))
 
     return { success: true, data: transactions }
-  } catch (error) {
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : "Failed to reserve inventory",
-      data: [],
+  },
+  {
+    actionName: 'reserveInventory',
+    component: 'InventoryManagement',
+    businessContext: {
+      domain: 'inventory',
+      operation: 'update',
+      resourceType: 'inventory_reservation',
+      criticalOperation: true
     }
   }
-}
+)
 
-export async function releaseInventory(
-  data: ReserveInventoryRequest,
-): Promise<InventoryResponse<InventoryTransaction[]>> {
-  try {
+export const releaseInventory = inventoryAction(
+  async (input: {
+    data: ReserveInventoryRequest;
+  }): Promise<ServerActionResult<InventoryTransaction[]>> => {
+    const { data } = input;
     const transactions: InventoryTransaction[] = data.reservations.map((reservation, index) => ({
       id: `trans_${Date.now()}_${index}`,
       type: TransactionType.RESERVATION_RELEASE,
@@ -425,21 +546,26 @@ export async function releaseInventory(
     }))
 
     return { success: true, data: transactions }
-  } catch (error) {
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : "Failed to release inventory",
-      data: [],
+  },
+  {
+    actionName: 'releaseInventory',
+    component: 'InventoryManagement',
+    businessContext: {
+      domain: 'inventory',
+      operation: 'update',
+      resourceType: 'inventory_reservation',
+      criticalOperation: true
     }
   }
-}
+)
 
 // ===== INVENTORY TRANSACTIONS =====
-export async function getInventoryTransactions(
-  organizationId: string,
-  filters?: TransactionFilters,
-): Promise<InventoryResponse<InventoryTransactionWithRelations[]>> {
-  try {
+export const getInventoryTransactions = inventoryAction(
+  async (input: {
+    organizationId: string;
+    filters?: TransactionFilters;
+  }): Promise<ServerActionResult<InventoryTransactionWithRelations[]>> => {
+    const { organizationId, filters } = input;
     const mockTransactions: InventoryTransactionWithRelations[] = [
       {
         id: "trans_1",
@@ -522,23 +648,27 @@ export async function getInventoryTransactions(
     }
 
     return { success: true, data: filteredTransactions }
-  } catch (error) {
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : "Failed to fetch inventory transactions",
-      data: [],
+  },
+  {
+    actionName: 'getInventoryTransactions',
+    component: 'InventoryManagement',
+    businessContext: {
+      domain: 'inventory',
+      operation: 'read',
+      resourceType: 'inventory_transactions',
+      criticalOperation: false
     }
   }
-}
+)
 
 
-export async function getInventoryStats(): Promise<InventoryStatsResponse> {
-  try {
+export const getInventoryStats = inventoryAction(
+  async (): Promise<ServerActionResult<InventoryStats>> => {
     const user = await getAuthenticatedUser()
     const userOrgId = user.organizationId
     console.log(`[v0] Getting inventory stats for org:", ${userOrgId}`)
 
-    const inventoryLevels = await getInventoryLevels(userOrgId)
+    const inventoryLevels = await getInventoryLevels({ organizationId: userOrgId })
     const invenLevelData = inventoryLevels.data
     const totalItems = invenLevelData?.length
     const totalValue = invenLevelData?.reduce((sum, level) => sum + level.totalValue, 0)
@@ -558,15 +688,21 @@ export async function getInventoryStats(): Promise<InventoryStatsResponse> {
 
     console.log("[v0] Calculated inventory stats:", stats)
     return {
-      data: stats,
       success: true,
-      error: null
+      data: stats
     }
-  } catch (error) {
-    console.error("Error fetching inventory stats:", error)
-    throw error
+  },
+  {
+    actionName: 'getInventoryStats',
+    component: 'InventoryDashboard',
+    businessContext: {
+      domain: 'inventory',
+      operation: 'read',
+      resourceType: 'inventory_stats',
+      criticalOperation: false
+    }
   }
-}
+)
 
 // export async function getInventoryTransactions(
 //   organizationId: string, limit: number, options: {
@@ -629,10 +765,11 @@ export async function getInventoryStats(): Promise<InventoryStatsResponse> {
 // }
 
 // ===== STOCK ADJUSTMENTS =====
-export async function getStockAdjustments(
-  organizationId: string,
-): Promise<InventoryResponse<StockAdjustmentWithRelations[]>> {
-  try {
+export const getStockAdjustments = inventoryAction(
+  async (input: {
+    organizationId: string;
+  }): Promise<ServerActionResult<StockAdjustmentWithRelations[]>> => {
+    const { organizationId } = input;
     const mockAdjustments: StockAdjustmentWithRelations[] = [
       {
         id: "adj_1",
@@ -665,19 +802,24 @@ export async function getStockAdjustments(
     ]
 
     return { success: true, data: mockAdjustments }
-  } catch (error) {
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : "Failed to fetch stock adjustments",
-      data: [],
+  },
+  {
+    actionName: 'getStockAdjustments',
+    component: 'InventoryManagement',
+    businessContext: {
+      domain: 'inventory',
+      operation: 'read',
+      resourceType: 'stock_adjustments',
+      criticalOperation: false
     }
   }
-}
+)
 
-export async function createStockAdjustment(
-  data: CreateStockAdjustmentRequest,
-): Promise<InventoryResponse<StockAdjustment>> {
-  try {
+export const createStockAdjustment = inventoryAction(
+  async (input: {
+    data: CreateStockAdjustmentRequest;
+  }): Promise<ServerActionResult<StockAdjustment>> => {
+    const { data } = input;
     const adjustment: StockAdjustment = {
       id: `adj_${Date.now()}`,
       adjustmentNumber: `ADJ-${Date.now()}`,
@@ -696,20 +838,25 @@ export async function createStockAdjustment(
     }
 
     return { success: true, data: adjustment }
-  } catch (error) {
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : "Failed to create stock adjustment",
-      data: {} as StockAdjustment,
+  },
+  {
+    actionName: 'createStockAdjustment',
+    component: 'InventoryManagement',
+    businessContext: {
+      domain: 'inventory',
+      operation: 'create',
+      resourceType: 'stock_adjustment',
+      criticalOperation: true
     }
   }
-}
+)
 
 // ===== STOCK TRANSFERS =====
-export async function getStockTransfers(
-  organizationId: string,
-): Promise<InventoryResponse<StockTransferWithRelations[]>> {
-  try {
+export const getStockTransfers = inventoryAction(
+  async (input: {
+    organizationId: string;
+  }): Promise<ServerActionResult<StockTransferWithRelations[]>> => {
+    const { organizationId } = input;
     const mockTransfers: StockTransferWithRelations[] = [
       {
         id: "transfer_1",
@@ -747,17 +894,24 @@ export async function getStockTransfers(
     ]
 
     return { success: true, data: mockTransfers }
-  } catch (error) {
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : "Failed to fetch stock transfers",
-      data: [],
+  },
+  {
+    actionName: 'getStockTransfers',
+    component: 'InventoryManagement',
+    businessContext: {
+      domain: 'inventory',
+      operation: 'read',
+      resourceType: 'stock_transfers',
+      criticalOperation: false
     }
   }
-}
+)
 
-export async function createStockTransfer(data: CreateStockTransferRequest): Promise<InventoryResponse<StockTransfer>> {
-  try {
+export const createStockTransfer = inventoryAction(
+  async (input: {
+    data: CreateStockTransferRequest;
+  }): Promise<ServerActionResult<StockTransfer>> => {
+    const { data } = input;
     const transfer: StockTransfer = {
       id: `transfer_${Date.now()}`,
       transferNumber: `TRF-${Date.now()}`,
@@ -777,11 +931,15 @@ export async function createStockTransfer(data: CreateStockTransferRequest): Pro
     }
 
     return { success: true, data: transfer }
-  } catch (error) {
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : "Failed to create stock transfer",
-      data: {} as StockTransfer,
+  },
+  {
+    actionName: 'createStockTransfer',
+    component: 'InventoryManagement',
+    businessContext: {
+      domain: 'inventory',
+      operation: 'create',
+      resourceType: 'stock_transfer',
+      criticalOperation: true
     }
   }
-}
+)

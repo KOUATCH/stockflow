@@ -1,12 +1,19 @@
 "use server"
 
+import { randomUUID } from "crypto"
+
 import { db } from "@/prisma/db"
+import {
+  CashDrawerTransactionType,
+  POSSessionStatus,
+  Prisma,
+} from "@prisma/client"
 import { revalidatePath } from "next/cache"
 
 export interface CashDrawerSession {
   id: string
   sessionNumber: string
-  terminalId: string
+  stationId: string
   userId: string
   locationId: string
   status: "ACTIVE" | "CLOSED" | "SUSPENDED" | "RECONCILED"
@@ -17,10 +24,10 @@ export interface CashDrawerSession {
   expectedBalance?: number
   variance?: number
   notes?: string
-  terminal: {
+  station: {
     id: string
     name: string
-    terminalNumber: string
+    stationNumber: string
   }
   user: {
     id: string
@@ -65,58 +72,136 @@ export interface CashDrawerSummary {
   lastEvent?: Date
 }
 
+const CASH_REVALIDATION_PATHS = [
+  "/[locale]/dashboard/cashSystem",
+  "/[locale]/dashboard/session-pos-sync",
+  "/[locale]/dashboard/pos-system",
+] as const
 
+function createId() {
+  return randomUUID()
+}
 
+function revalidateCashDrawerPaths() {
+  for (const path of CASH_REVALIDATION_PATHS) {
+    revalidatePath(path, "page")
+  }
+}
 
+function toNumber(value: Prisma.Decimal | number | string | null | undefined): number {
+  if (value === null || value === undefined) {
+    return 0
+  }
 
-// export interface  POSSession {
-//   sessionNumber:string
-//   status:string
-//   startTime:string
-//   endTime:string
+  if (typeof value === "number") {
+    return value
+  }
 
-//   terminalId:string
-//   terminal:string
-//   locationId:string
-//   currentStation:string
+  if (typeof value === "string") {
+    return Number(value) || 0
+  }
 
-//   userId:string
-//   user:string
+  return value.toNumber()
+}
 
-//   openingBalance:string
-//   closingBalance:string
-//   expectedBalance:string
-//   variance:string
+function generateNumber(prefix: string) {
+  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8).toUpperCase()}`
+}
 
-//   totalSales:string
-//   totalTax:string
-//   totalDiscount:string
-//   transactionCount:string
+function mapSessionForClient(session: any, cashDrawer: any): CashDrawerSession {
+  return {
+    id: session.id,
+    sessionNumber: session.sessionNumber,
+    stationId: session.terminalId,
+    userId: session.userId,
+    locationId: session.locationId,
+    status: session.status,
+    startTime: session.startTime,
+    endTime: session.endTime ?? undefined,
+    openingBalance: toNumber(session.openingBalance),
+    closingBalance: session.closingBalance === null ? undefined : toNumber(session.closingBalance),
+    expectedBalance: session.expectedBalance === null ? undefined : toNumber(session.expectedBalance),
+    variance: session.variance === null ? undefined : toNumber(session.variance),
+    notes: session.notes ?? undefined,
+    station: {
+      id: session.terminal.id,
+      name: session.terminal.name,
+      stationNumber: session.terminal.terminalNumber,
+    },
+    user: {
+      id: session.user.id,
+      firstName: session.user.firstName ?? "",
+      lastName: session.user.lastName ?? "",
+      email: session.user.email ?? "",
+    },
+    cashDrawer: cashDrawer
+      ? {
+          id: cashDrawer.id,
+          currentBalance: toNumber(cashDrawer.currentBalance),
+          expectedBalance: toNumber(cashDrawer.expectedBalance),
+          isOpen: cashDrawer.isOpen,
+        }
+      : undefined,
+  }
+}
 
-//   cashTotal:string
-//   cardTotal:string
-//   digitalTotal:string
+async function getSessionAndDrawer(sessionId: string) {
+  const session = await db.pOSSession.findUnique({
+    where: { id: sessionId },
+    include: {
+      terminal: true,
+      user: {
+        select: {
+          id: true,
+          firstName: true,
+          lastName: true,
+          email: true,
+        },
+      },
+    },
+  })
 
-//   salesOrders:string
-//   cashDrawerTransactions:string
+  if (!session) {
+    return { session: null, cashDrawer: null }
+  }
 
-//   notes:string
+  const cashDrawer = await db.cashDrawer.findFirst({
+    where: {
+      terminalId: session.terminalId,
+      locationId: session.locationId,
+    },
+  })
 
-//   createdAt:string
-//   updatedAt:string
-//   POSStation:string
-//   Location:string
+  return { session, cashDrawer }
+}
 
-// }
+async function getOpenDrawerForSession(sessionId: string) {
+  const { session, cashDrawer } = await getSessionAndDrawer(sessionId)
+
+  if (!session || session.status !== POSSessionStatus.ACTIVE) {
+    return { session: null, cashDrawer: null, error: "Active session not found" }
+  }
+
+  if (!cashDrawer || !cashDrawer.isOpen) {
+    return { session, cashDrawer: null, error: "Cash drawer not found" }
+  }
+
+  return { session, cashDrawer, error: undefined }
+}
+
 // Open a new POS session with cash drawer
 export async function openPosSession(
-  terminalId: string, userId: string, locationId: string, organizationId: string, openingBalance: number): Promise<{ success: boolean; sessionId?: string; error?: string }> {
+  stationId: string,
+  userId: string,
+  locationId: string,
+  organizationId: string,
+  openingBalance: number
+): Promise<{ success: boolean; sessionId?: string; error?: string }> {
   try {
-    // Check if there's already an active session for this terminal
     const existingSession = await db.pOSSession.findFirst({
       where: {
-        terminalId,
-        status: "ACTIVE",
+        terminalId: stationId,
+        status: POSSessionStatus.ACTIVE,
       },
     })
 
@@ -124,86 +209,103 @@ export async function openPosSession(
       return { success: false, error: "Terminal already has an active session" }
     }
 
-    // Verify terminal exists and is active
-    const terminal = await db.pOSStation.findFirst({
+    const station = await db.pOSStation.findFirst({
       where: {
-        id: terminalId,
+        id: stationId,
         isActive: true,
       },
     })
 
-    if (!terminal) {
+    if (!station) {
       return { success: false, error: "Terminal not found or inactive" }
     }
 
-    // Generate session number
-    const sessionNumber = `SES-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
-
-    // Create new session
-    const session = await db.pOSSession.create({
-      data: {
-        sessionNumber,
-        terminalId,
-        userId,
-        locationId,
-        status: "ACTIVE",
-        openingBalance: openingBalance,
-        expectedBalance: openingBalance,
-      },
-    })
-
-    // Get or create cash drawer for this terminal
-    let cashDrawer = await db.cashDrawer.findFirst({
-      where: { terminalId },
-    })
-
-    if (!cashDrawer) {
-      cashDrawer = await db.cashDrawer.create({
+    const session = await db.$transaction(async (tx) => {
+      const now = new Date()
+      const createdSession = await tx.pOSSession.create({
         data: {
-          name: `Cash Drawer - ${terminal.name}`,
-          drawerNumber: `DRAWER-${terminal.terminalNumber}`,
-          terminalId,
+          id: createId(),
+          sessionNumber: generateNumber("SES"),
+          terminalId: stationId,
+          userId,
           locationId,
-          currentBalance: openingBalance,
+          organizationId,
+          status: POSSessionStatus.ACTIVE,
+          startTime: now,
+          openingBalance,
           expectedBalance: openingBalance,
-          isOpen: true,
+          totalSales: 0,
+          totalTax: 0,
+          totalDiscount: 0,
+          transactionCount: 0,
+          cashTotal: 0,
+          cardTotal: 0,
+          mobileMoneyTotal: 0,
+          bankTransferTotal: 0,
+          creditTotal: 0,
+          updatedAt: now,
         },
       })
-    } else {
-      // Update cash drawer
-      await db.cashDrawer.update({
-        where: { id: cashDrawer.id },
+
+      let cashDrawer = await tx.cashDrawer.findFirst({
+        where: {
+          terminalId: stationId,
+          locationId,
+        },
+      })
+
+      if (!cashDrawer) {
+        cashDrawer = await tx.cashDrawer.create({
+          data: {
+            id: createId(),
+            name: `Cash Drawer - ${station.name}`,
+            drawerNumber: `DRAWER-${station.terminalNumber}`,
+            terminalId: stationId,
+            locationId,
+            currentBalance: openingBalance,
+            expectedBalance: openingBalance,
+            isOpen: true,
+            updatedAt: now,
+          },
+        })
+      } else {
+        cashDrawer = await tx.cashDrawer.update({
+          where: { id: cashDrawer.id },
+          data: {
+            currentBalance: openingBalance,
+            expectedBalance: openingBalance,
+            isOpen: true,
+            updatedAt: now,
+          },
+        })
+      }
+
+      await tx.cashDrawerTransaction.create({
         data: {
-          currentBalance: openingBalance,
-          expectedBalance: openingBalance,
-          isOpen: true,
+          id: createId(),
+          cashDrawerId: cashDrawer.id,
+          sessionId: createdSession.id,
+          userId,
+          type: CashDrawerTransactionType.OPENING_BALANCE,
+          amount: openingBalance,
+          reason: "Session opening balance",
+          balanceBefore: 0,
+          balanceAfter: openingBalance,
         },
       })
-    }
 
-    // Record opening transaction
-    await db.cashDrawerTransaction.create({
-      data: {
-        cashDrawerId: cashDrawer.id,
-        sessionId: session.id,
-        userId,
-        type: "OPENING_BALANCE",
-        amount: openingBalance,
-        reason: "Session opening balance",
-        balanceBefore: 0,
-        balanceAfter: openingBalance,
-      },
+      await tx.pOSStation.update({
+        where: { id: stationId },
+        data: {
+          currentSessionId: createdSession.id,
+          updatedAt: now,
+        },
+      })
+
+      return createdSession
     })
 
-    // Update terminal's current session
-    await db.pOSStation.update({
-      where: { id: terminalId },
-      data: {
-        currentSessionId: session.id,
-      },
-    })
-
-    revalidatePath("/pos")
+    revalidateCashDrawerPaths()
     return { success: true, sessionId: session.id }
   } catch (error) {
     console.error("Error opening POS session:", error)
@@ -218,75 +320,69 @@ export async function closePosSession(
   notes?: string
 ): Promise<{ success: boolean; error?: string }> {
   try {
-    const session = await db.pOSSession.findUnique({
-      where: { id: sessionId },
-      include: {
-        terminal: {
-          include: {
-            CashDrawer: true,
-          },
-        },
-      },
-    })
+    const { session, cashDrawer } = await getSessionAndDrawer(sessionId)
 
     if (!session) {
       return { success: false, error: "Session not found" }
     }
 
-    if (session.status !== "ACTIVE") {
+    if (session.status !== POSSessionStatus.ACTIVE) {
       return { success: false, error: "Session is not active" }
     }
 
-    const variance = actualBalance - (session.expectedBalance || 0)
+    const expectedBalance = toNumber(session.expectedBalance)
+    const variance = actualBalance - expectedBalance
 
-    // Update session
-    await db.pOSSession.update({
-      where: { id: sessionId },
-      data: {
-        status: "CLOSED",
-        endTime: new Date(),
-        closingBalance: actualBalance,
-        variance: variance,
-        notes,
-      },
-    })
-
-    // Update cash drawer
-    const cashDrawer = session.terminal.CashDrawer[0]
-    if (cashDrawer) {
-      await db.cashDrawer.update({
-        where: { id: cashDrawer.id },
+    await db.$transaction(async (tx) => {
+      const now = new Date()
+      await tx.pOSSession.update({
+        where: { id: sessionId },
         data: {
-          isOpen: false,
-          currentBalance: actualBalance,
-        },
-      })
-
-      // Record closing transaction
-      await db.cashDrawerTransaction.create({
-        data: {
-          cashDrawerId: cashDrawer.id,
-          sessionId,
-          userId: session.userId,
-          type: "CLOSING_BALANCE",
-          amount: actualBalance,
-          reason: "Session closing balance",
+          status: POSSessionStatus.CLOSED,
+          endTime: now,
+          closingBalance: actualBalance,
+          variance,
           notes,
-          balanceBefore: session.expectedBalance || 0,
-          balanceAfter: actualBalance,
+          updatedAt: now,
         },
       })
-    }
 
-    // Clear terminal's current session
-    await db.pOSStation.update({
-      where: { id: session.terminalId },
-      data: {
-        currentSessionId: null,
-      },
+      if (cashDrawer) {
+        await tx.cashDrawer.update({
+          where: { id: cashDrawer.id },
+          data: {
+            isOpen: false,
+            currentBalance: actualBalance,
+            updatedAt: now,
+          },
+        })
+
+        await tx.cashDrawerTransaction.create({
+          data: {
+            id: createId(),
+            cashDrawerId: cashDrawer.id,
+            sessionId,
+            userId: session.userId,
+            type: CashDrawerTransactionType.CLOSING_BALANCE,
+            amount: actualBalance,
+            reason: "Session closing balance",
+            notes,
+            balanceBefore: expectedBalance,
+            balanceAfter: actualBalance,
+          },
+        })
+      }
+
+      await tx.pOSStation.update({
+        where: { id: session.terminalId },
+        data: {
+          currentSessionId: null,
+          updatedAt: now,
+        },
+      })
     })
 
-    revalidatePath("/pos")
+    revalidateCashDrawerPaths()
     return { success: true }
   } catch (error) {
     console.error("Error closing POS session:", error)
@@ -302,62 +398,51 @@ export async function addCashToDrawer(
   description?: string
 ): Promise<{ success: boolean; error?: string }> {
   try {
-    const session = await db.pOSSession.findUnique({
-      where: { id: sessionId },
-      include: {
-        terminal: {
-          include: {
-            CashDrawer: true,
-          },
-        },
-      },
-    })
+    const { session, cashDrawer, error } = await getOpenDrawerForSession(sessionId)
 
-    if (!session || session.status !== "ACTIVE") {
-      return { success: false, error: "Active session not found" }
+    if (!session || !cashDrawer) {
+      return { success: false, error }
     }
 
-    const cashDrawer = session.terminal.CashDrawer[0]
-    if (!cashDrawer) {
-      return { success: false, error: "Cash drawer not found" }
-    }
-
-    const currentBalance = cashDrawer.currentBalance
+    const currentBalance = toNumber(cashDrawer.currentBalance)
     const newBalance = currentBalance + amount
 
-    // Update cash drawer balance
-    await db.cashDrawer.update({
-      where: { id: cashDrawer.id },
-      data: {
-        currentBalance: newBalance,
-        expectedBalance: newBalance,
-      },
+    await db.$transaction(async (tx) => {
+      const now = new Date()
+      await tx.cashDrawer.update({
+        where: { id: cashDrawer.id },
+        data: {
+          currentBalance: newBalance,
+          expectedBalance: newBalance,
+          updatedAt: now,
+        },
+      })
+
+      await tx.pOSSession.update({
+        where: { id: sessionId },
+        data: {
+          expectedBalance: newBalance,
+          updatedAt: now,
+        },
+      })
+
+      await tx.cashDrawerTransaction.create({
+        data: {
+          id: createId(),
+          cashDrawerId: cashDrawer.id,
+          sessionId,
+          userId: session.userId,
+          type: CashDrawerTransactionType.CASH_IN,
+          amount,
+          reason,
+          notes: description,
+          balanceBefore: currentBalance,
+          balanceAfter: newBalance,
+        },
+      })
     })
 
-    // Update session expected balance
-    await db.pOSSession.update({
-      where: { id: sessionId },
-      data: {
-        expectedBalance: newBalance,
-      },
-    })
-
-    // Record transaction
-    await db.cashDrawerTransaction.create({
-      data: {
-        cashDrawerId: cashDrawer.id,
-        sessionId,
-        userId: session.userId,
-        type: "CASH_IN",
-        amount,
-        reason,
-        notes: description,
-        balanceBefore: currentBalance,
-        balanceAfter: newBalance,
-      },
-    })
-
-    revalidatePath("/pos")
+    revalidateCashDrawerPaths()
     return { success: true }
   } catch (error) {
     console.error("Error adding cash to drawer:", error)
@@ -373,66 +458,55 @@ export async function removeCashFromDrawer(
   description?: string
 ): Promise<{ success: boolean; error?: string }> {
   try {
-    const session = await db.pOSSession.findUnique({
-      where: { id: sessionId },
-      include: {
-        terminal: {
-          include: {
-            CashDrawer: true,
-          },
-        },
-      },
-    })
+    const { session, cashDrawer, error } = await getOpenDrawerForSession(sessionId)
 
-    if (!session || session.status !== "ACTIVE") {
-      return { success: false, error: "Active session not found" }
+    if (!session || !cashDrawer) {
+      return { success: false, error }
     }
 
-    const cashDrawer = session.terminal.CashDrawer[0]
-    if (!cashDrawer) {
-      return { success: false, error: "Cash drawer not found" }
-    }
-
-    const currentBalance = cashDrawer.currentBalance
+    const currentBalance = toNumber(cashDrawer.currentBalance)
     const newBalance = currentBalance - amount
 
     if (newBalance < 0) {
       return { success: false, error: "Insufficient cash in drawer" }
     }
 
-    // Update cash drawer balance
-    await db.cashDrawer.update({
-      where: { id: cashDrawer.id },
-      data: {
-        currentBalance: newBalance,
-        expectedBalance: newBalance,
-      },
+    await db.$transaction(async (tx) => {
+      const now = new Date()
+      await tx.cashDrawer.update({
+        where: { id: cashDrawer.id },
+        data: {
+          currentBalance: newBalance,
+          expectedBalance: newBalance,
+          updatedAt: now,
+        },
+      })
+
+      await tx.pOSSession.update({
+        where: { id: sessionId },
+        data: {
+          expectedBalance: newBalance,
+          updatedAt: now,
+        },
+      })
+
+      await tx.cashDrawerTransaction.create({
+        data: {
+          id: createId(),
+          cashDrawerId: cashDrawer.id,
+          sessionId,
+          userId: session.userId,
+          type: CashDrawerTransactionType.CASH_OUT,
+          amount: -amount,
+          reason,
+          notes: description,
+          balanceBefore: currentBalance,
+          balanceAfter: newBalance,
+        },
+      })
     })
 
-    // Update session expected balance
-    await db.pOSSession.update({
-      where: { id: sessionId },
-      data: {
-        expectedBalance: newBalance,
-      },
-    })
-
-    // Record transaction
-    await db.cashDrawerTransaction.create({
-      data: {
-        cashDrawerId: cashDrawer.id,
-        sessionId,
-        userId: session.userId,
-        type: "CASH_OUT",
-        amount,
-        reason,
-        notes: description,
-        balanceBefore: currentBalance,
-        balanceAfter: newBalance,
-      },
-    })
-
-    revalidatePath("/pos")
+    revalidateCashDrawerPaths()
     return { success: true }
   } catch (error) {
     console.error("Error removing cash from drawer:", error)
@@ -441,29 +515,15 @@ export async function removeCashFromDrawer(
 }
 
 // Get current session
-export async function getCurrentSession(terminalId: string): Promise<CashDrawerSession | null> {
+export async function getCurrentSession(stationId: string): Promise<CashDrawerSession | null> {
   try {
     const session = await db.pOSSession.findFirst({
       where: {
-        terminalId,
-        status: "ACTIVE",
+        terminalId: stationId,
+        status: POSSessionStatus.ACTIVE,
       },
       include: {
-        terminal: {
-          select: {
-            id: true,
-            name: true,
-            terminalNumber: true,
-            CashDrawer: {
-              select: {
-                id: true,
-                currentBalance: true,
-                expectedBalance: true,
-                isOpen: true,
-              },
-            },
-          },
-        },
+        terminal: true,
         user: {
           select: {
             id: true,
@@ -477,29 +537,14 @@ export async function getCurrentSession(terminalId: string): Promise<CashDrawerS
 
     if (!session) return null
 
-    return {
-      id: session.id,
-      sessionNumber: session.sessionNumber,
-      terminalId: session.terminalId,
-      userId: session.userId,
-      locationId: session.locationId,
-      status: session.status,
-      startTime: session.startTime,
-      endTime: session.endTime ?? undefined,
-      openingBalance: session.openingBalance,
-      closingBalance: session.closingBalance ?? undefined,
-      expectedBalance: session.expectedBalance ?? undefined,
-      variance: session.variance ?? undefined,
-      notes: session.notes ?? undefined,
-      terminal: session.terminal,
-      user: {
-        id: session.user.id,
-        firstName: session.user.firstName ?? "",
-        lastName: session.user.lastName ?? "",
-        email: session.user.email,
+    const cashDrawer = await db.cashDrawer.findFirst({
+      where: {
+        terminalId: stationId,
+        locationId: session.locationId,
       },
-      cashDrawer: session.terminal.CashDrawer[0] || undefined,
-    }
+    })
+
+    return mapSessionForClient(session, cashDrawer)
   } catch (error) {
     console.error("Error getting current session:", error)
     return null
@@ -523,18 +568,18 @@ export async function getcashDrawerTransactions(sessionId: string, limit = 50): 
       take: limit,
     })
 
-    return events.map(event => ({
+    return events.map((event) => ({
       id: event.id,
       cashDrawerId: event.cashDrawerId,
       sessionId: event.sessionId ?? undefined,
       userId: event.userId,
       type: event.type,
-      amount: event.amount,
+      amount: toNumber(event.amount),
       reason: event.reason ?? undefined,
       notes: event.notes ?? undefined,
-      balanceBefore: event.balanceBefore ?? undefined,
-      balanceAfter: event.balanceAfter ?? undefined,
-      createdAt: event.createdAt ?? undefined,
+      balanceBefore: toNumber(event.balanceBefore),
+      balanceAfter: toNumber(event.balanceAfter),
+      createdAt: event.createdAt,
       user: {
         firstName: event.user?.firstName ?? "",
         lastName: event.user?.lastName ?? "",
@@ -549,46 +594,37 @@ export async function getcashDrawerTransactions(sessionId: string, limit = 50): 
 // Get cash drawer summary
 export async function getCashDrawerSummary(sessionId: string): Promise<CashDrawerSummary | null> {
   try {
-    const session = await db.pOSSession.findUnique({
-      where: { id: sessionId },
-      include: {
-        terminal: {
-          include: {
-            CashDrawer: true,
-          },
-        },
-      },
-    })
+    const { session, cashDrawer } = await getSessionAndDrawer(sessionId)
 
-    if (!session) return null
-
-    const cashDrawer = session.terminal.CashDrawer[0]
-    if (!cashDrawer) return null
+    if (!session || !cashDrawer) return null
 
     const events = await db.cashDrawerTransaction.findMany({
       where: { sessionId },
     })
 
     const totalSales = events
-      .filter((e) => e.type === "SALE")
-      .reduce((sum, e) => sum + e.amount, 0)
+      .filter((event) => event.type === CashDrawerTransactionType.SALE)
+      .reduce((sum, event) => sum + toNumber(event.amount), 0)
 
     const totalCashIn = events
-      .filter((e) => e.type === "CASH_IN")
-      .reduce((sum, e) => sum + e.amount, 0)
+      .filter((event) => event.type === CashDrawerTransactionType.CASH_IN)
+      .reduce((sum, event) => sum + toNumber(event.amount), 0)
 
     const totalCashOut = events
-      .filter((e) => e.type === "CASH_OUT" || e.type === "PAYOUT")
-      .reduce((sum, e) => sum + e.amount, 0)
+      .filter((event) => event.type === CashDrawerTransactionType.CASH_OUT || event.type === CashDrawerTransactionType.PAYOUT)
+      .reduce((sum, event) => sum + Math.abs(toNumber(event.amount)), 0)
 
     const lastEvent = events.length > 0
-      ? events.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())[0].createdAt
+      ? [...events].sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())[0].createdAt
       : undefined
 
+    const currentBalance = toNumber(cashDrawer.currentBalance)
+    const expectedBalance = toNumber(cashDrawer.expectedBalance)
+
     return {
-      currentBalance: cashDrawer.currentBalance,
-      expectedBalance: cashDrawer.expectedBalance,
-      variance: cashDrawer.currentBalance - cashDrawer.expectedBalance,
+      currentBalance,
+      expectedBalance,
+      variance: currentBalance - expectedBalance,
       totalSales,
       totalCashIn,
       totalCashOut,
@@ -609,68 +645,56 @@ export async function recordSaleTransaction(
 ): Promise<{ success: boolean; error?: string }> {
   try {
     if (paymentMethod !== "CASH") {
-      // For non-cash payments, we don't need to update cash drawer
       return { success: true }
     }
 
-    const session = await db.pOSSession.findUnique({
-      where: { id: sessionId },
-      include: {
-        terminal: {
-          include: {
-            CashDrawer: true,
-          },
-        },
-      },
-    })
+    const { session, cashDrawer, error } = await getOpenDrawerForSession(sessionId)
 
-    if (!session || session.status !== "ACTIVE") {
-      return { success: false, error: "Active session not found" }
+    if (!session || !cashDrawer) {
+      return { success: false, error }
     }
 
-    const cashDrawer = session.terminal.CashDrawer[0]
-    if (!cashDrawer) {
-      return { success: false, error: "Cash drawer not found" }
-    }
-
-    const currentBalance = cashDrawer.currentBalance
+    const currentBalance = toNumber(cashDrawer.currentBalance)
     const newBalance = currentBalance + amount
 
-    // Update cash drawer balance
-    await db.cashDrawer.update({
-      where: { id: cashDrawer.id },
-      data: {
-        currentBalance: newBalance,
-      },
+    await db.$transaction(async (tx) => {
+      const now = new Date()
+      await tx.cashDrawer.update({
+        where: { id: cashDrawer.id },
+        data: {
+          currentBalance: newBalance,
+          expectedBalance: newBalance,
+          updatedAt: now,
+        },
+      })
+
+      await tx.cashDrawerTransaction.create({
+        data: {
+          id: createId(),
+          cashDrawerId: cashDrawer.id,
+          sessionId,
+          userId: session.userId,
+          type: CashDrawerTransactionType.SALE,
+          amount,
+          reason: "Sale transaction",
+          balanceBefore: currentBalance,
+          balanceAfter: newBalance,
+        },
+      })
+
+      await tx.pOSSession.update({
+        where: { id: sessionId },
+        data: {
+          totalSales: { increment: amount },
+          transactionCount: { increment: 1 },
+          cashTotal: { increment: amount },
+          expectedBalance: newBalance,
+          updatedAt: now,
+        },
+      })
     })
 
-    // Record sale event
-    await db.cashDrawerTransaction.create({
-      data: {
-        cashDrawerId: cashDrawer.id,
-        sessionId,
-        userId: session.userId,
-        type: "SALE",
-        amount,
-        reason: "Sale transaction",
-        balanceBefore: currentBalance,
-        balanceAfter: newBalance,
-      },
-    })
-
-    // Update session totals
-    await db.pOSSession.update({
-      where: { id: sessionId },
-      data: {
-        totalSales: { increment: amount },
-        transactionCount: { increment: 1 },
-        cashTotal: paymentMethod === "CASH" ? { increment: amount } : undefined,
-        // cardTotal: paymentMethod === "CARD" ? { increment: amount } : undefined,
-        // digitalTotal: paymentMethod === "DIGITAL" ? { increment: amount } : undefined,
-      },
-    })
-
-    revalidatePath("/pos")
+    revalidateCashDrawerPaths()
     return { success: true }
   } catch (error) {
     console.error("Error recording sale transaction:", error)
@@ -685,58 +709,51 @@ export async function reconcileSession(
   notes?: string
 ): Promise<{ success: boolean; variance?: number; error?: string }> {
   try {
-    const session = await db.pOSSession.findUnique({
-      where: { id: sessionId },
-      include: {
-        terminal: {
-          include: {
-            CashDrawer: true,
-          },
-        },
-      },
-    })
+    const { session, cashDrawer } = await getSessionAndDrawer(sessionId)
 
     if (!session) {
       return { success: false, error: "Session not found" }
     }
 
-    if (session.status !== "ACTIVE") {
+    if (session.status !== POSSessionStatus.ACTIVE) {
       return { success: false, error: "Session is not active" }
     }
 
-    const expectedBalance = session.expectedBalance || 0
+    const expectedBalance = toNumber(session.expectedBalance)
     const variance = actualCash - expectedBalance
 
-    // Update session
-    await db.pOSSession.update({
-      where: { id: sessionId },
-      data: {
-        status: "RECONCILED",
-        closingBalance: actualCash,
-        variance: variance,
-        notes,
-      },
-    })
-
-    const cashDrawer = session.terminal.CashDrawer[0]
-    if (cashDrawer) {
-      // Record reconciliation event
-      await db.cashDrawerTransaction.create({
+    await db.$transaction(async (tx) => {
+      const now = new Date()
+      await tx.pOSSession.update({
+        where: { id: sessionId },
         data: {
-          cashDrawerId: cashDrawer.id,
-          sessionId,
-          userId: session.userId,
-          type: "RECONCILIATION",
-          amount: actualCash,
-          reason: "Session reconciliation",
-          notes: variance !== 0 ? `Variance: ${variance}` : undefined,
-          balanceBefore: expectedBalance,
-          balanceAfter: actualCash,
+          status: POSSessionStatus.RECONCILED,
+          closingBalance: actualCash,
+          variance,
+          notes,
+          updatedAt: now,
         },
       })
-    }
 
-    revalidatePath("/pos")
+      if (cashDrawer) {
+        await tx.cashDrawerTransaction.create({
+          data: {
+            id: createId(),
+            cashDrawerId: cashDrawer.id,
+            sessionId,
+            userId: session.userId,
+            type: CashDrawerTransactionType.RECONCILIATION,
+            amount: variance,
+            reason: "Session reconciliation",
+            notes: variance !== 0 ? `Variance: ${variance}` : notes,
+            balanceBefore: expectedBalance,
+            balanceAfter: actualCash,
+          },
+        })
+      }
+    })
+
+    revalidateCashDrawerPaths()
     return { success: true, variance }
   } catch (error) {
     console.error("Error reconciling session:", error)

@@ -32,8 +32,8 @@ const posAPI = {
     return await getPOSSessions({
       locationId: filters.locationId,
       status: filters.status,
-      startDate: filters.startDate,
-      endDate: filters.endDate
+      startDate: filters.dateFrom,
+      endDate: filters.dateTo
     })
   },
 
@@ -43,8 +43,9 @@ const posAPI = {
 
   startSession: async (data: CreatePOSSessionPayload) => {
     return await startPOSSession({
-      locationId: data.locationId,
-      initialCash: data.initialCash,
+      terminalId: data.stationId,
+      openingBalance: data.openingBalance,
+      userId: data.userId,
       notes: data.notes
     })
   },
@@ -52,7 +53,7 @@ const posAPI = {
   closeSession: async (data: ClosePOSSessionPayload) => {
     return await closePOSSession({
       sessionId: data.sessionId,
-      finalCash: data.finalCash,
+      closingBalance: data.closingBalance,
       notes: data.notes
     })
   },
@@ -80,7 +81,8 @@ const posAPI = {
       type: data.type,
       amount: data.amount,
       reason: data.reason,
-      notes: data.notes
+      notes: data.notes,
+      userId: data.userId
     })
   },
 
@@ -110,6 +112,24 @@ const posAPI = {
   getDailyReports: async (organizationId: string, locationId?: string, dateFrom?: string, dateTo?: string) => {
     return await getDailyReports(organizationId, locationId, dateFrom, dateTo)
   },
+}
+
+type POSActionData<T> = { success: true; data: T } | { success: false; error: string }
+type POSSessionLike = { id: string; terminalId?: string; stationId?: string }
+type POSTerminalLike = { currentSessionId?: string | null }
+type POSSummaryLike = {
+  activeSessions: number
+  totalSalesToday: number
+  transactionsToday: number
+  averageTransactionValue: number
+  cashInDrawer: number
+  topSellingItems: unknown[]
+  paymentMethodBreakdown: Record<string, number>
+  hourlyStats: unknown[]
+}
+
+function actionData<T>(result: POSActionData<T> | undefined): T | undefined {
+  return result?.success ? result.data : undefined
 }
 
 // Query Keys
@@ -158,12 +178,17 @@ export function useStartPOSSession() {
   const queryClient = useQueryClient()
   
   return useMutation({
+    meta: { operation: 'start', entity: 'POS Session' },
     mutationFn: posAPI.startSession,
     onSuccess: (data) => {
       // Invalidate and refetch sessions
       queryClient.invalidateQueries({ queryKey: posQueryKeys.sessions() })
       // Update terminal data
-      queryClient.invalidateQueries({ queryKey: posQueryKeys.terminal(data.data.terminalId) })
+      const session = actionData(data) as POSSessionLike | undefined
+      const terminalId = session?.terminalId ?? session?.stationId
+      if (terminalId) {
+        queryClient.invalidateQueries({ queryKey: posQueryKeys.terminal(terminalId) })
+      }
     },
   })
 }
@@ -175,14 +200,21 @@ export function useClosePOSSession() {
   const queryClient = useQueryClient()
   
   return useMutation({
+    meta: { operation: 'close', entity: 'POS Session' },
     mutationFn: posAPI.closeSession,
     onSuccess: (data) => {
       // Invalidate and refetch sessions
       queryClient.invalidateQueries({ queryKey: posQueryKeys.sessions() })
       // Update specific session
-      queryClient.invalidateQueries({ queryKey: posQueryKeys.session(data.data.id) })
+      const session = actionData(data) as POSSessionLike | undefined
+      if (session?.id) {
+        queryClient.invalidateQueries({ queryKey: posQueryKeys.session(session.id) })
+      }
       // Update terminal data
-      queryClient.invalidateQueries({ queryKey: posQueryKeys.terminal(data.data.terminalId) })
+      const terminalId = session?.terminalId ?? session?.stationId
+      if (terminalId) {
+        queryClient.invalidateQueries({ queryKey: posQueryKeys.terminal(terminalId) })
+      }
     },
   })
 }
@@ -190,7 +222,7 @@ export function useClosePOSSession() {
 /**
  * Hook to fetch POS terminals
  */
-export function usepOSStations(organizationId: string, locationId?: string) {
+export function usePOSStations(organizationId: string, locationId?: string) {
   return useQuery({
     queryKey: [...posQueryKeys.terminals(), organizationId, locationId],
     queryFn: () => posAPI.getTerminals(organizationId, locationId),
@@ -201,7 +233,7 @@ export function usepOSStations(organizationId: string, locationId?: string) {
 /**
  * Hook to fetch a single POS terminal
  */
-export function usepOSStation(id: string) {
+export function usePOSStation(id: string) {
   return useQuery({
     queryKey: posQueryKeys.terminal(id),
     queryFn: () => posAPI.getTerminal(id),
@@ -227,6 +259,7 @@ export function useCashDrawerOperation() {
   const queryClient = useQueryClient()
   
   return useMutation({
+    meta: { operation: 'process', entity: 'Cash Drawer Operation' },
     mutationFn: posAPI.performCashDrawerOperation,
     onSuccess: (data, variables) => {
       // Invalidate cash drawer data
@@ -246,6 +279,7 @@ export function useProcessPayment() {
   const queryClient = useQueryClient()
   
   return useMutation({
+    meta: { operation: 'process', entity: 'Payment' },
     mutationFn: posAPI.processPayment,
     onSuccess: (data, variables) => {
       // Invalidate payments for the sales order
@@ -253,7 +287,7 @@ export function useProcessPayment() {
       // Invalidate sales order data
       queryClient.invalidateQueries({ queryKey: ['salesOrders', variables.salesOrderId] })
       // Invalidate POS summary
-      queryClient.invalidateQueries({ queryKey: posQueryKeys.summary })
+      queryClient.invalidateQueries({ queryKey: posQueryKeys.all })
     },
   })
 }
@@ -288,11 +322,12 @@ export function useGenerateDailyReport() {
   const queryClient = useQueryClient()
   
   return useMutation({
+    meta: { operation: 'generate', entity: 'Daily Report' },
     mutationFn: ({ locationId, date }: { locationId: string; date: string }) =>
       posAPI.generateDailyReport(locationId, date),
     onSuccess: () => {
       // Invalidate daily reports
-      queryClient.invalidateQueries({ queryKey: posQueryKeys.dailyReports })
+      queryClient.invalidateQueries({ queryKey: posQueryKeys.all })
     },
   })
 }
@@ -317,32 +352,36 @@ export function useDailyReports(
  * Hook to get active session for a terminal
  */
 export function useActiveSession(terminalId: string) {
-  const { data: terminal } = usepOSStation(terminalId)
-  const { data: session } = usePOSSession(terminal?.currentSessionId || '')
+  const { data: terminal } = usePOSStation(terminalId)
+  const terminalData = actionData(terminal) as POSTerminalLike | undefined
+  const { data: session } = usePOSSession(terminalData?.currentSessionId || '')
   
   return {
     activeSession: session,
-    hasActiveSession: !!terminal?.currentSessionId,
+    hasActiveSession: !!terminalData?.currentSessionId,
     isLoading: !terminal && !session,
   }
 }
+
+export { usePOSStation as usepOSStation, usePOSStations as usepOSStations }
 
 /**
  * Hook to get real-time POS metrics
  */
 export function usePOSMetrics(organizationId: string, locationId?: string) {
   const { data: summary, isLoading, error } = usePOSSummary(organizationId, locationId)
+  const summaryData = actionData(summary) as POSSummaryLike | undefined
   
   return {
-    metrics: summary ? {
-      activeSessions: summary.activeSessions,
-      totalSalesToday: summary.totalSalesToday,
-      transactionsToday: summary.transactionsToday,
-      averageTransactionValue: summary.averageTransactionValue,
-      cashInDrawer: summary.cashInDrawer,
-      topSellingItems: summary.topSellingItems,
-      paymentMethodBreakdown: summary.paymentMethodBreakdown,
-      hourlyStats: summary.hourlyStats,
+    metrics: summaryData ? {
+      activeSessions: summaryData.activeSessions,
+      totalSalesToday: summaryData.totalSalesToday,
+      transactionsToday: summaryData.transactionsToday,
+      averageTransactionValue: summaryData.averageTransactionValue,
+      cashInDrawer: summaryData.cashInDrawer,
+      topSellingItems: summaryData.topSellingItems,
+      paymentMethodBreakdown: summaryData.paymentMethodBreakdown,
+      hourlyStats: summaryData.hourlyStats,
     } : null,
     isLoading,
     error,

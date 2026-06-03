@@ -1,35 +1,39 @@
-import { unitAPI } from "@/services/unitAPI"
-import { UnitKeys } from "@/types/queryKeys"
-import { UnitCreateDTO } from "@/types/unit"
-import { useMutation, useQueryClient } from "@tanstack/react-query"
+import { useCreateUnit as useCreateUnitMutation } from "@/hooks/useUnits"
 import { useNotifications } from "@/components/notifications/NotificationProvider"
 
 export function useCreateUnit() {
-  const queryClient = useQueryClient()
   const { formSuccess, formError } = useNotifications();
+  const createUnitMutation = useCreateUnitMutation();
 
-  return useMutation({
-    mutationFn: async (data: UnitCreateDTO) => {
-      return await unitAPI.createUnit(data)
+  return {
+    ...createUnitMutation,
+    mutate: (data: any) => {
+      createUnitMutation.mutate(data, {
+        onSuccess: (newUnit) => {
+          formSuccess("Unit Creation", "Unit has been created successfully");
+        },
+        onError: (error: Error) => {
+          formError(
+            "Unit Creation",
+            error.message || "Unknown error occurred",
+            "Failed to create unit"
+          );
+        }
+      });
     },
-    onSuccess: (newUnit) => {
-      formSuccess("Unit Creation", "Unit has been created successfully");
-
-      // Invalidate and refetch unit list
-      queryClient.invalidateQueries({ queryKey: UnitKeys.lists() })
-
-      if (newUnit?.organizationId) {
-        queryClient.invalidateQueries({
-          queryKey: UnitKeys.orgUnits(newUnit.organizationId),
-        })
+    mutateAsync: async (data: any) => {
+      try {
+        const result = await createUnitMutation.mutateAsync(data);
+        formSuccess("Unit Creation", "Unit has been created successfully");
+        return result;
+      } catch (error: any) {
+        formError(
+          "Unit Creation",
+          error.message || "Unknown error occurred",
+          "Failed to create unit"
+        );
+        throw error;
       }
-    },
-    onError: (error: Error) => {
-      formError(
-        "Unit Creation",
-        error.message || "Unknown error occurred",
-        "Failed to create unit"
-      );
-    },
-  })
+    }
+  };
 }

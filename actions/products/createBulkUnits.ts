@@ -1,5 +1,5 @@
 import { UnitProps } from "@/types/types";
-import createUnit from "./createUnit";
+import { createUnit } from "@/actions/units/getUnitsAction";
 
 const createBulkUnits= async(units: UnitProps[])=> {
   try {

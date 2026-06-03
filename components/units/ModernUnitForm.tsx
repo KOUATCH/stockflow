@@ -26,7 +26,8 @@ import { useNotifications } from "../notifications/NotificationProvider"
 
 // Enhanced validation schema for units
 const unitCreationSchema = z.object({
-  name: z.string().min(1, "Unit name is required").max(50, "Name must be less than 50 characters").trim(),
+  nameEn: z.string().min(1, "English unit name is required").max(50, "Name must be less than 50 characters").trim(),
+  nameFr: z.string().optional(),
   symbol: z.string().min(1, "Symbol is required").max(10, "Symbol must be less than 10 characters").trim(),
 })
 
@@ -75,7 +76,8 @@ export function ModernUnitForm({
   const form = useForm<UnitCreationFormData>({
     resolver: zodResolver(unitCreationSchema),
     defaultValues: {
-      name: "",
+      nameEn: "",
+      nameFr: "",
       symbol: "",
     },
     mode: "onChange"
@@ -83,7 +85,8 @@ export function ModernUnitForm({
 
   // Watch form values for real-time feedback
   const watchedValues = form.watch()
-  const { name, symbol } = watchedValues
+  const { nameEn, symbol } = watchedValues
+  const displayName = nameEn || watchedValues.nameFr || ""
 
   const handleSubmit = async (data: UnitCreationFormData) => {
     const operationId = operationStart("Creating Unit")
@@ -102,7 +105,7 @@ export function ModernUnitForm({
         await action(formData)
       }
 
-      operationComplete("Unit Created", `${data.name} (${data.symbol}) has been successfully added to your units!`)
+      operationComplete("Unit Created", `${data.nameEn} (${data.symbol}) has been successfully added to your units!`)
     } catch (error) {
       console.log("Failed to create unit:", error)
       operationComplete("Creation Failed", "Failed to create unit. Please check your information and try again.")
@@ -119,13 +122,13 @@ export function ModernUnitForm({
 
   // Handle unit suggestion selection
   const handleUnitSuggestion = (unitSuggestion: typeof UNIT_SUGGESTIONS[0]) => {
-    form.setValue("name", unitSuggestion.name, { shouldValidate: true })
+    form.setValue("nameEn", unitSuggestion.name, { shouldValidate: true })
     form.setValue("symbol", unitSuggestion.symbol, { shouldValidate: true })
     success("Unit Selected", `Applied ${unitSuggestion.name} (${unitSuggestion.symbol}) to the form`)
   }
 
   // Calculate completion percentage
-  const completionPercentage = (name && symbol) ? 100 : (name || symbol) ? 50 : 0
+  const completionPercentage = (nameEn && symbol) ? 100 : (nameEn || symbol) ? 50 : 0
 
   return (
     <TooltipProvider>
@@ -178,22 +181,47 @@ export function ModernUnitForm({
                       <div className="grid gap-6 md:grid-cols-2">
                         <FormField
                           control={form.control}
-                          name="name"
+                          name="nameEn"
                           render={({ field }) => (
                             <FormItem>
                               <FormLabel className="text-base font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-2">
                                 <Sparkles className="h-4 w-4 text-blue-500" />
-                                Unit Name *
+                                Unit Name (English) *
                               </FormLabel>
                               <FormControl>
                                 <Input
-                                  placeholder="Enter unit name (e.g., Kilogram, Piece)"
+                                  placeholder="Enter unit name"
                                   className="h-12 text-lg bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm border-2 border-slate-200 dark:border-slate-700 focus:border-blue-500 dark:focus:border-blue-400 rounded-xl shadow-sm"
                                   {...field}
                                 />
                               </FormControl>
                               <FormDescription className="text-sm text-slate-500 dark:text-slate-400">
-                                The full name of the measurement unit
+                                Stored as the English unit name
+                              </FormDescription>
+                              <FormMessage />
+                            </FormItem>
+                          )}
+                        />
+
+                        <FormField
+                          control={form.control}
+                          name="nameFr"
+                          render={({ field }) => (
+                            <FormItem>
+                              <FormLabel className="text-base font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-2">
+                                <Sparkles className="h-4 w-4 text-blue-500" />
+                                Unit Name (French)
+                              </FormLabel>
+                              <FormControl>
+                                <Input
+                                  placeholder="Nom de l'unite"
+                                  className="h-12 text-lg bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm border-2 border-slate-200 dark:border-slate-700 focus:border-blue-500 dark:focus:border-blue-400 rounded-xl shadow-sm"
+                                  {...field}
+                                  value={field.value || ""}
+                                />
+                              </FormControl>
+                              <FormDescription className="text-sm text-slate-500 dark:text-slate-400">
+                                Used for French locale display when available
                               </FormDescription>
                               <FormMessage />
                             </FormItem>
@@ -248,7 +276,7 @@ export function ModernUnitForm({
                         </div>
                       </div>
 
-                      {(name && symbol) && (
+                      {(displayName && symbol) && (
                         <div className="p-6 rounded-2xl bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 border-2 border-blue-200 dark:border-blue-700">
                           <div className="flex items-center gap-3 mb-4">
                             <CheckCircle className="h-6 w-6 text-blue-600 dark:text-blue-400" />
@@ -257,7 +285,7 @@ export function ModernUnitForm({
                           <div className="space-y-3">
                             <div className="flex justify-between items-center">
                               <span className="text-sm text-blue-600 dark:text-blue-400">Full Name:</span>
-                              <span className="font-medium text-blue-900 dark:text-blue-100">{name}</span>
+                              <span className="font-medium text-blue-900 dark:text-blue-100">{displayName}</span>
                             </div>
                             <div className="flex justify-between items-center">
                               <span className="text-sm text-blue-600 dark:text-blue-400">Symbol:</span>
@@ -268,7 +296,7 @@ export function ModernUnitForm({
                             <div className="pt-2 border-t border-blue-200 dark:border-blue-700">
                               <span className="text-sm text-blue-600 dark:text-blue-400">Usage Example:</span>
                               <p className="text-sm text-blue-800 dark:text-blue-200 mt-1">
-                                "5 {symbol}" will display as "5 {name}"
+                                5 {symbol} will display as 5 {displayName}
                               </p>
                             </div>
                           </div>
@@ -289,7 +317,7 @@ export function ModernUnitForm({
 
                         <Button
                           type="submit"
-                          disabled={form.formState.isSubmitting || isLoading || !name || !symbol}
+                          disabled={form.formState.isSubmitting || isLoading || !nameEn || !symbol}
                           className="px-8 py-3 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white shadow-lg"
                         >
                           {form.formState.isSubmitting || isLoading ? (
@@ -331,7 +359,7 @@ export function ModernUnitForm({
                     </div>
                     <div>
                       <h3 className="font-bold text-slate-900 dark:text-white text-xl mb-1">
-                        {name || "New Unit"}
+                        {displayName || "New Unit"}
                       </h3>
                       {symbol && (
                         <p className="text-sm text-slate-500 dark:text-slate-400 font-mono bg-slate-100 dark:bg-slate-800 px-2 py-1 rounded-lg inline-block">
@@ -364,7 +392,7 @@ export function ModernUnitForm({
                       <Progress value={completionPercentage} className="h-2" />
                     </div>
                     <p className="text-xs text-slate-500 dark:text-slate-400 text-center mt-3">
-                      {(name && symbol) ? "Ready to create unit!" : "Complete both fields to continue"}
+                      {(nameEn && symbol) ? "Ready to create unit!" : "Complete both fields to continue"}
                     </p>
                   </div>
 

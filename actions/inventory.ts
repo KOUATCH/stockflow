@@ -7,7 +7,7 @@ import { revalidatePath } from "next/cache";
 export async function getInventoryLevels(organizationId: string) {
   try {
 
-    const inventoryLevels = await db.inventory.findMany({
+    const inventoryLevels = await db.inventoryLevel.findMany({
       where: {
         item: {
           organizationId: organizationId
@@ -17,9 +17,9 @@ export async function getInventoryLevels(organizationId: string) {
         item: {
           select: {
             id: true,
-            name: true,
+            nameEn: true,
             sku: true,
-            description: true,
+            descriptionEn: true,
           }
         },
         location: {
@@ -30,7 +30,7 @@ export async function getInventoryLevels(organizationId: string) {
         }
       },
       orderBy: [
-        { item: { name: "asc" } },
+        { item: { nameEn: "asc" } },
         { location: { name: "asc" } }
       ]
     });
@@ -62,7 +62,7 @@ export async function getInventoryTransactions(organizationId: string) {
         item: {
           select: {
             id: true,
-            name: true,
+            nameEn: true,
             sku: true,
           }
         },
@@ -72,10 +72,11 @@ export async function getInventoryTransactions(organizationId: string) {
             name: true,
           }
         },
-        user: {
+        createdBy: {
           select: {
             id: true,
-            name: true,
+            firstName: true,
+            lastName: true,
             email: true,
           }
         }
@@ -109,13 +110,20 @@ export async function reserveInventory(reservations: {
 
     for (const reservation of reservations) {
       // Check current inventory level
-      const inventory = await db.inventory.findUnique({
+      const inventory = await db.inventoryLevel.findUnique({
         where: {
           itemId_locationId: {
             itemId: reservation.itemId,
             locationId: reservation.locationId,
           }
-        }
+        },
+        include: {
+          item: {
+            select: {
+              organizationId: true,
+            },
+          },
+        },
       });
 
       if (!inventory) {
@@ -128,7 +136,7 @@ export async function reserveInventory(reservations: {
         continue;
       }
 
-      if (inventory.availableQuantity < reservation.quantity) {
+      if (Number(inventory.quantityAvailable) < reservation.quantity) {
         results.push({
           itemId: reservation.itemId,
           locationId: reservation.locationId,
@@ -139,7 +147,7 @@ export async function reserveInventory(reservations: {
       }
 
       // Reserve the inventory
-      await db.inventory.update({
+      await db.inventoryLevel.update({
         where: {
           itemId_locationId: {
             itemId: reservation.itemId,
@@ -147,8 +155,10 @@ export async function reserveInventory(reservations: {
           }
         },
         data: {
-          availableQuantity: inventory.availableQuantity - reservation.quantity,
-          reservedQuantity: inventory.reservedQuantity + reservation.quantity,
+          quantityAvailable: { decrement: reservation.quantity },
+          quantityReserved: { increment: reservation.quantity },
+          lastTransactionAt: new Date(),
+          version: { increment: 1 },
         }
       });
 
@@ -157,10 +167,13 @@ export async function reserveInventory(reservations: {
         data: {
           itemId: reservation.itemId,
           locationId: reservation.locationId,
-          type: "RESERVE",
+          organizationId: inventory.item.organizationId,
+          type: "RESERVATION",
           quantity: reservation.quantity,
-          reason: "Inventory reserved for order",
-          userId: userId,
+          notes: "Inventory reserved for order",
+          createdById: userId,
+          balanceAfter: inventory.quantityOnHand,
+          serialNumbers: [],
         }
       });
 
@@ -199,13 +212,20 @@ export async function releaseInventory(reservations: {
 
     for (const reservation of reservations) {
       // Check current inventory level
-      const inventory = await db.inventory.findUnique({
+      const inventory = await db.inventoryLevel.findUnique({
         where: {
           itemId_locationId: {
             itemId: reservation.itemId,
             locationId: reservation.locationId,
           }
-        }
+        },
+        include: {
+          item: {
+            select: {
+              organizationId: true,
+            },
+          },
+        },
       });
 
       if (!inventory) {
@@ -218,7 +238,7 @@ export async function releaseInventory(reservations: {
         continue;
       }
 
-      if (inventory.reservedQuantity < reservation.quantity) {
+      if (Number(inventory.quantityReserved) < reservation.quantity) {
         results.push({
           itemId: reservation.itemId,
           locationId: reservation.locationId,
@@ -229,7 +249,7 @@ export async function releaseInventory(reservations: {
       }
 
       // Release the inventory
-      await db.inventory.update({
+      await db.inventoryLevel.update({
         where: {
           itemId_locationId: {
             itemId: reservation.itemId,
@@ -237,8 +257,10 @@ export async function releaseInventory(reservations: {
           }
         },
         data: {
-          availableQuantity: inventory.availableQuantity + reservation.quantity,
-          reservedQuantity: inventory.reservedQuantity - reservation.quantity,
+          quantityAvailable: { increment: reservation.quantity },
+          quantityReserved: { decrement: reservation.quantity },
+          lastTransactionAt: new Date(),
+          version: { increment: 1 },
         }
       });
 
@@ -247,10 +269,13 @@ export async function releaseInventory(reservations: {
         data: {
           itemId: reservation.itemId,
           locationId: reservation.locationId,
-          type: "RELEASE",
+          organizationId: inventory.item.organizationId,
+          type: "RESERVATION_RELEASE",
           quantity: reservation.quantity,
-          reason: "Reserved inventory released",
-          userId: userId,
+          notes: "Reserved inventory released",
+          createdById: userId,
+          balanceAfter: inventory.quantityOnHand,
+          serialNumbers: [],
         }
       });
 

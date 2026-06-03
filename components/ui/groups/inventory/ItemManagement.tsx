@@ -1,10 +1,10 @@
 "use client"
 
+import { notify } from "@/lib/notifications/notify"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { format } from "date-fns"
 import { memo, useCallback, useMemo, useState } from "react"
 import { useForm } from "react-hook-form"
-import { toast } from "sonner"
 import * as XLSX from "xlsx"
 import { z } from "zod"
 
@@ -71,7 +71,10 @@ import {
   Search,
   SlidersHorizontal
 } from "lucide-react"
+import { getLocaleFromPathname, localizePath } from "@/i18n/routing"
+import { DEFAULT_LOCALE } from "@/types/bilingual"
 import Link from "next/link"
+import { usePathname } from "next/navigation"
 
 import { Badge } from "@/components/ui/badge"
 import { Checkbox } from "@/components/ui/checkbox"
@@ -169,7 +172,7 @@ const getColumns = (
       cell: ({ row }) => {
         const item = row.original
         return (
-          <div className="flex items-center gap-3">
+          <div className="flex min-w-[220px] items-center gap-3">
             <div className="h-10 w-10 flex-shrink-0 overflow-hidden rounded-md border">
               <img
                 src={item.thumbnail || DEFAULT_IMAGE_URL}
@@ -177,7 +180,7 @@ const getColumns = (
                 className="h-full w-full object-cover object-center"
               />
             </div>
-            <div className="flex flex-col">
+            <div className="min-w-0 flex flex-col">
               <span className="font-medium text-foreground line-clamp-1">{item.name}</span>
               <span className="text-xs text-muted-foreground">{item.sku}</span>
             </div>
@@ -283,12 +286,9 @@ const ModernItemTable = ({
   onRefresh,
   onAdd,
   onExport,
-  onEdit,
-  onDelete,
-  isDeleting,
-  itemToDelete,
   title,
   subtitle,
+  createItemHref,
 }: {
   data: ItemWithInventoryLevelsPayload[]
   columns: ColumnDef<ItemWithInventoryLevelsPayload>[]
@@ -296,12 +296,9 @@ const ModernItemTable = ({
   onRefresh: () => void
   onAdd: () => void
   onExport: (data: ItemWithInventoryLevelsPayload[]) => void
-  onEdit: (item: ItemWithInventoryLevelsPayload) => void
-  onDelete: (item: ItemWithInventoryLevelsPayload) => void
-  isDeleting: boolean
-  itemToDelete: ItemWithInventoryLevelsPayload | null
   title: string
   subtitle: string
+  createItemHref: string
 }) => {
   const [sorting, setSorting] = useState<SortingState>([])
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
@@ -335,25 +332,27 @@ const ModernItemTable = ({
   })
 
   const selectedRows = table.getFilteredSelectedRowModel().rows
+  const hasActiveSearch = Boolean(String(globalFilter ?? "").trim())
+  const pageCount = Math.max(table.getPageCount(), 1)
 
   return (
-    <div className="w-full space-y-4 p-3">
+    <div className="w-full min-w-0 space-y-4 p-0 sm:p-1">
       {/* Header with title and actions */}
-      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h2 className="text-2xl font-bold tracking-tight">{title}</h2>
-          <p className="text-muted-foreground">{subtitle}</p>
+      <div className="flex min-w-0 flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
+        <div className="min-w-0">
+          <h2 className="text-xl font-bold leading-tight sm:text-2xl">{title}</h2>
+          <p className="mt-1 max-w-2xl text-sm leading-6 text-muted-foreground">{subtitle}</p>
         </div>
 
-        <div className="flex flex-wrap gap-2">
-          <Button variant="outline" size="sm" onClick={onRefresh} disabled={isLoading}>
+        <div className="flex w-full flex-col gap-2 sm:flex-row sm:flex-wrap xl:w-auto xl:justify-end">
+          <Button variant="outline" size="sm" onClick={onRefresh} disabled={isLoading} className="w-full sm:w-auto">
             <RefreshCw className={`mr-2 h-4 w-4 ${isLoading ? "animate-spin" : ""}`} />
             Refresh
           </Button>
 
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
-              <Button variant="outline" size="sm">
+              <Button variant="outline" size="sm" className="w-full sm:w-auto">
                 <SlidersHorizontal className="mr-2 h-4 w-4" />
                 View
                 <ChevronDownIcon className="ml-2 h-4 w-4" />
@@ -378,66 +377,71 @@ const ModernItemTable = ({
             </DropdownMenuContent>
           </DropdownMenu>
 
-          <Button size="sm" onClick={onAdd}>
+          <Button size="sm" onClick={onAdd} className="w-full sm:w-auto">
             <Plus className="mr-2 h-4 w-4" />
-            Add Item (Quick)
+            Quick Add
           </Button>
-          <Button size="sm" asChild className="bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-700 hover:to-emerald-700 text-white">
-            <Link href="/dashboard/inventory/items/create">
+          <Button size="sm" asChild className="w-full bg-gradient-to-r from-teal-600 to-emerald-600 text-white hover:from-teal-700 hover:to-emerald-700 sm:w-auto">
+            <Link href={createItemHref}>
               <Package className="mr-2 h-4 w-4" />
-              Add Item (Full)
+              Full Form
             </Link>
           </Button>
         </div>
       </div>
 
       {/* Filters and search */}
-      <div className="flex items-center gap-4">
-        <div className="relative flex-1">
+      <div className="flex min-w-0 flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <div className="relative w-full min-w-0 lg:max-w-md">
           <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Search items..."
             value={globalFilter ?? ""}
             onChange={(event) => setGlobalFilter(event.target.value)}
-            className="pl-8 sm:w-[300px] md:w-[400px]"
+            className="w-full pl-8"
           />
         </div>
 
-        {selectedRows.length > 0 && (
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-muted-foreground">
-              {selectedRows.length} selected
-            </span>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => onExport(selectedRows.map(row => row.original))}
-            >
-              <Download className="mr-2 h-4 w-4" />
-              Export Selected
-            </Button>
-          </div>
-        )}
+        <div className="flex w-full flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-center lg:w-auto lg:justify-end">
+          {selectedRows.length > 0 && (
+            <div className="flex min-w-0 flex-col gap-2 rounded-md border bg-muted/30 px-3 py-2 sm:flex-row sm:items-center">
+              <span className="whitespace-nowrap text-sm text-muted-foreground">
+                {selectedRows.length} selected
+              </span>
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => onExport(selectedRows.map(row => row.original))}
+                className="w-full sm:w-auto"
+              >
+                <Download className="mr-2 h-4 w-4" />
+                Export Selected
+              </Button>
+            </div>
+          )}
 
-        <Button
-          variant="outline"
-          size="sm"
-          onClick={() => onExport(data)}
-        >
-          <Download className="mr-2 h-4 w-4" />
-          Export All
-        </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => onExport(data)}
+            className="w-full sm:w-auto"
+          >
+            <Download className="mr-2 h-4 w-4" />
+            Export All
+          </Button>
+        </div>
       </div>
 
       {/* Table */}
-      <div className="rounded-md border">
-        <Table>
-          <TableHeader>
+      <div className="overflow-hidden rounded-lg border bg-background/40">
+        <div className="w-full overflow-x-auto">
+        <Table className="min-w-[920px]">
+          <TableHeader className="sticky top-0 z-10 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80">
             {table.getHeaderGroups().map((headerGroup) => (
               <TableRow key={headerGroup.id}>
                 {headerGroup.headers.map((header) => {
                   return (
-                    <TableHead key={header.id}>
+                    <TableHead key={header.id} className="whitespace-nowrap">
                       {header.isPlaceholder
                         ? null
                         : flexRender(
@@ -474,7 +478,7 @@ const ModernItemTable = ({
                   className="group"
                 >
                   {row.getVisibleCells().map((cell) => (
-                    <TableCell key={cell.id}>
+                    <TableCell key={cell.id} className="align-middle">
                       {flexRender(
                         cell.column.columnDef.cell,
                         cell.getContext()
@@ -487,26 +491,55 @@ const ModernItemTable = ({
               <TableRow>
                 <TableCell
                   colSpan={columns.length}
-                  className="h-24 text-center"
+                  className="h-64 text-center"
                 >
-                  No items found.
+                  <div className="mx-auto flex max-w-md flex-col items-center justify-center gap-4 py-10">
+                    <div className="flex h-14 w-14 items-center justify-center rounded-lg border bg-muted text-muted-foreground">
+                      <Package className="h-7 w-7" />
+                    </div>
+                    <div>
+                      <h3 className="text-base font-semibold text-foreground">
+                        {hasActiveSearch ? "No matching items" : "No inventory items yet"}
+                      </h3>
+                      <p className="mt-2 text-sm leading-6 text-muted-foreground">
+                        {hasActiveSearch
+                          ? "Try a different search term or clear the filter to see the full catalog."
+                          : "Create your first item to start tracking pricing, stock health, and inventory value."}
+                      </p>
+                    </div>
+                    <div className="flex w-full flex-col gap-2 sm:w-auto sm:flex-row">
+                      {hasActiveSearch && (
+                        <Button variant="outline" size="sm" onClick={() => setGlobalFilter("")}>
+                          Clear Search
+                        </Button>
+                      )}
+                      <Button size="sm" onClick={onAdd}>
+                        <Plus className="mr-2 h-4 w-4" />
+                        Quick Add
+                      </Button>
+                      <Button variant="outline" size="sm" asChild>
+                        <Link href={createItemHref}>Full Form</Link>
+                      </Button>
+                    </div>
+                  </div>
                 </TableCell>
               </TableRow>
             )}
           </TableBody>
         </Table>
+        </div>
       </div>
 
       {/* Pagination and summary */}
-      <div className="flex items-center justify-between">
+      <div className="flex min-w-0 flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div className="text-sm text-muted-foreground">
           {table.getFilteredSelectedRowModel().rows.length} of{" "}
           {table.getFilteredRowModel().rows.length} row(s) selected.
         </div>
 
-        <div className="flex items-center space-x-6 lg:space-x-8">
-          <div className="flex items-center space-x-2">
-            <p className="text-sm font-medium">Rows per page</p>
+        <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-center lg:justify-end">
+          <div className="flex items-center gap-2">
+            <p className="whitespace-nowrap text-sm font-medium">Rows per page</p>
             <select
               className="h-8 w-[70px] rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
               value={table.getState().pagination.pageSize}
@@ -522,12 +555,12 @@ const ModernItemTable = ({
             </select>
           </div>
 
-          <div className="flex w-[100px] items-center justify-center text-sm font-medium">
+          <div className="flex min-w-[100px] items-center justify-center text-sm font-medium">
             Page {table.getState().pagination.pageIndex + 1} of{" "}
-            {table.getPageCount()}
+            {pageCount}
           </div>
 
-          <div className="flex items-center space-x-2">
+          <div className="flex items-center gap-2">
             <Button
               variant="outline"
               size="sm"
@@ -566,6 +599,10 @@ const ItemManagement = memo<ItemManagementProps>(
     if (!organizationId) {
       throw new Error("Organization ID is required to manage items")
     }
+
+    const pathname = usePathname()
+    const locale = getLocaleFromPathname(pathname) ?? DEFAULT_LOCALE
+    const localizedHref = (href: string) => localizePath(href, locale)
 
     // Ensure data is properly formatted
     const itemsArray = useMemo(() => (Array.isArray(initialItemData) ? initialItemData : []), [initialItemData])
@@ -648,17 +685,17 @@ const ItemManagement = memo<ItemManagementProps>(
           const fileName = `Items_${format(new Date(), "yyyy-MM-dd_HH-mm-ss")}.xlsx`
           XLSX.writeFile(workbook, fileName)
 
-          toast.success("Export successful", {
+          notify.success("Export successful", {
             description: `${filteredItems.length} items exported to ${fileName}`,
           })
         } catch (error) {
           console.error("Export error:", error)
-          toast.error("Export failed", {
+          notify.error("Export failed", {
             description: error instanceof Error ? error.message : "Unknown error occurred",
           })
         }
       },
-      [formatDate],
+      [],
     )
 
     // Form handlers
@@ -679,9 +716,9 @@ const ItemManagement = memo<ItemManagementProps>(
     const handleRefresh = useCallback(async () => {
       try {
         await refetch()
-        toast.success("Items refreshed successfully")
+        notify.success("Items refreshed successfully")
       } catch (error) {
-        toast.error("Failed to refresh items")
+        notify.error("Failed to refresh items")
       }
     }, [refetch])
 
@@ -706,7 +743,7 @@ const ItemManagement = memo<ItemManagementProps>(
 
           await createItemMutation.mutateAsync(newItemData)
 
-          toast.success("Item added successfully", {
+          notify.success("Item added successfully", {
             description: `${data.name} has been added to your inventory`,
           })
 
@@ -717,7 +754,7 @@ const ItemManagement = memo<ItemManagementProps>(
           await refetch()
         } catch (error) {
           console.error("Submit error:", error)
-          toast.error("Failed to add item", {
+          notify.error("Failed to add item", {
             description: error instanceof Error ? error.message : "Unknown error occurred",
           })
         }
@@ -731,7 +768,7 @@ const ItemManagement = memo<ItemManagementProps>(
 
       try {
         await deleteItemMutation.mutateAsync({ id: itemToDelete.id!, organizationId })
-        toast.success("Item deleted successfully", {
+        notify.success("Item deleted successfully", {
           description: `${itemToDelete.name} has been removed from your inventory`,
         })
         setDeleteDialogOpen(false)
@@ -739,23 +776,23 @@ const ItemManagement = memo<ItemManagementProps>(
         await refetch()
       } catch (error) {
         console.error("Delete error:", error)
-        toast.error("Failed to delete item", {
+        notify.error("Failed to delete item", {
           description: error instanceof Error ? error.message : "Unknown error occurred",
         })
       }
-    }, [itemToDelete, deleteItemMutation, setDeleteDialogOpen, setItemToDelete, refetch])
+    }, [itemToDelete, deleteItemMutation, organizationId, setDeleteDialogOpen, setItemToDelete, refetch])
 
     // Table columns
     const columns = useMemo(
       () => getColumns(formatCurrency, formatDate, handleEditClick, handleDeleteClick, deleteItemMutation.isPending, itemToDelete),
-      [formatCurrency, formatDate, handleEditClick, handleDeleteClick, deleteItemMutation.isPending, itemToDelete]
+      [handleEditClick, handleDeleteClick, deleteItemMutation.isPending, itemToDelete]
     )
 
     // Subtitle with stats
     const subtitle = useMemo(() => {
       if (itemsArray.length === 0) return "No items found"
       return `${itemStats.totalItems} ${itemStats.totalItems === 1 ? "item" : "items"} | Total Value: ${formatCurrency(itemStats.totalValue)}`
-    }, [itemsArray.length, itemStats.totalItems, itemStats.totalValue, formatCurrency])
+    }, [itemsArray.length, itemStats.totalItems, itemStats.totalValue])
 
     // Error state
     if (error) {
@@ -787,12 +824,9 @@ const ItemManagement = memo<ItemManagementProps>(
           onRefresh={handleRefresh}
           onAdd={handleAddClick}
           onExport={handleExport}
-          onEdit={handleEditClick}
-          onDelete={handleDeleteClick}
-          isDeleting={deleteItemMutation.isPending}
-          itemToDelete={itemToDelete}
           title={title || "Items Management"}
           subtitle={subtitle}
+          createItemHref={localizedHref("/dashboard/inventory/items/create")}
         />
 
         {/* Add Item Form Dialog */}

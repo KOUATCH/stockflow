@@ -1,969 +1,930 @@
 "use client"
 
-import React, { useState, useEffect } from 'react'
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Badge } from '@/components/ui/badge'
-import { Button } from '@/components/ui/button'
-import { Progress } from '@/components/ui/progress'
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import { Input } from '@/components/ui/input'
-import { Separator } from '@/components/ui/separator'
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
-import { ScrollArea } from '@/components/ui/scroll-area'
-import { Skeleton } from '@/components/ui/skeleton'
 import {
-  BarChart,
+  Alert,
+  AlertDescription,
+  AlertTitle,
+} from "@/components/ui/alert"
+import { Badge } from "@/components/ui/badge"
+import { Button } from "@/components/ui/button"
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card"
+import { Progress } from "@/components/ui/progress"
+import { ScrollArea } from "@/components/ui/scroll-area"
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select"
+import { Skeleton } from "@/components/ui/skeleton"
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { useNotifications } from "@/components/notifications/NotificationProvider"
+import useDashboardData from "@/hooks/useDashboardData"
+import type {
+  DashboardAlert,
+  DashboardData,
+  DashboardMetric,
+  DashboardPeriod,
+} from "@/actions/dashboard/getDashboardData"
+import { cn } from "@/lib/utils"
+import {
+  Activity,
+  AlertTriangle,
+  ArrowDownRight,
+  ArrowUpRight,
+  BarChart3,
+  Boxes,
+  Building2,
+  CheckCircle2,
+  Clock3,
+  CreditCard,
+  DollarSign,
+  ExternalLink,
+  Package,
+  RefreshCw,
+  ShoppingCart,
+  Sparkles,
+  TrendingUp,
+  Users,
+} from "lucide-react"
+import Link from "next/link"
+import { useMemo, useState } from "react"
+import type { ComponentType } from "react"
+import {
+  Area,
+  AreaChart,
   Bar,
+  BarChart,
+  CartesianGrid,
+  ResponsiveContainer,
+  Tooltip,
   XAxis,
   YAxis,
-  CartesianGrid,
-  Tooltip,
-  ResponsiveContainer,
-  LineChart,
-  Line,
-  PieChart,
-  Pie,
-  Cell,
-  AreaChart,
-  Area,
-  ComposedChart,
-  Legend
-} from 'recharts'
-import {
-  TrendingUp,
-  TrendingDown,
-  DollarSign,
-  ShoppingCart,
-  Package,
-  Users,
-  AlertTriangle,
-  CheckCircle,
-  Clock,
-  ArrowUpRight,
-  ArrowDownRight,
-  Eye,
-  Plus,
-  RefreshCw,
-  Search,
-  Filter,
-  Download,
-  Calendar,
-  Target,
-  Zap,
-  Shield,
-  Globe,
-  BarChart3,
-  Activity,
-  Layers,
-  PieChart as PieChartIcon,
-  FileText,
-  Mail,
-  Bell,
-  Settings,
-  HelpCircle,
-  MoreHorizontal,
-  MapPin,
-  Truck,
-  CreditCard,
-  Star,
-  Bookmark,
-  Share2,
-  Printer,
-  Archive,
-  Database,
-  Wifi,
-  WifiOff,
-  AlertCircle,
-  CheckCircle2,
-  XCircle,
-  Info
-} from 'lucide-react'
-import useDashboardData from '@/hooks/useDashboardData'
-import InventoryCarousel from './InventoryCarousel'
-import { formatCurrency, formatNumber, formatPercentage, getRelativeTime } from '@/lib/utils'
+} from "recharts"
+
+export interface EnterpriseDashboardLabels {
+  title: string
+  subtitle: string
+  connected: string
+  generated: string
+  refresh: string
+  refreshing: string
+  refreshStarted: string
+  refreshStartedMessage: string
+  refreshSuccess: string
+  refreshSuccessMessage: string
+  refreshError: string
+  allLocations: string
+  filters: {
+    period: string
+    location: string
+  }
+  periods: Record<DashboardPeriod, string>
+  tabs: {
+    overview: string
+    inventory: string
+    operations: string
+  }
+  metrics: {
+    revenue: string
+    orders: string
+    customers: string
+    inventoryValue: string
+    averageOrderValue: string
+    cashCollected: string
+  }
+  metricDescriptions: {
+    revenue: string
+    orders: string
+    customers: string
+    inventoryValue: string
+    averageOrderValue: string
+    cashCollected: string
+  }
+  sections: {
+    salesTrend: string
+    salesTrendDescription: string
+    topProducts: string
+    topProductsDescription: string
+    pendingActions: string
+    stockHealth: string
+    stockHealthDescription: string
+    locationPerformance: string
+    locationPerformanceDescription: string
+    alerts: string
+    alertsDescription: string
+    recentActivity: string
+    recentActivityDescription: string
+    quickActions: string
+    quickActionsDescription: string
+  }
+  stock: {
+    trackedItems: string
+    inStock: string
+    lowStock: string
+    outOfStock: string
+    overstock: string
+    reorderCandidates: string
+    availableUnits: string
+    reservedUnits: string
+  }
+  empty: {
+    topProducts: string
+    alerts: string
+    activity: string
+    locations: string
+  }
+  actions: {
+    view: string
+    open: string
+    inventory: string
+    sales: string
+    purchases: string
+    finance: string
+  }
+  comparison: string
+}
+
+export const defaultEnterpriseDashboardLabels: EnterpriseDashboardLabels = {
+  title: "Operations dashboard",
+  subtitle: "A real-time overview of sales, stock, purchasing, and branch health.",
+  connected: "Live data",
+  generated: "Updated",
+  refresh: "Refresh",
+  refreshing: "Refreshing",
+  refreshStarted: "Dashboard refresh started",
+  refreshStartedMessage: "Fetching the latest operating data.",
+  refreshSuccess: "Dashboard refreshed",
+  refreshSuccessMessage: "The latest dashboard data is now visible.",
+  refreshError: "Dashboard refresh failed",
+  allLocations: "All locations",
+  filters: {
+    period: "Period",
+    location: "Location",
+  },
+  periods: {
+    "7d": "Last 7 days",
+    "30d": "Last 30 days",
+    "90d": "Last 90 days",
+    mtd: "Month to date",
+  },
+  tabs: {
+    overview: "Overview",
+    inventory: "Inventory",
+    operations: "Operations",
+  },
+  metrics: {
+    revenue: "Revenue",
+    orders: "Orders",
+    customers: "Customers",
+    inventoryValue: "Inventory value",
+    averageOrderValue: "Avg. order value",
+    cashCollected: "Cash collected",
+  },
+  metricDescriptions: {
+    revenue: "Completed sales in the selected period",
+    orders: "Completed and delivered sales orders",
+    customers: "Customers in this organization",
+    inventoryValue: "Current value of tracked stock",
+    averageOrderValue: "Revenue divided by completed orders",
+    cashCollected: "Paid customer payments in the period",
+  },
+  sections: {
+    salesTrend: "Sales trend",
+    salesTrendDescription: "Daily revenue and completed order movement.",
+    topProducts: "Top products",
+    topProductsDescription: "Best revenue contributors in the selected period.",
+    pendingActions: "Pending actions",
+    stockHealth: "Inventory health",
+    stockHealthDescription: "Tracked stock posture across the selected scope.",
+    locationPerformance: "Location performance",
+    locationPerformanceDescription: "Revenue, orders, and stock value by branch.",
+    alerts: "Operating alerts",
+    alertsDescription: "Important issues that need attention.",
+    recentActivity: "Recent activity",
+    recentActivityDescription: "Latest sales, purchase, and stock movements.",
+    quickActions: "Quick actions",
+    quickActionsDescription: "Move from insight to the operational surface.",
+  },
+  stock: {
+    trackedItems: "Tracked items",
+    inStock: "Healthy",
+    lowStock: "Low stock",
+    outOfStock: "Out of stock",
+    overstock: "Overstock",
+    reorderCandidates: "Reorder candidates",
+    availableUnits: "Available units",
+    reservedUnits: "Reserved units",
+  },
+  empty: {
+    topProducts: "No product sales were found for this period.",
+    alerts: "No urgent operating alerts right now.",
+    activity: "No recent activity was found for this period.",
+    locations: "No active locations were found.",
+  },
+  actions: {
+    view: "View",
+    open: "Open",
+    inventory: "Inventory",
+    sales: "Sales",
+    purchases: "Purchases",
+    finance: "Finance",
+  },
+  comparison: "vs previous period",
+}
 
 interface EnhancedEnterpriseDashboardProps {
+  organizationId: string
+  dashboardData: DashboardData
+  labels?: EnterpriseDashboardLabels
+  locale?: string
+  dashboardBasePath?: string
   className?: string
 }
 
-export default function EnhancedEnterpriseDashboard({ className = "" }: EnhancedEnterpriseDashboardProps) {
-  const [selectedPeriod, setSelectedPeriod] = useState("30d")
-  const [searchQuery, setSearchQuery] = useState("")
-  const [currentTime, setCurrentTime] = useState(new Date())
-  const [selectedTab, setSelectedTab] = useState("overview")
+const periodOptions: DashboardPeriod[] = ["7d", "30d", "90d", "mtd"]
 
-  // Real-time dashboard data
-  const {
-    metrics,
-    salesData,
-    topProducts,
-    locations,
-    alerts,
-    activities,
-    isLoading,
-    error,
-    lastUpdated,
-    refreshData,
-    markAlertAsRead,
-    dismissAlert,
-    unreadAlerts,
-    criticalAlerts,
-    isDataStale
-  } = useDashboardData(30000) // Refresh every 30 seconds
+function getTrend(metric: DashboardMetric) {
+  if (metric.change > 0) return "up"
+  if (metric.change < 0) return "down"
+  return "flat"
+}
 
-  useEffect(() => {
-    const timer = setInterval(() => {
-      setCurrentTime(new Date())
-    }, 1000)
-    return () => clearInterval(timer)
-  }, [])
+function formatChange(value: number, locale: string) {
+  const formatter = new Intl.NumberFormat(locale, {
+    maximumFractionDigits: 1,
+    minimumFractionDigits: 0,
+  })
 
-  const getKPICards = () => {
-    if (!metrics) return []
+  return `${value > 0 ? "+" : ""}${formatter.format(value)}%`
+}
 
-    return [
-      {
-        title: "Total Revenue",
-        value: formatCurrency(metrics.revenue.current),
-        change: `${metrics.revenue.change >= 0 ? '+' : ''}${formatPercentage(metrics.revenue.change)}`,
-        trend: metrics.revenue.change >= 0 ? "up" : "down",
-        icon: DollarSign,
-        description: "vs last month",
-        color: "from-blue-500 to-blue-600",
-        target: formatCurrency(metrics.revenue.target),
-        targetProgress: (metrics.revenue.current / metrics.revenue.target) * 100
-      },
-      {
-        title: "Orders",
-        value: formatNumber(metrics.orders.current),
-        change: `${metrics.orders.change >= 0 ? '+' : ''}${formatPercentage(metrics.orders.change)}`,
-        trend: metrics.orders.change >= 0 ? "up" : "down",
-        icon: ShoppingCart,
-        description: "vs last month",
-        color: "from-green-500 to-green-600",
-        target: formatNumber(metrics.orders.target),
-        targetProgress: (metrics.orders.current / metrics.orders.target) * 100
-      },
-      {
-        title: "Inventory Value",
-        value: formatCurrency(metrics.inventory.current),
-        change: `${metrics.inventory.change >= 0 ? '+' : ''}${formatPercentage(metrics.inventory.change)}`,
-        trend: metrics.inventory.change >= 0 ? "up" : "down",
-        icon: Package,
-        description: "vs last month",
-        color: "from-purple-500 to-purple-600",
-        target: formatCurrency(metrics.inventory.target),
-        targetProgress: (metrics.inventory.current / metrics.inventory.target) * 100
-      },
-      {
-        title: "Active Customers",
-        value: formatNumber(metrics.customers.current),
-        change: `${metrics.customers.change >= 0 ? '+' : ''}${formatPercentage(metrics.customers.change)}`,
-        trend: metrics.customers.change >= 0 ? "up" : "down",
-        icon: Users,
-        description: "vs last month",
-        color: "from-orange-500 to-orange-600",
-        target: formatNumber(metrics.customers.target),
-        targetProgress: (metrics.customers.current / metrics.customers.target) * 100
-      },
-      {
-        title: "Conversion Rate",
-        value: `${formatPercentage(metrics.conversionRate.current)}`,
-        change: `${metrics.conversionRate.change >= 0 ? '+' : ''}${formatPercentage(metrics.conversionRate.change)}`,
-        trend: metrics.conversionRate.change >= 0 ? "up" : "down",
-        icon: Target,
-        description: "vs last month",
-        color: "from-teal-500 to-teal-600",
-        target: `${formatPercentage(metrics.conversionRate.target)}`,
-        targetProgress: (metrics.conversionRate.current / metrics.conversionRate.target) * 100
-      },
-      {
-        title: "Avg Order Value",
-        value: formatCurrency(metrics.avgOrderValue.current),
-        change: `${metrics.avgOrderValue.change >= 0 ? '+' : ''}${formatPercentage(metrics.avgOrderValue.change)}`,
-        trend: metrics.avgOrderValue.change >= 0 ? "up" : "down",
-        icon: TrendingUp,
-        description: "vs last month",
-        color: "from-pink-500 to-pink-600",
-        target: formatCurrency(metrics.avgOrderValue.target),
-        targetProgress: (metrics.avgOrderValue.current / metrics.avgOrderValue.target) * 100
-      }
-    ]
+function formatNumber(value: number, locale: string) {
+  return new Intl.NumberFormat(locale, {
+    maximumFractionDigits: 0,
+  }).format(value)
+}
+
+function formatCurrency(value: number, currency: string, locale: string) {
+  return new Intl.NumberFormat(locale, {
+    style: "currency",
+    currency,
+    maximumFractionDigits: currency === "XAF" ? 0 : 2,
+  }).format(value)
+}
+
+function formatDateTime(value: string, locale: string) {
+  return new Intl.DateTimeFormat(locale, {
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(new Date(value))
+}
+
+function resolveDashboardHref(href: string | undefined, dashboardBasePath: string) {
+  if (!href) return dashboardBasePath
+  if (href === "/dashboard") return dashboardBasePath
+  if (href.startsWith("/dashboard/")) {
+    return `${dashboardBasePath}${href.slice("/dashboard".length)}`
   }
+  return href
+}
 
-  const getActivityIcon = (type: string) => {
-    switch (type) {
-      case 'order': return <ShoppingCart className="h-4 w-4" />
-      case 'inventory': return <Package className="h-4 w-4" />
-      case 'payment': return <CreditCard className="h-4 w-4" />
-      case 'customer': return <Users className="h-4 w-4" />
-      case 'return': return <ArrowDownRight className="h-4 w-4" />
-      case 'system': return <Settings className="h-4 w-4" />
-      default: return <Activity className="h-4 w-4" />
-    }
+function alertClasses(type: DashboardAlert["type"]) {
+  switch (type) {
+    case "critical":
+      return "border-red-200 bg-red-50 text-red-950 dark:border-red-900/70 dark:bg-red-950/30 dark:text-red-100"
+    case "warning":
+      return "border-amber-200 bg-amber-50 text-amber-950 dark:border-amber-900/70 dark:bg-amber-950/30 dark:text-amber-100"
+    case "success":
+      return "border-emerald-200 bg-emerald-50 text-emerald-950 dark:border-emerald-900/70 dark:bg-emerald-950/30 dark:text-emerald-100"
+    default:
+      return "border-sky-200 bg-sky-50 text-sky-950 dark:border-sky-900/70 dark:bg-sky-950/30 dark:text-sky-100"
   }
+}
 
-  const getActivityColor = (status: string) => {
-    switch (status) {
-      case 'success': return 'text-green-600 bg-green-50 border-green-200'
-      case 'warning': return 'text-yellow-600 bg-yellow-50 border-yellow-200'
-      case 'error': return 'text-red-600 bg-red-50 border-red-200'
-      case 'info': return 'text-blue-600 bg-blue-50 border-blue-200'
-      default: return 'text-gray-600 bg-gray-50 border-gray-200'
-    }
-  }
+function MetricCard({
+  title,
+  description,
+  value,
+  metric,
+  icon: Icon,
+  locale,
+  labels,
+  accent,
+}: {
+  title: string
+  description: string
+  value: string
+  metric: DashboardMetric
+  icon: ComponentType<{ className?: string }>
+  locale: string
+  labels: EnterpriseDashboardLabels
+  accent: string
+}) {
+  const trend = getTrend(metric)
+  const TrendIcon = trend === "up" ? ArrowUpRight : trend === "down" ? ArrowDownRight : Activity
+  const trendClass =
+    trend === "up"
+      ? "text-emerald-600 dark:text-emerald-400"
+      : trend === "down"
+        ? "text-red-600 dark:text-red-400"
+        : "text-muted-foreground"
 
-  const getAlertIcon = (type: string) => {
-    switch (type) {
-      case 'critical': return <XCircle className="h-4 w-4 text-red-500" />
-      case 'warning': return <AlertTriangle className="h-4 w-4 text-yellow-500" />
-      case 'info': return <Info className="h-4 w-4 text-blue-500" />
-      case 'success': return <CheckCircle2 className="h-4 w-4 text-green-500" />
-      default: return <Bell className="h-4 w-4 text-gray-500" />
-    }
-  }
+  return (
+    <Card className="overflow-hidden border-border/70 bg-card shadow-sm">
+      <CardContent className="p-5">
+        <div className="flex items-start justify-between gap-4">
+          <div className="min-w-0 space-y-2">
+            <p className="text-sm font-medium text-muted-foreground">{title}</p>
+            <p className="truncate text-2xl font-semibold tracking-tight text-foreground">{value}</p>
+          </div>
+          <div className={cn("rounded-lg p-2.5", accent)}>
+            <Icon className="h-5 w-5" />
+          </div>
+        </div>
+        <div className="mt-4 flex items-center gap-2 text-xs">
+          <span className={cn("inline-flex items-center gap-1 font-medium", trendClass)}>
+            <TrendIcon className="h-3.5 w-3.5" />
+            {formatChange(metric.change, locale)}
+          </span>
+          <span className="text-muted-foreground">{labels.comparison}</span>
+        </div>
+        <p className="mt-2 line-clamp-2 text-xs text-muted-foreground">{description}</p>
+      </CardContent>
+    </Card>
+  )
+}
 
-  const getConnectionStatus = () => {
-    if (error) return { icon: WifiOff, color: 'text-red-500', text: 'Connection Error' }
-    if (isDataStale) return { icon: WifiOff, color: 'text-yellow-500', text: 'Connection Unstable' }
-    return { icon: Wifi, color: 'text-green-500', text: 'Connected' }
-  }
-
-  const connectionStatus = getConnectionStatus()
-
-  if (error) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 flex items-center justify-center">
-        <Card className="w-full max-w-md">
-          <CardHeader>
-            <CardTitle className="flex items-center text-red-600">
-              <AlertCircle className="h-5 w-5 mr-2" />
-              Dashboard Error
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-muted-foreground mb-4">{error}</p>
-            <Button onClick={refreshData} className="w-full">
-              <RefreshCw className="h-4 w-4 mr-2" />
-              Retry
-            </Button>
-          </CardContent>
-        </Card>
+function LoadingDashboard() {
+  return (
+    <div className="space-y-6 p-4 sm:p-6">
+      <Skeleton className="h-24 w-full" />
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-6">
+        {Array.from({ length: 6 }).map((_, index) => (
+          <Skeleton key={index} className="h-40 w-full" />
+        ))}
       </div>
-    )
+      <div className="grid gap-4 lg:grid-cols-[1.4fr_0.8fr]">
+        <Skeleton className="h-96 w-full" />
+        <Skeleton className="h-96 w-full" />
+      </div>
+    </div>
+  )
+}
+
+export default function EnhancedEnterpriseDashboard({
+  organizationId,
+  dashboardData,
+  labels = defaultEnterpriseDashboardLabels,
+  locale = "en",
+  dashboardBasePath = "/dashboard",
+  className,
+}: EnhancedEnterpriseDashboardProps) {
+  const [period, setPeriod] = useState<DashboardPeriod>(dashboardData.period.key)
+  const [locationId, setLocationId] = useState<string>("all")
+  const notifications = useNotifications()
+  const locationOptions = dashboardData.locations
+
+  const filters = useMemo(
+    () => ({
+      period,
+      locationId: locationId === "all" ? undefined : locationId,
+    }),
+    [period, locationId]
+  )
+  const shouldUseInitialData = period === dashboardData.period.key && locationId === "all"
+
+  const {
+    data,
+    error,
+    isFetching,
+    isLoading,
+    refetch,
+  } = useDashboardData(organizationId, filters, shouldUseInitialData ? dashboardData : undefined)
+
+  const dashboard = data || dashboardData
+  const currency = dashboard.organization.currency || "XAF"
+
+  const kpis = [
+    {
+      title: labels.metrics.revenue,
+      description: labels.metricDescriptions.revenue,
+      value: formatCurrency(dashboard.kpis.revenue.current, currency, locale),
+      metric: dashboard.kpis.revenue,
+      icon: DollarSign,
+      accent: "bg-emerald-100 text-emerald-700 dark:bg-emerald-950 dark:text-emerald-300",
+    },
+    {
+      title: labels.metrics.orders,
+      description: labels.metricDescriptions.orders,
+      value: formatNumber(dashboard.kpis.orders.current, locale),
+      metric: dashboard.kpis.orders,
+      icon: ShoppingCart,
+      accent: "bg-sky-100 text-sky-700 dark:bg-sky-950 dark:text-sky-300",
+    },
+    {
+      title: labels.metrics.customers,
+      description: labels.metricDescriptions.customers,
+      value: formatNumber(dashboard.kpis.customers.current, locale),
+      metric: dashboard.kpis.customers,
+      icon: Users,
+      accent: "bg-violet-100 text-violet-700 dark:bg-violet-950 dark:text-violet-300",
+    },
+    {
+      title: labels.metrics.inventoryValue,
+      description: labels.metricDescriptions.inventoryValue,
+      value: formatCurrency(dashboard.kpis.inventoryValue.current, currency, locale),
+      metric: dashboard.kpis.inventoryValue,
+      icon: Package,
+      accent: "bg-amber-100 text-amber-700 dark:bg-amber-950 dark:text-amber-300",
+    },
+    {
+      title: labels.metrics.averageOrderValue,
+      description: labels.metricDescriptions.averageOrderValue,
+      value: formatCurrency(dashboard.kpis.averageOrderValue.current, currency, locale),
+      metric: dashboard.kpis.averageOrderValue,
+      icon: TrendingUp,
+      accent: "bg-rose-100 text-rose-700 dark:bg-rose-950 dark:text-rose-300",
+    },
+    {
+      title: labels.metrics.cashCollected,
+      description: labels.metricDescriptions.cashCollected,
+      value: formatCurrency(dashboard.kpis.cashCollected.current, currency, locale),
+      metric: dashboard.kpis.cashCollected,
+      icon: CreditCard,
+      accent: "bg-cyan-100 text-cyan-700 dark:bg-cyan-950 dark:text-cyan-300",
+    },
+  ]
+
+  const criticalAlert = dashboard.alerts.find((alert) => alert.type === "critical")
+  const stockTotal = Math.max(dashboard.stockHealth.trackedItems, 1)
+
+  async function handleRefresh() {
+    notifications.info(labels.refreshStarted, labels.refreshStartedMessage, {
+      category: "operation",
+      duration: 2500,
+    })
+
+    const result = await refetch()
+
+    if (result.error) {
+      notifications.error(labels.refreshError, result.error.message, {
+        category: "operation",
+      })
+      return
+    }
+
+    notifications.success(labels.refreshSuccess, labels.refreshSuccessMessage, {
+      category: "operation",
+    })
+  }
+
+  if (isLoading && !dashboard) {
+    return <LoadingDashboard />
   }
 
   return (
-    <div className={`min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 ${className}`}>
-      {/* Header Section */}
-      <div className="sticky top-0 z-40 backdrop-blur-md bg-white/80 border-b border-white/20 shadow-sm">
-        <div className="p-6">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center space-x-6">
+    <div className={cn("min-h-screen bg-background text-foreground", className)}>
+      <div className="space-y-6 p-4 sm:p-6">
+        <section className="rounded-none border-b border-border/70 bg-background pb-5">
+          <div className="flex flex-col gap-5 xl:flex-row xl:items-end xl:justify-between">
+            <div className="min-w-0 space-y-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <Badge variant="outline" className="gap-1.5">
+                  <Sparkles className="h-3.5 w-3.5 text-emerald-600" />
+                  {labels.connected}
+                </Badge>
+                <Badge variant="secondary" className="gap-1.5">
+                  <Clock3 className="h-3.5 w-3.5" />
+                  {labels.generated}: {formatDateTime(dashboard.generatedAt, locale)}
+                </Badge>
+              </div>
               <div>
-                <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-600 via-purple-600 to-indigo-600 bg-clip-text text-transparent">
-                  StockFlow Executive Dashboard
+                <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">
+                  {labels.title}
                 </h1>
-                <div className="flex items-center space-x-4 mt-1">
-                  <p className="text-muted-foreground">
-                    Real-time business intelligence and analytics
-                  </p>
-                  <Badge variant="outline" className="text-xs">
-                    <connectionStatus.icon className={`h-3 w-3 mr-1 ${connectionStatus.color}`} />
-                    {connectionStatus.text}
-                  </Badge>
-                  <Badge variant="outline" className="text-xs">
-                    <Clock className="h-3 w-3 mr-1" />
-                    {currentTime.toLocaleTimeString()}
-                  </Badge>
-                  {lastUpdated && (
-                    <Badge variant="outline" className="text-xs">
-                      Updated {getRelativeTime(lastUpdated)}
-                    </Badge>
-                  )}
-                </div>
+                <p className="mt-2 max-w-3xl text-sm text-muted-foreground sm:text-base">
+                  {labels.subtitle}
+                </p>
               </div>
             </div>
 
-            <div className="flex items-center space-x-3">
-              <div className="flex items-center space-x-2">
-                <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                  <Input
-                    placeholder="Search dashboard..."
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    className="pl-10 w-64 bg-white/70 backdrop-blur-sm"
-                  />
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+              <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                  <p className="text-xs font-medium text-muted-foreground">{labels.filters.period}</p>
+                  <Select value={period} onValueChange={(value) => setPeriod(value as DashboardPeriod)}>
+                    <SelectTrigger className="w-full sm:w-[170px]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {periodOptions.map((option) => (
+                        <SelectItem key={option} value={option}>
+                          {labels.periods[option]}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
                 </div>
-                <Select value={selectedPeriod} onValueChange={setSelectedPeriod}>
-                  <SelectTrigger className="w-32 bg-white/70 backdrop-blur-sm">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="7d">Last 7 days</SelectItem>
-                    <SelectItem value="30d">Last 30 days</SelectItem>
-                    <SelectItem value="90d">Last 90 days</SelectItem>
-                    <SelectItem value="1y">Last year</SelectItem>
-                  </SelectContent>
-                </Select>
+
+                <div className="space-y-1.5">
+                  <p className="text-xs font-medium text-muted-foreground">{labels.filters.location}</p>
+                  <Select value={locationId} onValueChange={setLocationId}>
+                    <SelectTrigger className="w-full sm:w-[210px]">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">{labels.allLocations}</SelectItem>
+                      {locationOptions.map((location) => (
+                        <SelectItem key={location.id} value={location.id}>
+                          {location.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
 
-              <Separator orientation="vertical" className="h-8" />
-
-              <div className="flex items-center space-x-2">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={refreshData}
-                  disabled={isLoading}
-                  className="bg-white/70 backdrop-blur-sm"
-                >
-                  <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
-                  Refresh
-                </Button>
-
-                {/* Alerts Bell */}
-                <Button variant="outline" size="sm" className="bg-white/70 backdrop-blur-sm relative">
-                  <Bell className="h-4 w-4 mr-2" />
-                  Alerts
-                  {unreadAlerts > 0 && (
-                    <Badge className="absolute -top-2 -right-2 h-5 w-5 rounded-full p-0 flex items-center justify-center text-xs">
-                      {unreadAlerts}
-                    </Badge>
-                  )}
-                </Button>
-
-                <Button variant="outline" size="sm" className="bg-white/70 backdrop-blur-sm">
-                  <Download className="h-4 w-4 mr-2" />
-                  Export
-                </Button>
-                <Button variant="outline" size="sm" className="bg-white/70 backdrop-blur-sm">
-                  <Settings className="h-4 w-4 mr-2" />
-                  Settings
-                </Button>
-              </div>
+              <Button onClick={handleRefresh} disabled={isFetching} className="sm:self-end">
+                <RefreshCw className={cn("mr-2 h-4 w-4", isFetching && "animate-spin")} />
+                {isFetching ? labels.refreshing : labels.refresh}
+              </Button>
             </div>
           </div>
-        </div>
-      </div>
+        </section>
 
-      <div className="p-6 space-y-8">
-        {/* Critical Alerts */}
-        {criticalAlerts > 0 && (
-          <Alert className="border-red-200 bg-red-50/50 backdrop-blur-sm">
-            <AlertTriangle className="h-4 w-4 text-red-500" />
-            <AlertTitle className="text-red-700">Critical System Alert</AlertTitle>
-            <AlertDescription className="text-red-600">
-              {criticalAlerts} critical alert{criticalAlerts > 1 ? 's' : ''} require immediate attention.
-              <Button variant="link" className="p-0 h-auto ml-2 text-red-700">
-                View Details
-              </Button>
+        {error && (
+          <Alert className="border-red-200 bg-red-50 text-red-950 dark:border-red-900/70 dark:bg-red-950/30 dark:text-red-100">
+            <AlertTriangle className="h-4 w-4" />
+            <AlertTitle>{labels.refreshError}</AlertTitle>
+            <AlertDescription>{error.message}</AlertDescription>
+          </Alert>
+        )}
+
+        {criticalAlert && (
+          <Alert className={alertClasses(criticalAlert.type)}>
+            <AlertTriangle className="h-4 w-4" />
+            <AlertTitle>{criticalAlert.title}</AlertTitle>
+            <AlertDescription className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+              <span>{criticalAlert.description}</span>
+              {criticalAlert.href && (
+                <Button asChild size="sm" variant="outline">
+                  <Link href={resolveDashboardHref(criticalAlert.href, dashboardBasePath)}>
+                    {labels.actions.view}
+                    <ExternalLink className="ml-2 h-3.5 w-3.5" />
+                  </Link>
+                </Button>
+              )}
             </AlertDescription>
           </Alert>
         )}
 
-        {/* KPI Grid */}
-        {isLoading && !metrics ? (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6">
-            {Array.from({ length: 6 }).map((_, index) => (
-              <Card key={index} className="border-0 shadow-lg bg-white/70 backdrop-blur-md">
-                <CardContent className="p-6">
-                  <Skeleton className="h-12 w-12 rounded-xl mb-4" />
-                  <Skeleton className="h-4 w-24 mb-2" />
-                  <Skeleton className="h-8 w-32 mb-3" />
-                  <Skeleton className="h-2 w-full mb-2" />
-                  <Skeleton className="h-3 w-16" />
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-6">
-            {getKPICards().map((kpi, index) => {
-              const Icon = kpi.icon
-              const isPositive = kpi.trend === "up"
+        <section className="grid gap-4 sm:grid-cols-2 xl:grid-cols-6">
+          {kpis.map((kpi) => (
+            <MetricCard key={kpi.title} {...kpi} locale={locale} labels={labels} />
+          ))}
+        </section>
 
-              const cardGradient = {
-                "from-blue-500 to-blue-600": "from-blue-50 to-blue-100",
-                "from-green-500 to-green-600": "from-green-50 to-green-100",
-                "from-purple-500 to-purple-600": "from-purple-50 to-purple-100",
-                "from-orange-500 to-orange-600": "from-orange-50 to-orange-100",
-                "from-teal-500 to-teal-600": "from-teal-50 to-teal-100",
-                "from-pink-500 to-pink-600": "from-pink-50 to-pink-100"
-              }[kpi.color] || "from-gray-50 to-gray-100"
-
-              const textColor = {
-                "from-blue-500 to-blue-600": "text-blue-800",
-                "from-green-500 to-green-600": "text-green-800",
-                "from-purple-500 to-purple-600": "text-purple-800",
-                "from-orange-500 to-orange-600": "text-orange-800",
-                "from-teal-500 to-teal-600": "text-teal-800",
-                "from-pink-500 to-pink-600": "text-pink-800"
-              }[kpi.color] || "text-gray-800"
-
-              return (
-                <Card key={index} className={`group border-0 shadow-lg bg-gradient-to-br ${cardGradient} backdrop-blur-md hover:shadow-xl transition-all duration-300 hover:-translate-y-1`}>
-                  <CardContent className="p-6">
-                    <div className="flex items-start justify-between mb-4">
-                      <div className={`p-3 rounded-xl bg-gradient-to-br ${kpi.color} shadow-lg`}>
-                        <Icon className="h-6 w-6 text-white" />
-                      </div>
-                      <Badge variant={isPositive ? "default" : "destructive"} className="text-xs bg-white/70 backdrop-blur-sm">
-                        {isPositive ? <TrendingUp className="h-3 w-3 mr-1" /> : <TrendingDown className="h-3 w-3 mr-1" />}
-                        {kpi.change}
-                      </Badge>
-                    </div>
-
-                    <div className="space-y-3">
-                      <div>
-                        <p className={`text-sm font-medium ${textColor.replace('800', '600')}`}>{kpi.title}</p>
-                        <p className={`text-2xl font-bold ${textColor}`}>{kpi.value}</p>
-                      </div>
-
-                      <div className="space-y-2">
-                        <div className={`flex justify-between text-xs ${textColor.replace('800', '600')}`}>
-                          <span>Target: {kpi.target}</span>
-                          <span>{kpi.targetProgress.toFixed(1)}%</span>
-                        </div>
-                        <Progress value={Math.min(kpi.targetProgress, 100)} className="h-2 bg-white/30" />
-                      </div>
-
-                      <p className={`text-xs ${textColor.replace('800', '600')}`}>{kpi.description}</p>
-                    </div>
-                  </CardContent>
-                </Card>
-              )
-            })}
-          </div>
-        )}
-
-        {/* Main Content Tabs */}
-        <Tabs value={selectedTab} onValueChange={setSelectedTab} className="space-y-6">
-          <TabsList className="grid w-full grid-cols-5 bg-white/70 backdrop-blur-md">
-            <TabsTrigger value="overview" className="flex items-center space-x-2">
+        <Tabs defaultValue="overview" className="space-y-5">
+          <TabsList className="grid h-auto w-full grid-cols-3 gap-1 rounded-lg bg-muted p-1 md:w-[520px]">
+            <TabsTrigger value="overview" className="gap-2">
               <BarChart3 className="h-4 w-4" />
-              <span>Overview</span>
+              <span className="truncate">{labels.tabs.overview}</span>
             </TabsTrigger>
-            <TabsTrigger value="sales" className="flex items-center space-x-2">
-              <TrendingUp className="h-4 w-4" />
-              <span>Sales</span>
+            <TabsTrigger value="inventory" className="gap-2">
+              <Boxes className="h-4 w-4" />
+              <span className="truncate">{labels.tabs.inventory}</span>
             </TabsTrigger>
-            <TabsTrigger value="inventory" className="flex items-center space-x-2">
-              <Package className="h-4 w-4" />
-              <span>Inventory</span>
-            </TabsTrigger>
-            <TabsTrigger value="operations" className="flex items-center space-x-2">
+            <TabsTrigger value="operations" className="gap-2">
               <Activity className="h-4 w-4" />
-              <span>Operations</span>
-            </TabsTrigger>
-            <TabsTrigger value="analytics" className="flex items-center space-x-2">
-              <PieChartIcon className="h-4 w-4" />
-              <span>Analytics</span>
+              <span className="truncate">{labels.tabs.operations}</span>
             </TabsTrigger>
           </TabsList>
 
-          {/* Overview Tab */}
-          <TabsContent value="overview" className="space-y-6">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <Card className="border-0 shadow-lg bg-white/70 backdrop-blur-md">
+          <TabsContent value="overview" className="space-y-5">
+            <div className="grid gap-5 xl:grid-cols-[1.35fr_0.85fr]">
+              <Card className="border-border/70 shadow-sm">
                 <CardHeader>
-                  <CardTitle className="flex items-center">
-                    <BarChart3 className="h-5 w-5 mr-2 text-blue-600" />
-                    Revenue Trend
-                  </CardTitle>
-                  <CardDescription>Monthly revenue performance over time</CardDescription>
+                  <CardTitle>{labels.sections.salesTrend}</CardTitle>
+                  <CardDescription>{labels.sections.salesTrendDescription}</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  {isLoading ? (
-                    <Skeleton className="h-80 w-full" />
-                  ) : (
-                    <ResponsiveContainer width="100%" height={320}>
-                      <AreaChart data={salesData}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                        <XAxis dataKey="period" />
-                        <YAxis />
+                  <div className="h-[330px]">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <AreaChart data={dashboard.salesTrend}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                        <XAxis dataKey="label" tickLine={false} axisLine={false} fontSize={12} />
+                        <YAxis tickLine={false} axisLine={false} fontSize={12} />
                         <Tooltip
                           contentStyle={{
-                            backgroundColor: 'rgba(255, 255, 255, 0.95)',
-                            backdropFilter: 'blur(10px)',
-                            border: 'none',
-                            borderRadius: '12px',
-                            boxShadow: '0 8px 32px rgba(0,0,0,0.1)'
+                            background: "hsl(var(--popover))",
+                            border: "1px solid hsl(var(--border))",
+                            borderRadius: 8,
+                            color: "hsl(var(--popover-foreground))",
                           }}
-                          formatter={(value: any) => [formatCurrency(value), 'Revenue']}
+                          formatter={(value, name) => {
+                            if (name === "revenue") return [formatCurrency(Number(value), currency, locale), labels.metrics.revenue]
+                            return [formatNumber(Number(value), locale), labels.metrics.orders]
+                          }}
                         />
                         <Area
                           type="monotone"
                           dataKey="revenue"
-                          stroke="#3B82F6"
-                          fill="#3B82F6"
-                          fillOpacity={0.3}
+                          stroke="#059669"
+                          fill="#059669"
+                          fillOpacity={0.18}
                           strokeWidth={2}
-                        />
-                      </AreaChart>
-                    </ResponsiveContainer>
-                  )}
-                </CardContent>
-              </Card>
-
-              <Card className="border-0 shadow-lg bg-white/70 backdrop-blur-md">
-                <CardHeader>
-                  <CardTitle className="flex items-center justify-between">
-                    <div className="flex items-center">
-                      <Star className="h-5 w-5 mr-2 text-yellow-600" />
-                      Top Products
-                    </div>
-                    <Button variant="ghost" size="sm">
-                      <Eye className="h-4 w-4 mr-2" />
-                      View All
-                    </Button>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {isLoading ? (
-                    <div className="space-y-4">
-                      {Array.from({ length: 5 }).map((_, index) => (
-                        <div key={index} className="flex items-center space-x-4 p-4">
-                          <Skeleton className="h-4 w-4 rounded-full" />
-                          <div className="flex-1 space-y-2">
-                            <Skeleton className="h-4 w-3/4" />
-                            <Skeleton className="h-3 w-1/2" />
-                          </div>
-                          <Skeleton className="h-6 w-16" />
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <ScrollArea className="h-80">
-                      <div className="space-y-4">
-                        {topProducts.map((product, index) => (
-                          <div key={product.id} className="flex items-center justify-between p-4 bg-slate-50/50 rounded-lg backdrop-blur-sm border border-white/20">
-                            <div className="flex items-center space-x-4">
-                              <div className="w-2 h-2 rounded-full bg-blue-500"></div>
-                              <div>
-                                <p className="font-semibold text-sm">{product.name}</p>
-                                <p className="text-xs text-muted-foreground">
-                                  {product.category} • {formatNumber(product.sales)} units • {formatPercentage(product.margin)}% margin
-                                </p>
-                              </div>
-                            </div>
-                            <div className="flex items-center space-x-4">
-                              <div className="text-right">
-                                <p className="font-semibold text-sm">{formatCurrency(product.revenue)}</p>
-                                <Badge variant={product.trend === 'up' ? 'default' : product.trend === 'down' ? 'destructive' : 'secondary'} className="text-xs">
-                                  {product.trend === 'up' && <TrendingUp className="h-3 w-3 mr-1" />}
-                                  {product.trend === 'down' && <TrendingDown className="h-3 w-3 mr-1" />}
-                                  {product.trend === 'up' ? '+' : product.trend === 'down' ? '-' : ''}
-                                  {product.trend !== 'stable' ? '5.2%' : 'Stable'}
-                                </Badge>
-                              </div>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </ScrollArea>
-                  )}
-                </CardContent>
-              </Card>
-            </div>
-          </TabsContent>
-
-          {/* Sales Tab */}
-          <TabsContent value="sales" className="space-y-6">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <Card className="border-0 shadow-lg bg-white/70 backdrop-blur-md">
-                <CardHeader>
-                  <CardTitle className="flex items-center">
-                    <TrendingUp className="h-5 w-5 mr-2 text-green-600" />
-                    Sales vs Orders
-                  </CardTitle>
-                  <CardDescription>Revenue and order volume correlation</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  {isLoading ? (
-                    <Skeleton className="h-80 w-full" />
-                  ) : (
-                    <ResponsiveContainer width="100%" height={320}>
-                      <ComposedChart data={salesData}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                        <XAxis dataKey="period" />
-                        <YAxis yAxisId="left" />
-                        <YAxis yAxisId="right" orientation="right" />
-                        <Tooltip
-                          contentStyle={{
-                            backgroundColor: 'rgba(255, 255, 255, 0.95)',
-                            backdropFilter: 'blur(10px)',
-                            border: 'none',
-                            borderRadius: '12px',
-                            boxShadow: '0 8px 32px rgba(0,0,0,0.1)'
-                          }}
-                        />
-                        <Legend />
-                        <Bar yAxisId="left" dataKey="revenue" fill="#3B82F6" name="Revenue ($)" />
-                        <Line yAxisId="right" type="monotone" dataKey="orders" stroke="#10B981" strokeWidth={3} name="Orders" />
-                      </ComposedChart>
-                    </ResponsiveContainer>
-                  )}
-                </CardContent>
-              </Card>
-
-              <Card className="border-0 shadow-lg bg-white/70 backdrop-blur-md">
-                <CardHeader>
-                  <CardTitle className="flex items-center">
-                    <MapPin className="h-5 w-5 mr-2 text-red-600" />
-                    Location Performance
-                  </CardTitle>
-                  <CardDescription>Revenue by store location</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  {isLoading ? (
-                    <div className="space-y-4">
-                      {Array.from({ length: 4 }).map((_, index) => (
-                        <div key={index} className="p-4 space-y-3">
-                          <div className="flex justify-between">
-                            <Skeleton className="h-4 w-32" />
-                            <Skeleton className="h-5 w-12" />
-                          </div>
-                          <Skeleton className="h-3 w-24" />
-                          <Skeleton className="h-2 w-full" />
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <ScrollArea className="h-80">
-                      <div className="space-y-4">
-                        {locations.filter(loc => loc.type !== 'warehouse').map((location) => (
-                          <div key={location.id} className="p-4 bg-slate-50/50 rounded-lg backdrop-blur-sm border border-white/20">
-                            <div className="flex items-center justify-between mb-2">
-                              <div>
-                                <p className="font-semibold text-sm">{location.name}</p>
-                                <p className="text-xs text-muted-foreground">
-                                  {formatNumber(location.orders)} orders • {location.rating.toFixed(1)}★ rating
-                                </p>
-                              </div>
-                              <Badge variant={location.growth >= 0 ? 'default' : 'destructive'}>
-                                {location.growth >= 0 ? '+' : ''}{formatPercentage(location.growth)}
-                              </Badge>
-                            </div>
-                            <div className="space-y-2">
-                              <div className="flex justify-between text-xs">
-                                <span>Revenue: {formatCurrency(location.revenue)}</span>
-                                <span>Target: {formatCurrency(location.revenue * 1.15)}</span>
-                              </div>
-                              <Progress value={(location.revenue / (location.revenue * 1.15)) * 100} className="h-2" />
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </ScrollArea>
-                  )}
-                </CardContent>
-              </Card>
-            </div>
-          </TabsContent>
-
-          {/* Inventory Tab */}
-          <TabsContent value="inventory" className="space-y-6">
-            <InventoryCarousel
-              items={[]} // Will use generated mock data
-              isLoading={isLoading}
-              className="w-full"
-            />
-          </TabsContent>
-
-          {/* Operations Tab */}
-          <TabsContent value="operations" className="space-y-6">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <Card className="border-0 shadow-lg bg-white/70 backdrop-blur-md">
-                <CardHeader>
-                  <CardTitle className="flex items-center justify-between">
-                    <div className="flex items-center">
-                      <Activity className="h-5 w-5 mr-2 text-blue-600" />
-                      Recent Activities
-                    </div>
-                    <Badge variant="outline">{activities.length} activities</Badge>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {isLoading ? (
-                    <div className="space-y-4">
-                      {Array.from({ length: 5 }).map((_, index) => (
-                        <div key={index} className="flex items-start space-x-3 p-3">
-                          <Skeleton className="h-8 w-8 rounded-lg" />
-                          <div className="flex-1 space-y-2">
-                            <Skeleton className="h-4 w-3/4" />
-                            <Skeleton className="h-3 w-1/2" />
-                            <Skeleton className="h-3 w-1/4" />
-                          </div>
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <ScrollArea className="h-96">
-                      <div className="space-y-4">
-                        {activities.map((activity) => (
-                          <div key={activity.id} className={`flex items-start space-x-3 p-3 rounded-lg border backdrop-blur-sm ${getActivityColor(activity.status)}`}>
-                            <div className="p-2 rounded-lg bg-white/70">
-                              {getActivityIcon(activity.type)}
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <p className="font-semibold text-sm">{activity.title}</p>
-                              <p className="text-xs text-muted-foreground">{activity.description}</p>
-                              <p className="text-xs text-muted-foreground mt-1">
-                                {getRelativeTime(activity.timestamp)}
-                              </p>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </ScrollArea>
-                  )}
-                </CardContent>
-              </Card>
-
-              <Card className="border-0 shadow-lg bg-white/70 backdrop-blur-md">
-                <CardHeader>
-                  <CardTitle className="flex items-center justify-between">
-                    <div className="flex items-center">
-                      <Bell className="h-5 w-5 mr-2 text-orange-600" />
-                      System Alerts
-                    </div>
-                    <Badge variant="outline">{alerts.length} alerts</Badge>
-                  </CardTitle>
-                </CardHeader>
-                <CardContent>
-                  {isLoading ? (
-                    <div className="space-y-4">
-                      {Array.from({ length: 4 }).map((_, index) => (
-                        <div key={index} className="flex items-start space-x-3 p-3">
-                          <Skeleton className="h-4 w-4" />
-                          <div className="flex-1 space-y-2">
-                            <Skeleton className="h-4 w-3/4" />
-                            <Skeleton className="h-3 w-1/2" />
-                            <Skeleton className="h-3 w-1/4" />
-                          </div>
-                          <Skeleton className="h-6 w-6" />
-                        </div>
-                      ))}
-                    </div>
-                  ) : (
-                    <ScrollArea className="h-96">
-                      <div className="space-y-4">
-                        {alerts.map((alert) => (
-                          <div
-                            key={alert.id}
-                            className={`flex items-start space-x-3 p-3 rounded-lg border backdrop-blur-sm transition-opacity ${
-                              alert.isRead ? 'opacity-70' : ''
-                            } ${
-                              alert.type === 'critical' ? 'bg-red-50/70 border-red-200' :
-                              alert.type === 'warning' ? 'bg-yellow-50/70 border-yellow-200' :
-                              alert.type === 'success' ? 'bg-green-50/70 border-green-200' :
-                              'bg-blue-50/70 border-blue-200'
-                            }`}
-                            onClick={() => markAlertAsRead(alert.id)}
-                          >
-                            {getAlertIcon(alert.type)}
-                            <div className="flex-1 min-w-0">
-                              <p className="font-semibold text-sm">{alert.title}</p>
-                              <p className="text-xs text-muted-foreground">{alert.description}</p>
-                              <p className="text-xs text-muted-foreground mt-1">
-                                {getRelativeTime(alert.timestamp)}
-                              </p>
-                            </div>
-                            <Button
-                              variant="ghost"
-                              size="sm"
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                dismissAlert(alert.id)
-                              }}
-                            >
-                              <XCircle className="h-4 w-4" />
-                            </Button>
-                          </div>
-                        ))}
-                      </div>
-                    </ScrollArea>
-                  )}
-                </CardContent>
-              </Card>
-            </div>
-          </TabsContent>
-
-          {/* Analytics Tab */}
-          <TabsContent value="analytics" className="space-y-6">
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <Card className="border-0 shadow-lg bg-white/70 backdrop-blur-md">
-                <CardHeader>
-                  <CardTitle className="flex items-center">
-                    <PieChartIcon className="h-5 w-5 mr-2 text-purple-600" />
-                    Customer Growth
-                  </CardTitle>
-                  <CardDescription>Customer acquisition over time</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  {isLoading ? (
-                    <Skeleton className="h-80 w-full" />
-                  ) : (
-                    <ResponsiveContainer width="100%" height={320}>
-                      <LineChart data={salesData}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                        <XAxis dataKey="period" />
-                        <YAxis />
-                        <Tooltip
-                          contentStyle={{
-                            backgroundColor: 'rgba(255, 255, 255, 0.95)',
-                            backdropFilter: 'blur(10px)',
-                            border: 'none',
-                            borderRadius: '12px',
-                            boxShadow: '0 8px 32px rgba(0,0,0,0.1)'
-                          }}
-                          formatter={(value: any) => [formatNumber(value), 'Customers']}
-                        />
-                        <Line
-                          type="monotone"
-                          dataKey="customers"
-                          stroke="#8B5CF6"
-                          strokeWidth={3}
-                          dot={{ fill: '#8B5CF6', strokeWidth: 2, r: 4 }}
-                        />
-                      </LineChart>
-                    </ResponsiveContainer>
-                  )}
-                </CardContent>
-              </Card>
-
-              <Card className="border-0 shadow-lg bg-white/70 backdrop-blur-md">
-                <CardHeader>
-                  <CardTitle className="flex items-center">
-                    <Target className="h-5 w-5 mr-2 text-teal-600" />
-                    Conversion Rate
-                  </CardTitle>
-                  <CardDescription>Sales conversion performance</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  {isLoading ? (
-                    <Skeleton className="h-80 w-full" />
-                  ) : (
-                    <ResponsiveContainer width="100%" height={320}>
-                      <AreaChart data={salesData}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                        <XAxis dataKey="period" />
-                        <YAxis />
-                        <Tooltip
-                          contentStyle={{
-                            backgroundColor: 'rgba(255, 255, 255, 0.95)',
-                            backdropFilter: 'blur(10px)',
-                            border: 'none',
-                            borderRadius: '12px',
-                            boxShadow: '0 8px 32px rgba(0,0,0,0.1)'
-                          }}
-                          formatter={(value: any) => [`${formatPercentage(value)}`, 'Conversion Rate']}
                         />
                         <Area
                           type="monotone"
-                          dataKey="conversionRate"
-                          stroke="#14B8A6"
-                          fill="#14B8A6"
-                          fillOpacity={0.3}
+                          dataKey="orders"
+                          stroke="#2563eb"
+                          fill="#2563eb"
+                          fillOpacity={0.12}
                           strokeWidth={2}
                         />
                       </AreaChart>
                     </ResponsiveContainer>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="border-border/70 shadow-sm">
+                <CardHeader>
+                  <CardTitle>{labels.sections.topProducts}</CardTitle>
+                  <CardDescription>{labels.sections.topProductsDescription}</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {dashboard.topProducts.length === 0 ? (
+                    <p className="rounded-lg border border-dashed p-6 text-sm text-muted-foreground">
+                      {labels.empty.topProducts}
+                    </p>
+                  ) : (
+                    <div className="space-y-4">
+                      {dashboard.topProducts.map((product, index) => (
+                        <Link
+                          key={product.id}
+                          href={resolveDashboardHref(product.href, dashboardBasePath)}
+                          className="group flex items-center gap-3 rounded-lg border border-border/70 p-3 transition-colors hover:bg-muted/60"
+                        >
+                          <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-muted text-sm font-semibold">
+                            {index + 1}
+                          </div>
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-sm font-medium">{product.name}</p>
+                            <p className="truncate text-xs text-muted-foreground">
+                              {product.sku} · {product.category}
+                            </p>
+                          </div>
+                          <div className="text-right">
+                            <p className="text-sm font-semibold">{formatCurrency(product.revenue, currency, locale)}</p>
+                            <p className="text-xs text-muted-foreground">
+                              {formatNumber(product.quantitySold, locale)} sold
+                            </p>
+                          </div>
+                          <ExternalLink className="h-4 w-4 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
+                        </Link>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+
+            <Card className="border-border/70 shadow-sm">
+              <CardHeader>
+                <CardTitle>{labels.sections.pendingActions}</CardTitle>
+                <CardDescription>{labels.sections.quickActionsDescription}</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid gap-3 md:grid-cols-3">
+                  {dashboard.pendingActions.map((action) => (
+                    <Link
+                      key={action.id}
+                      href={resolveDashboardHref(action.href, dashboardBasePath)}
+                      className="rounded-lg border border-border/70 p-4 transition-colors hover:bg-muted/60"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div>
+                          <p className="text-sm font-medium">{action.label}</p>
+                          <p className="mt-2 text-3xl font-semibold">{formatNumber(action.count, locale)}</p>
+                        </div>
+                        <Badge
+                          variant={action.severity === "critical" ? "destructive" : "secondary"}
+                          className="capitalize"
+                        >
+                          {action.severity}
+                        </Badge>
+                      </div>
+                    </Link>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="inventory" className="space-y-5">
+            <div className="grid gap-5 xl:grid-cols-[0.85fr_1.15fr]">
+              <Card className="border-border/70 shadow-sm">
+                <CardHeader>
+                  <CardTitle>{labels.sections.stockHealth}</CardTitle>
+                  <CardDescription>{labels.sections.stockHealthDescription}</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-5">
+                  <div className="grid grid-cols-2 gap-3">
+                    {[
+                      [labels.stock.trackedItems, dashboard.stockHealth.trackedItems],
+                      [labels.stock.inStock, dashboard.stockHealth.inStock],
+                      [labels.stock.lowStock, dashboard.stockHealth.lowStock],
+                      [labels.stock.outOfStock, dashboard.stockHealth.outOfStock],
+                      [labels.stock.overstock, dashboard.stockHealth.overstock],
+                      [labels.stock.reorderCandidates, dashboard.stockHealth.reorderCandidates],
+                    ].map(([label, value]) => (
+                      <div key={label} className="rounded-lg border border-border/70 p-3">
+                        <p className="text-xs text-muted-foreground">{label}</p>
+                        <p className="mt-1 text-xl font-semibold">{formatNumber(Number(value), locale)}</p>
+                      </div>
+                    ))}
+                  </div>
+
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between text-sm">
+                      <span>{labels.stock.inStock}</span>
+                      <span>{formatNumber(dashboard.stockHealth.inStock, locale)}</span>
+                    </div>
+                    <Progress value={(dashboard.stockHealth.inStock / stockTotal) * 100} className="h-2" />
+                    <div className="grid gap-2 text-xs text-muted-foreground sm:grid-cols-2">
+                      <span>
+                        {labels.stock.availableUnits}: {formatNumber(dashboard.stockHealth.availableUnits, locale)}
+                      </span>
+                      <span>
+                        {labels.stock.reservedUnits}: {formatNumber(dashboard.stockHealth.reservedUnits, locale)}
+                      </span>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="border-border/70 shadow-sm">
+                <CardHeader>
+                  <CardTitle>{labels.sections.locationPerformance}</CardTitle>
+                  <CardDescription>{labels.sections.locationPerformanceDescription}</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {dashboard.locations.length === 0 ? (
+                    <p className="rounded-lg border border-dashed p-6 text-sm text-muted-foreground">
+                      {labels.empty.locations}
+                    </p>
+                  ) : (
+                    <div className="h-[360px]">
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart data={dashboard.locations}>
+                          <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                          <XAxis dataKey="name" tickLine={false} axisLine={false} fontSize={12} />
+                          <YAxis tickLine={false} axisLine={false} fontSize={12} />
+                          <Tooltip
+                            contentStyle={{
+                              background: "hsl(var(--popover))",
+                              border: "1px solid hsl(var(--border))",
+                              borderRadius: 8,
+                              color: "hsl(var(--popover-foreground))",
+                            }}
+                            formatter={(value, name) => {
+                              if (name === "revenue") return [formatCurrency(Number(value), currency, locale), labels.metrics.revenue]
+                              if (name === "inventoryValue") return [formatCurrency(Number(value), currency, locale), labels.metrics.inventoryValue]
+                              return [formatNumber(Number(value), locale), labels.metrics.orders]
+                            }}
+                          />
+                          <Bar dataKey="revenue" fill="#0f766e" radius={[6, 6, 0, 0]} />
+                          <Bar dataKey="inventoryValue" fill="#d97706" radius={[6, 6, 0, 0]} />
+                        </BarChart>
+                      </ResponsiveContainer>
+                    </div>
                   )}
                 </CardContent>
               </Card>
             </div>
           </TabsContent>
-        </Tabs>
 
-        {/* Quick Actions Grid */}
-        <Card className="border-0 shadow-lg bg-white/70 backdrop-blur-md">
-          <CardHeader>
-            <CardTitle className="flex items-center">
-              <Zap className="h-5 w-5 mr-2 text-yellow-600" />
-              Quick Actions
-            </CardTitle>
-            <CardDescription>Frequently used business operations and shortcuts</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-8 gap-4">
-              <Card className="group border-0 shadow-md bg-gradient-to-br from-green-50 to-green-100 hover:shadow-lg transition-all duration-300 hover:-translate-y-1 cursor-pointer">
-                <CardContent className="p-4 flex flex-col items-center justify-center h-20 space-y-2">
-                  <div className="p-2 rounded-lg bg-gradient-to-br from-green-500 to-green-600 shadow-md">
-                    <Plus className="h-5 w-5 text-white" />
-                  </div>
-                  <span className="text-xs font-medium text-green-800">New Order</span>
+          <TabsContent value="operations" className="space-y-5">
+            <div className="grid gap-5 xl:grid-cols-2">
+              <Card className="border-border/70 shadow-sm">
+                <CardHeader>
+                  <CardTitle>{labels.sections.alerts}</CardTitle>
+                  <CardDescription>{labels.sections.alertsDescription}</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {dashboard.alerts.length === 0 ? (
+                    <div className="flex items-center gap-3 rounded-lg border border-dashed p-6 text-sm text-muted-foreground">
+                      <CheckCircle2 className="h-5 w-5 text-emerald-600" />
+                      {labels.empty.alerts}
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {dashboard.alerts.map((alert) => (
+                        <Link
+                          key={alert.id}
+                          href={resolveDashboardHref(alert.href, dashboardBasePath)}
+                          className={cn("block rounded-lg border p-4 transition-opacity hover:opacity-90", alertClasses(alert.type))}
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <div>
+                              <p className="font-medium">{alert.title}</p>
+                              <p className="mt-1 text-sm opacity-85">{alert.description}</p>
+                            </div>
+                            <ExternalLink className="h-4 w-4 shrink-0 opacity-70" />
+                          </div>
+                        </Link>
+                      ))}
+                    </div>
+                  )}
                 </CardContent>
               </Card>
 
-              <Card className="group border-0 shadow-md bg-gradient-to-br from-purple-50 to-purple-100 hover:shadow-lg transition-all duration-300 hover:-translate-y-1 cursor-pointer">
-                <CardContent className="p-4 flex flex-col items-center justify-center h-20 space-y-2">
-                  <div className="p-2 rounded-lg bg-gradient-to-br from-purple-500 to-purple-600 shadow-md">
-                    <Package className="h-5 w-5 text-white" />
-                  </div>
-                  <span className="text-xs font-medium text-purple-800">Add Product</span>
-                </CardContent>
-              </Card>
+              <Card className="border-border/70 shadow-sm">
+                <CardHeader>
+                  <CardTitle>{labels.sections.recentActivity}</CardTitle>
+                  <CardDescription>{labels.sections.recentActivityDescription}</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {dashboard.activities.length === 0 ? (
+                    <p className="rounded-lg border border-dashed p-6 text-sm text-muted-foreground">
+                      {labels.empty.activity}
+                    </p>
+                  ) : (
+                    <ScrollArea className="h-[360px] pr-3">
+                      <div className="space-y-3">
+                        {dashboard.activities.map((activity) => {
+                          const Icon =
+                            activity.type === "sale"
+                              ? ShoppingCart
+                              : activity.type === "purchase"
+                                ? Building2
+                                : Package
 
-              <Card className="group border-0 shadow-md bg-gradient-to-br from-orange-50 to-orange-100 hover:shadow-lg transition-all duration-300 hover:-translate-y-1 cursor-pointer">
-                <CardContent className="p-4 flex flex-col items-center justify-center h-20 space-y-2">
-                  <div className="p-2 rounded-lg bg-gradient-to-br from-orange-500 to-orange-600 shadow-md">
-                    <Users className="h-5 w-5 text-white" />
-                  </div>
-                  <span className="text-xs font-medium text-orange-800">New Customer</span>
-                </CardContent>
-              </Card>
-
-              <Card className="group border-0 shadow-md bg-gradient-to-br from-teal-50 to-teal-100 hover:shadow-lg transition-all duration-300 hover:-translate-y-1 cursor-pointer">
-                <CardContent className="p-4 flex flex-col items-center justify-center h-20 space-y-2">
-                  <div className="p-2 rounded-lg bg-gradient-to-br from-teal-500 to-teal-600 shadow-md">
-                    <Truck className="h-5 w-5 text-white" />
-                  </div>
-                  <span className="text-xs font-medium text-teal-800">Stock Transfer</span>
-                </CardContent>
-              </Card>
-
-              <Card className="group border-0 shadow-md bg-gradient-to-br from-pink-50 to-pink-100 hover:shadow-lg transition-all duration-300 hover:-translate-y-1 cursor-pointer">
-                <CardContent className="p-4 flex flex-col items-center justify-center h-20 space-y-2">
-                  <div className="p-2 rounded-lg bg-gradient-to-br from-pink-500 to-pink-600 shadow-md">
-                    <CreditCard className="h-5 w-5 text-white" />
-                  </div>
-                  <span className="text-xs font-medium text-pink-800">Process Payment</span>
-                </CardContent>
-              </Card>
-
-              <Card className="group border-0 shadow-md bg-gradient-to-br from-blue-50 to-blue-100 hover:shadow-lg transition-all duration-300 hover:-translate-y-1 cursor-pointer">
-                <CardContent className="p-4 flex flex-col items-center justify-center h-20 space-y-2">
-                  <div className="p-2 rounded-lg bg-gradient-to-br from-blue-500 to-blue-600 shadow-md">
-                    <FileText className="h-5 w-5 text-white" />
-                  </div>
-                  <span className="text-xs font-medium text-blue-800">Reports</span>
-                </CardContent>
-              </Card>
-
-              <Card className="group border-0 shadow-md bg-gradient-to-br from-indigo-50 to-indigo-100 hover:shadow-lg transition-all duration-300 hover:-translate-y-1 cursor-pointer">
-                <CardContent className="p-4 flex flex-col items-center justify-center h-20 space-y-2">
-                  <div className="p-2 rounded-lg bg-gradient-to-br from-indigo-500 to-indigo-600 shadow-md">
-                    <Database className="h-5 w-5 text-white" />
-                  </div>
-                  <span className="text-xs font-medium text-indigo-800">Backup</span>
-                </CardContent>
-              </Card>
-
-              <Card className="group border-0 shadow-md bg-gradient-to-br from-gray-50 to-gray-100 hover:shadow-lg transition-all duration-300 hover:-translate-y-1 cursor-pointer">
-                <CardContent className="p-4 flex flex-col items-center justify-center h-20 space-y-2">
-                  <div className="p-2 rounded-lg bg-gradient-to-br from-gray-500 to-gray-600 shadow-md">
-                    <Settings className="h-5 w-5 text-white" />
-                  </div>
-                  <span className="text-xs font-medium text-gray-800">Settings</span>
+                          return (
+                            <Link
+                              key={activity.id}
+                              href={resolveDashboardHref(activity.href, dashboardBasePath)}
+                              className="flex gap-3 rounded-lg border border-border/70 p-3 transition-colors hover:bg-muted/60"
+                            >
+                              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-muted">
+                                <Icon className="h-4 w-4" />
+                              </div>
+                              <div className="min-w-0 flex-1">
+                                <p className="truncate text-sm font-medium capitalize">{activity.title}</p>
+                                <p className="line-clamp-2 text-xs text-muted-foreground">{activity.description}</p>
+                                <p className="mt-1 text-xs text-muted-foreground">
+                                  {formatDateTime(activity.timestamp, locale)}
+                                </p>
+                              </div>
+                            </Link>
+                          )
+                        })}
+                      </div>
+                    </ScrollArea>
+                  )}
                 </CardContent>
               </Card>
             </div>
-          </CardContent>
-        </Card>
+
+            <Card className="border-border/70 shadow-sm">
+              <CardHeader>
+                <CardTitle>{labels.sections.quickActions}</CardTitle>
+                <CardDescription>{labels.sections.quickActionsDescription}</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                  {[
+                    { label: labels.actions.inventory, href: "/dashboard/inventory", icon: Package },
+                    { label: labels.actions.sales, href: "/dashboard/sales", icon: ShoppingCart },
+                    { label: labels.actions.purchases, href: "/dashboard/purchases", icon: Building2 },
+                    { label: labels.actions.finance, href: "/dashboard/finance", icon: CreditCard },
+                  ].map((action) => (
+                    <Button key={action.href} asChild variant="outline" className="h-12 justify-between">
+                      <Link href={resolveDashboardHref(action.href, dashboardBasePath)}>
+                        <span className="inline-flex items-center gap-2">
+                          <action.icon className="h-4 w-4" />
+                          {action.label}
+                        </span>
+                        <ExternalLink className="h-3.5 w-3.5" />
+                      </Link>
+                    </Button>
+                  ))}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
       </div>
     </div>
   )

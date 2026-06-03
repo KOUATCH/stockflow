@@ -1,7 +1,6 @@
 "use server"
 import { getAuthenticatedUser } from "@/lib/auth-server";
 import { db } from "@/prisma/db";
-import { InventoryLevelResponse } from "@/types/inventory";
 import { revalidatePath } from "next/cache";
 
 export interface InventoryLevel {
@@ -79,55 +78,78 @@ export interface InventoryStatsResponse {
   error?: string | null
 }
 
+function toNumber(value: any): number {
+  if (value === null || value === undefined) return 0
+  if (typeof value === "number") return value
+  if (typeof value === "string") return Number(value) || 0
+  if (typeof value.toNumber === "function") return value.toNumber()
+  return Number(value) || 0
+}
 
-export async function getInventoryLevels(locationId?: string): Promise<InventoryLevelResponse> {
+function localizedName(entity: any): string {
+  if (!entity) return ""
+  return entity.nameEn ?? entity.nameFr ?? entity.titleEn ?? entity.titleFr ?? entity.name ?? entity.title ?? ""
+}
+
+function mapInventoryLevel(level: any): InventoryLevel {
+  const itemName = localizedName(level.item) || level.item?.sku || ""
+  const categoryName = localizedName(level.item?.category) || level.item?.categoryId || ""
+  const unitName = localizedName(level.item?.unit) || level.item?.unit?.symbol || level.item?.unitId || ""
+
+  return {
+    id: level.id,
+    itemId: level.itemId,
+    locationId: level.locationId,
+    quantityOnHand: toNumber(level.quantityOnHand),
+    quantityReserved: toNumber(level.quantityReserved),
+    quantityAvailable: toNumber(level.quantityAvailable),
+    quantityInTransit: toNumber(level.quantityInTransit),
+    quantityOnOrder: toNumber(level.quantityOnOrder),
+    unitCost: toNumber(level.averageCost),
+    totalValue: toNumber(level.totalValue),
+    reorderPoint: toNumber(level.reorderPoint),
+    maxStockLevel: toNumber(level.item?.maxStockLevel),
+    averageCost: toNumber(level.averageCost),
+    createdAt: level.createdAt ?? new Date(),
+    updatedAt: level.updatedAt ?? new Date(),
+    item: {
+      id: level.item?.id ?? "",
+      name: itemName,
+      sku: level.item?.sku ?? "",
+      category: categoryName,
+      unit: unitName,
+    },
+    location: {
+      id: level.location?.id ?? "",
+      name: level.location?.name ?? "",
+      type: level.location?.type ?? "",
+    },
+  }
+}
+
+export async function getInventoryLevels(locationId?: string): Promise<InventoryLevelsResponse> {
   try {
-    // const user =await  getAuthenticatedUser()
-    // const userOrgId=user.organizationId
+    const user = await getAuthenticatedUser()
     const getOrgInventoryLevels = await db.inventoryLevel.findMany({
       where: {
-        locationId: locationId
+        ...(locationId && { locationId }),
+        item: {
+          organizationId: user.organizationId,
+          deletedAt: null,
+        },
       },
       include: {
-        item: true,
+        item: {
+          include: {
+            category: true,
+            unit: true,
+          },
+        },
         location: true,
       }
     })
     console.log("[v0] Found inventory levels:", getOrgInventoryLevels.length)
-    // Map DB results to InventoryLevel type
-    const mappedInventoryLevels: InventoryLevel[] = getOrgInventoryLevels.map((level: any) => ({
-      id: level.id,
-      itemId: level.itemId,
-      locationId: level.locationId,
-      quantityOnHand: level.quantityOnHand,
-      quantityReserved: level.quantityReserved,
-      quantityAvailable: level.quantityAvailable,
-      quantityInTransit: level.quantityInTransit ?? 0,
-      quantityOnOrder: level.quantityOnOrder ?? 0,
-      unitCost: level.unitCost ?? 0,
-      totalValue: level.totalValue ?? 0,
-      reorderPoint: level.reorderPoint ?? 0,
-      maxStockLevel: level.maxStockLevel ?? 0,
-      averageCost: level.averageCost ?? 0,
-      createdAt: level.createdAt ?? new Date(),
-      updatedAt: level.updatedAt ?? new Date(),
-      item: level.item
-        ? {
-            id: level.item.id,
-            name: level.item.name,
-            sku: level.item.sku,
-            category: level.item.category,
-            unit: level.item.unit,
-          }
-        : { id: "", name: "", sku: "", category: "", unit: "" },
-      location: level.location
-        ? {
-            id: level.location.id,
-            name: level.location.name,
-            type: level.location.type,
-          }
-        : { id: "", name: "", type: "" },
-    }));
+    const mappedInventoryLevels = getOrgInventoryLevels.map(mapInventoryLevel)
     return {
       data: mappedInventoryLevels,
       error: null,
@@ -146,7 +168,7 @@ export async function getInventoryStats(): Promise<InventoryStatsResponse> {
     const userOrgId = user.organizationId
     console.log(`[v0] Getting inventory stats for org:", ${userOrgId}`)
 
-    const inventoryLevels = await getInventoryLevels(userOrgId)
+    const inventoryLevels = await getInventoryLevels()
     const invenLevelData = inventoryLevels.data
     const totalItems = invenLevelData?.length
     const totalValue = invenLevelData?.reduce((sum, level) => sum + level.totalValue, 0)
@@ -256,52 +278,57 @@ export async function getInventoryTransactions(
     // }
     console.log("[v0] Found transactions:", invenTranx.length)
     // Map DB results to InventoryTransaction type, ensuring referenceType and referenceId are strings
-    const mappedTransactions: InventoryTransaction[] = invenTranx.map((txn) => ({
+    const mappedTransactions: InventoryTransaction[] = filteredTransactions.map((txn) => {
+      const unitCost = toNumber(txn.unitCost)
+      const quantity = toNumber(txn.quantity)
+      const totalCost = toNumber(txn.totalCost)
+
+      return {
       inventoryLevels: Array.isArray(txn.item?.inventoryLevels)
         ? txn.item.inventoryLevels.map((level: any) => ({
             id: level.id,
             itemId: txn.itemId,
             locationId: level.locationId,
-            quantityOnHand: level.quantityOnHand ?? 0,
-            quantityReserved: level.quantityReserved ?? 0,
-            quantityAvailable: level.quantityAvailable ?? 0,
+            quantityOnHand: toNumber(level.quantityOnHand),
+            quantityReserved: toNumber(level.quantityReserved),
+            quantityAvailable: toNumber(level.quantityAvailable),
             quantityInTransit: 0,
             quantityOnOrder: 0,
-            unitCost: txn.unitCost ?? 0,
-            totalValue: (level.quantityOnHand ?? 0) * (txn.unitCost ?? 0),
+            unitCost,
+            totalValue: toNumber(level.quantityOnHand) * unitCost,
             reorderPoint: 0,
             maxStockLevel: 0,
-            averageCost: txn.unitCost ?? 0,
+            averageCost: unitCost,
             createdAt: txn.createdAt,
             updatedAt: txn.createdAt,
             item: {
               id: txn.itemId,
-              name: txn.item?.name ?? "",
+              name: localizedName(txn.item) || txn.item?.sku || "",
               sku: txn.item?.sku ?? "",
               category: txn.item?.brandId ?? "",
-              unitId: txn.item?.unitId  ?? "",
+              unit: txn.item?.unitId  ?? "",
             },
             location: {
               id: level.locationId,
               name: txn.location?.name ?? "",
-              // type: txn.location?.type ?? "",
+              type: txn.location?.type ?? "",
             },
           }))
         : [],
       id: txn.id,
       // inventoryLevelId: txn.inventoryLevelId, // Uncomment if needed in your type
       type: txn.type,
-      quantity: txn.quantity,
-      unitCost: txn.unitCost,
-      totalCost: txn.totalCost,
+      quantity,
+      unitCost,
+      totalCost,
       referenceType: txn.referenceType ?? "",
       referenceId: txn.referenceId ?? "",
       itemId: txn.itemId,
       createdAt: txn.createdAt,
       item: {
-        name: txn.item?.name ?? "",
+        name: localizedName(txn.item) || txn.item?.sku || "",
       },
-    }));
+    }});
     return mappedTransactions
   } catch (error) {
     console.error("Error fetching inventory transactions:", error)
@@ -482,6 +509,68 @@ export async function getInventoryTransactions(
 //     }
 //   }
 // }
+
+export async function updateInventoryLevel(
+  inventoryLevelId: string,
+  updates: {
+    onHandQuantity?: number
+    reservedQuantity?: number
+    unitCost?: number
+    reorderPoint?: number
+    maxStockLevel?: number
+  },
+): Promise<InventoryLevel> {
+  const existingLevel = await db.inventoryLevel.findUnique({
+    where: { id: inventoryLevelId },
+    include: { item: true },
+  })
+
+  if (!existingLevel) {
+    throw new Error("Inventory level not found")
+  }
+
+  const nextQuantityOnHand = updates.onHandQuantity ?? toNumber(existingLevel.quantityOnHand)
+  const nextQuantityReserved = updates.reservedQuantity ?? toNumber(existingLevel.quantityReserved)
+  const nextUnitCost = updates.unitCost ?? toNumber(existingLevel.averageCost)
+  const nextQuantityAvailable = Math.max(0, nextQuantityOnHand - nextQuantityReserved)
+
+  const updated = await db.$transaction(async (tx) => {
+    if (updates.maxStockLevel !== undefined) {
+      await tx.item.update({
+        where: { id: existingLevel.itemId },
+        data: {
+          maxStockLevel: updates.maxStockLevel,
+        },
+      })
+    }
+
+    return tx.inventoryLevel.update({
+      where: { id: inventoryLevelId },
+      data: {
+        quantityOnHand: nextQuantityOnHand,
+        quantityReserved: nextQuantityReserved,
+        quantityAvailable: nextQuantityAvailable,
+        averageCost: nextUnitCost,
+        reorderPoint: updates.reorderPoint,
+        totalValue: nextQuantityOnHand * nextUnitCost,
+      },
+      include: {
+        item: {
+          include: {
+            category: true,
+            unit: true,
+          },
+        },
+        location: true,
+      },
+    })
+  })
+
+  revalidatePath("/dashboard/inventory")
+  revalidatePath("/")
+
+  return mapInventoryLevel(updated)
+}
 
 export async function bulkUpdateInventoryLevels(
   updates: Array<{

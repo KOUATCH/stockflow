@@ -1,5 +1,6 @@
 "use client"
 
+import { notify } from "@/lib/notifications/notify"
 import {
   completeSalesOrder,
   createSalesOrder,
@@ -11,8 +12,6 @@ import {
 } from "@/actions/sales-analyses/salesActions"
 import type { PaymentStatus, SalesOrderFilters, SalesOrderStatus } from "@/types/salesTypes"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
-import { toast } from "sonner"
-
 // ============================================================================
 // QUERY KEYS
 // ============================================================================
@@ -72,7 +71,7 @@ export function useSalesSummary(organizationId: string | undefined) {
 const getBaseMutationOptions = (queryClient: ReturnType<typeof useQueryClient>) => ({
   onSuccess: (data: any, variables: any) => {
     if (data.message) {
-      toast.success(data.message)
+      notify.success(data.message)
     }
     queryClient.invalidateQueries({ queryKey: SalesKeys.all })
     const organizationId = variables.organizationId || data.data?.organizationId
@@ -84,7 +83,7 @@ const getBaseMutationOptions = (queryClient: ReturnType<typeof useQueryClient>) 
     }
   },
   onError: (error: Error) => {
-    toast.error(error.message || "An unexpected error occurred.")
+    notify.error(error.message || "An unexpected error occurred.")
   },
 })
 
@@ -94,6 +93,7 @@ const getBaseMutationOptions = (queryClient: ReturnType<typeof useQueryClient>) 
 export function useCreateSalesOrder() {
   const queryClient = useQueryClient()
   return useMutation({
+    meta: { operation: 'create', entity: 'Sales Order' },
     mutationFn: createSalesOrder,
     ...getBaseMutationOptions(queryClient),
   })
@@ -105,6 +105,7 @@ export function useCreateSalesOrder() {
 export function useCompleteSalesOrder() {
   const queryClient = useQueryClient()
   return useMutation({
+    meta: { operation: 'complete', entity: 'Sales Order', suppressSuccessNotification: true, suppressErrorNotification: true },
     mutationFn: ({ id, organizationId }: { id: string; organizationId: string }) =>
       completeSalesOrder(id, organizationId),
     ...getBaseMutationOptions(queryClient),
@@ -117,6 +118,7 @@ export function useCompleteSalesOrder() {
 export function useUpdateSalesOrderStatus() {
   const queryClient = useQueryClient()
   return useMutation({
+    meta: { operation: 'update', entity: 'Sales Order Status' },
     mutationFn: ({
       id,
       status,
@@ -136,6 +138,7 @@ export function useUpdateSalesOrderStatus() {
 export function useUpdatePaymentStatus() {
   const queryClient = useQueryClient()
   return useMutation({
+    meta: { operation: 'update', entity: 'Payment Status' },
     mutationFn: ({
       id,
       paymentStatus,

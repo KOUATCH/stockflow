@@ -35,6 +35,7 @@ export function useCreateOrganization() {
   const { success, error } = useNotifications();
 
   return useMutation({
+    meta: { operation: 'create', entity: 'Organization' , suppressSuccessNotification: true, suppressErrorNotification: true },
     mutationFn: createOrganization,
     onSuccess: (result) => {
       if (result.success) {
@@ -57,6 +58,7 @@ export function useUpdateOrganization() {
   const { success, error } = useNotifications();
 
   return useMutation({
+    meta: { operation: 'update', entity: 'Organization' , suppressSuccessNotification: true, suppressErrorNotification: true },
     mutationFn: ({ organizationId, organizationData }: {
       organizationId: string;
       organizationData: any
@@ -82,6 +84,7 @@ export function useDeleteOrganization() {
   const { success, error, warning } = useNotifications();
 
   return useMutation({
+    meta: { operation: 'delete', entity: 'Organization' , suppressSuccessNotification: true, suppressErrorNotification: true },
     mutationFn: deleteOrganization,
     onSuccess: (result) => {
       if (result.success) {

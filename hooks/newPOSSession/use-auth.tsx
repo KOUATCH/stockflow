@@ -44,6 +44,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Login mutation
   const loginMutation = useMutation({
+    meta: { operation: 'login', entity: 'User', notify: false },
     mutationFn: ({ email, password }: { email: string; password: string }) => loginUser(email, password),
     onSuccess: (result) => {
       if (result.success) {
@@ -54,6 +55,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // Logout mutation
   const logoutMutation = useMutation({
+    meta: { operation: 'logout', entity: 'User', notify: false },
     mutationFn: logoutUser,
     onSuccess: () => {
       queryClient.clear()

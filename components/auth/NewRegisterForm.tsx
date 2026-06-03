@@ -8,6 +8,8 @@ import { Label } from "@/components/ui/label";
 import { Progress } from "@/components/ui/progress";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { getLocaleFromPathname, localizePath } from "@/i18n/routing";
+import { DEFAULT_LOCALE } from "@/types/bilingual";
 import { RegisterUserProps } from "@/types/types";
 import { cn } from "@/lib/utils";
 import {
@@ -32,7 +34,7 @@ import {
   Activity
 } from "lucide-react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useState, useCallback } from "react";
 import { useForm } from "react-hook-form";
 import Logo from "../global/Logo";
@@ -73,6 +75,9 @@ export default function NewRegisterForm() {
   } = useForm<RegisterUserProps>();
 
   const router = useRouter();
+  const pathname = usePathname();
+  const locale = getLocaleFromPathname(pathname) ?? DEFAULT_LOCALE;
+  const localizedHref = (href: string) => localizePath(href, locale);
   const { formError, formSuccess, info, warning } = useNotifications();
 
   // Watch password for confirmation matching
@@ -177,7 +182,7 @@ export default function NewRegisterForm() {
         setLoading(false);
         formSuccess("Account Created", "Welcome to StockFlow! Please check your email to verify your account.");
         reset();
-        router.push("/verify-email");
+        router.push(localizedHref("/verify-email"));
       } else {
         setLoading(false);
         const errorData = await response.json();
@@ -598,11 +603,11 @@ export default function NewRegisterForm() {
                         />
                         <label htmlFor="terms" className="text-sm text-gray-600">
                           I agree to the{" "}
-                          <Link href="/terms" className="text-emerald-600 hover:text-emerald-500">
+                          <Link href={localizedHref("/terms")} className="text-emerald-600 hover:text-emerald-500">
                             Terms of Service
                           </Link>{" "}
                           and{" "}
-                          <Link href="/privacy" className="text-emerald-600 hover:text-emerald-500">
+                          <Link href={localizedHref("/privacy")} className="text-emerald-600 hover:text-emerald-500">
                             Privacy Policy
                           </Link>
                         </label>
@@ -674,7 +679,7 @@ export default function NewRegisterForm() {
             <p className="text-gray-600">
               Already have an account?{" "}
               <Link
-                href="/login"
+                href={localizedHref("/login")}
                 className="text-emerald-600 hover:text-emerald-500 font-semibold transition-colors"
               >
                 Sign In

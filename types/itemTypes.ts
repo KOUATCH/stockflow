@@ -33,16 +33,19 @@ export type CompleteItemResponse = ApiResponse<ItemDTO[]>;
 export type SupplierItemResponse = ApiResponse<ItemWithSupplierDTO[]>;
 
 export type ItemCreateDTO = {
-  id: string;
-  createdAt: Date | string;
-  name: string;
-  slug: string;
+  id?: string;
+  createdAt?: Date | string;
+  nameEn: string;
+  nameFr?: string | null;
+  slug?: string;
   costPrice: number;
   sellingPrice: number
-  imageUrls: string[] | [];
-  thumbnail: string | null;
+  imageUrls?: string;
+  thumbnail?: string | null;
   sku: string;
   organizationId: string;
+  descriptionEn?: string | null;
+  descriptionFr?: string | null;
 }
 // types/item.ts
 export interface Item {
@@ -62,7 +65,6 @@ export interface Item {
 }
 
 export type ItemPayload = {
-  description: ReactNode;
   description: any;
   id: string;
   name: string;
@@ -79,7 +81,12 @@ export type ItemPayload = {
 // Fixed type definition
 export type ItemWithInventoryLevelsPayload = {
   id: string;
-  name: string;
+  nameEn: string;
+  nameFr?: string | null;
+  descriptionEn?: string | null;
+  descriptionFr?: string | null;
+  name?: string;
+  description?: string | null;
   slug: string;
   costPrice: number;
   sellingPrice: number;
@@ -88,9 +95,9 @@ export type ItemWithInventoryLevelsPayload = {
   thumbnail: string | null;
   organizationId: string;
   minStockLevel: number;
-  maxStockLevel?: number;
+  maxStockLevel?: number | null;
   reorderLevel?: number;
-  reorderQuantity?: number;
+  reorderQuantity?: number | null;
   reorderPoint?: number;
   isActive: boolean;
   isDiscontinued: boolean;
@@ -130,7 +137,7 @@ export type ItemWithSupplierDTO = {
   costPrice: number;
   sellingPrice: number;
   createdAt: Date;
-  imageUrls: string[] | [];
+  imageUrls: string;
   thumbnail: string | null;
   organizationId: string;
   sku: string;
@@ -139,24 +146,29 @@ export type ItemWithSupplierDTO = {
 
 export type UpdateItemPayload = {
   id?: string | undefined | null;
-  name: string | undefined | null;
+  nameEn: string | undefined | null;
+  nameFr?: string | undefined | null;
+  descriptionEn?: string | undefined | null;
+  descriptionFr?: string | undefined | null;
   slug: string;
   costPrice: number;
   sellingPrice: number;
   createdAt: Date | null;
   thumbnail: string | null;
   organizationId: string;
-  imageUrls: string[] | [];
+  imageUrls: string;
   sku: string;
 };
 
 export type UpdateItemBasicInfoPayload = {
   organizationId: any;
   id: string;
-  name: string;
-  imageUrls?: string | undefined;
+  nameEn?: string;
+  nameFr?: string | undefined;
+  imageUrls?: string | string[] | undefined;
   thumbnail?: string | undefined;
-  description?: string | undefined;
+  descriptionEn?: string | undefined;
+  descriptionFr?: string | undefined;
 };
 
 export type UpdateItemStockPayload = {
@@ -202,10 +214,12 @@ export type ItemApiResponse = {
 
 export type ItemDTO = {
   id: string;
-  name: string | null;
+  nameEn: string | null;
+  nameFr?: string | null;
   sku: string | null;
   barcode: string | null;
-  description: string | null;
+  descriptionEn: string | null;
+  descriptionFr?: string | null;
   dimensions: string | null;
   upc: string | null;
   ean: string | null;
@@ -227,6 +241,9 @@ export type ItemDTO = {
   maxStockLevel: number | null;
   isActive: boolean | null;
   imageUrls: string;
+  // Helper for backwards compatibility
+  name?: string; // computed from nameEn
+  description?: string; // computed from descriptionEn
 };
 
 export type ItemDTOLine = {

@@ -1,5 +1,10 @@
+import { notify } from "@/lib/notifications/notify"
 // hooks/useUnitQueries.ts
-import { unitAPI } from "@/services/unitAPI";
+import { getOrgUnits } from "@/actions/units/getUnitsAction";
+import createActionUnit from "@/actions/units/createActionUnit";
+import deleteUnit from "@/actions/units/deleteUnit";
+import getUnitById from "@/actions/units/getUnitById";
+import updateUnitById from "@/actions/units/updateUnitById";
 import { BriefUnitPayload, Unit, UnitCreateDTO, UpdateUnitPayload } from "@/types/unit";
 // import { BriefUnitPayload, Unit, UnitCreateDTO, UpdateUnitPayload } from "@/types/unit;
 import {
@@ -7,8 +12,6 @@ import {
   useQuery,
   useQueryClient
 } from "@tanstack/react-query";
-import { toast } from "sonner";
-
 // Query keys for caching
 export const UnitGreatKeys = {
   all: ["unit"] as const,
@@ -57,7 +60,13 @@ export const useOrgUnits = (
 ) => {
   return useQuery({
     queryKey: ['orgUnits', organizationId],
-    queryFn: () => unitAPI.getAllOrgUnits(organizationId),
+    queryFn: async () => {
+      const result = await getOrgUnits(organizationId);
+      if (!result.success) {
+        throw new Error(result.error || 'Failed to fetch units');
+      }
+      return result.data || [];
+    },
     initialData: options?.initialData,
     staleTime: 5 * 60 * 1000, // 5 minutes
   });
@@ -69,7 +78,7 @@ export function useUnit(id: string) {
   // Get a single Unit
   return useQuery({
     queryKey: UnitKeys.detail(id),
-    queryFn: () => unitAPI.deleteUnit(id),
+    queryFn: () => getUnitById(id),
     enabled: Boolean(id), // Only run if ID is provided
   });
 }
@@ -85,9 +94,10 @@ export function useCreateUnit() {
 
   // Create a new Unit
   return useMutation({
-    mutationFn: (data: UnitCreateDTO) => unitAPI.createUnit(data),
+    meta: { operation: 'create', entity: 'Unit' , suppressSuccessNotification: true, suppressErrorNotification: true },
+    mutationFn: (data: UnitCreateDTO) => createActionUnit(data),
     onSuccess: (_data, variables) => {
-      toast.success("Unit added successfully");
+      notify.success("Unit added successfully");
       // Invalidate Units list to trigger a refetch
       if (variables && (variables as any).organizationId) {
         queryClient.invalidateQueries({ queryKey: UnitKeys.briefOrgUnits((variables as any).organizationId) });
@@ -96,7 +106,7 @@ export function useCreateUnit() {
       }
     },
     onError: (error: Error) => {
-      toast.error("Failed to add Unit", {
+      notify.error("Failed to add Unit", {
         description: error.message || "Unknown error occurred",
       });
     },
@@ -107,7 +117,8 @@ export function useDeleteUnit() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (id: string) => unitAPI.deleteUnit(id),
+    meta: { operation: 'delete', entity: 'Unit' , suppressSuccessNotification: true, suppressErrorNotification: true },
+    mutationFn: (id: string) => deleteUnit(id),
     
     onMutate: async (id) => {
       // Get all relevant query keys that might contain this Unit
@@ -171,7 +182,7 @@ export function useDeleteUnit() {
     },
 
     onSuccess: async (data, id) => {
-      toast.success("Unit deleted successfully");
+      notify.success("Unit deleted successfully");
       
       // Invalidate and refetch all related queries to ensure data consistency
       await Promise.all([
@@ -202,7 +213,7 @@ export function useDeleteUnit() {
     },
 
     onError: (error: Error, id, context) => {
-      toast.error("Failed to delete Unit", {
+      notify.error("Failed to delete Unit", {
         description: error.message || "Unknown error occurred",
       });
 
@@ -240,7 +251,8 @@ export function useDeleteAUnit2() {
   const queryClient = useQueryClient();
 
   return useMutation({
-    mutationFn: (id: string) => unitAPI.deleteUnit(id),
+    meta: { operation: 'delete', entity: 'Unit2' , suppressSuccessNotification: true, suppressErrorNotification: true },
+    mutationFn: (id: string) => deleteUnit(id),
     
     onMutate: async (id) => {
       // Get all relevant query keys that might contain this Unit
@@ -304,13 +316,13 @@ export function useDeleteAUnit2() {
     },
 
     onSuccess: () => {
-      toast.success("Unit deleted successfully");
+      notify.success("Unit deleted successfully");
       // The optimistic update already happened in onMutate
       // No need to do anything else here for instant updates
     },
 
     onError: (error: Error, _id, context) => {
-      toast.error("Failed to delete Unit", {
+      notify.error("Failed to delete Unit", {
         description: error.message || "Unknown error occurred",
       });
 
@@ -340,8 +352,9 @@ export function useDeleteAUnitWithOrg() {
   const queryClient = useQueryClient();
 
   return useMutation({
+    meta: { operation: 'delete', entity: 'Unit Org' , suppressSuccessNotification: true, suppressErrorNotification: true },
     mutationFn: ({ id, organizationId }: { id: string; organizationId?: string }) => 
-      unitAPI.deleteUnit(id),
+      deleteUnit(id),
     
     onMutate: async ({ id, organizationId }) => {
       // Build query keys based on available data
@@ -396,11 +409,11 @@ export function useDeleteAUnitWithOrg() {
     },
 
     onSuccess: () => {
-      toast.success("Unit deleted successfully");
+      notify.success("Unit deleted successfully");
     },
 
     onError: (error: Error, _variables, context) => {
-      toast.error("Failed to delete Unit", {
+      notify.error("Failed to delete Unit", {
         description: error.message || "Unknown error occurred",
       });
 
@@ -432,8 +445,9 @@ export function useUpdateUnit() {
 
   // Update an existing Unit
   return useMutation({
+    meta: { operation: 'update', entity: 'Unit' , suppressSuccessNotification: true, suppressErrorNotification: true },
     mutationFn: ({ id, data }: { id: string; data: UpdateUnitPayload }) =>
-      unitAPI.updateUnit(id, data),
+      updateUnitById(id, data),
     onMutate: async (variables) => {
       await queryClient.cancelQueries({ queryKey: UnitKeys.detail(variables.id) });
       await queryClient.cancelQueries({ queryKey: UnitKeys.lists() });
@@ -453,7 +467,7 @@ export function useUpdateUnit() {
       return { previousUnitDetail, previousUnitsList };
     },
     onError: (error, variables, context) => {
-      toast.error("Failed to update Unit", {
+      notify.error("Failed to update Unit", {
         description: error.message || "Unknown error occurred",
       });
 
@@ -466,7 +480,7 @@ export function useUpdateUnit() {
       }
     },
     onSuccess: (updatedUnit, variables) => {
-      toast.success("Unit updated successfully");
+      notify.success("Unit updated successfully");
 
       queryClient.setQueryData(UnitKeys.detail(variables.id), (oldData: Unit | undefined) => {
         return { ...oldData, ...updatedUnit };

@@ -1,4 +1,6 @@
 "use client";
+
+import { notify } from "@/lib/notifications/notify"
 import { deleteSaving } from "@/actions/savings";
 import { deleteUser } from "@/actions/users/deleteUser";
 import {
@@ -22,7 +24,6 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { MoreHorizontal, Pencil, Trash } from "lucide-react";
 import Link from "next/link";
-import { toast } from "sonner";
 ;
 
 type ActionColumnProps = {
@@ -46,17 +47,17 @@ export default function ActionColumn({
         if (res?.ok) {
           window.location.reload();
         }
-        toast.success(`${model} Deleted Successfully`);
+        notify.success(`${model} Deleted Successfully`);
       } else if (model === "user") {
         const res = await deleteUser(id);
         if (res?.data) {
           window.location.reload();
         }
-        toast.success(`${model} Deleted Successfully`);
+        notify.success(`${model} Deleted Successfully`);
       }
     } catch (error) {
       console.log(error);
-      toast.error("Category Couldn't be deleted");
+      notify.error("Category Couldn't be deleted");
     }
   }
   return (

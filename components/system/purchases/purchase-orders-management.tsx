@@ -1,5 +1,6 @@
 "use client"
 
+import { notify } from "@/lib/notifications/notify"
 import { useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
@@ -20,8 +21,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Plus, Search, Filter, Eye, Edit, Package, Truck } from "lucide-react"
-import { useToast } from "@/hooks/use-toast"
-
 // Mock data for purchase orders
 const mockPurchaseOrders = [
   {
@@ -68,7 +67,6 @@ export default function PurchaseOrdersManagement() {
   const [statusFilter, setStatusFilter] = useState("all")
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false)
   const [expectedDate, setExpectedDate] = useState<Date | undefined>(undefined)
-  const { toast } = useToast()
 
   const getStatusColor = (status: string) => {
     switch (status) {
@@ -94,7 +92,7 @@ export default function PurchaseOrdersManagement() {
   })
 
   const handleCreateOrder = () => {
-    toast({
+    notify({
       title: "Purchase Order Created",
       description: "New purchase order has been created successfully.",
     })
@@ -103,7 +101,7 @@ export default function PurchaseOrdersManagement() {
 
   const handleApproveOrder = (orderId: string) => {
     setOrders(orders.map((order) => (order.id === orderId ? { ...order, status: "approved" } : order)))
-    toast({
+    notify({
       title: "Order Approved",
       description: `Purchase order ${orderId} has been approved.`,
     })
@@ -111,7 +109,7 @@ export default function PurchaseOrdersManagement() {
 
   const handleReceiveOrder = (orderId: string) => {
     setOrders(orders.map((order) => (order.id === orderId ? { ...order, status: "received" } : order)))
-    toast({
+    notify({
       title: "Order Received",
       description: `Purchase order ${orderId} has been marked as received.`,
     })
@@ -157,7 +155,7 @@ export default function PurchaseOrdersManagement() {
                   <Label htmlFor="expected-date">Expected Delivery</Label>
                   <DatePicker
                     date={expectedDate}
-                    setDate={setExpectedDate}
+                    onDateChange={setExpectedDate}
                     placeholder="Select expected delivery date"
                     minDate={new Date()}
                   />

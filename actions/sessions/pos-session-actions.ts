@@ -3,6 +3,16 @@
 import { db } from "@/prisma/db"
 import type { POSSessionStatus } from "@prisma/client"
 
+type DecimalLike = { toNumber?: () => number; toString: () => string } | number | string | null | undefined
+
+function toNumber(value: DecimalLike): number {
+  if (value == null) return 0
+  if (typeof value === "number") return value
+  if (typeof value === "string") return Number(value) || 0
+  if (typeof value.toNumber === "function") return value.toNumber()
+  return Number(value.toString()) || 0
+}
+
 // Unified types for session management
 export interface SessionData {
   stationId: string
@@ -38,14 +48,14 @@ export async function forceCloseActiveSession(
 
     const activeSession = await db.pOSSession.findFirst({
       where: {
-        stationId,
+        terminalId: stationId,
         status: "ACTIVE",
-        Location: {
+        location: {
           organizationId
         }
       },
       include: {
-        Location: true
+        location: true
       }
     })
 
@@ -65,7 +75,7 @@ export async function forceCloseActiveSession(
       // Close any open cash drawers for this station
       await db.cashDrawer.updateMany({
         where: {
-          stationId,
+          terminalId: stationId,
           isOpen: true,
         },
         data: {
@@ -121,7 +131,7 @@ export async function createPOSSession(data: SessionData): Promise<SessionRespon
         isActive: true,
       },
       include: {
-        Location: true
+        location: true
       }
     })
 
@@ -133,7 +143,7 @@ export async function createPOSSession(data: SessionData): Promise<SessionRespon
     }
 
     // Verify location belongs to organization
-    if (station.Location?.organizationId !== data.organizationId) {
+    if (station.location?.organizationId !== data.organizationId) {
       return {
         success: false,
         error: "Station location does not belong to the specified organization",
@@ -154,9 +164,10 @@ export async function createPOSSession(data: SessionData): Promise<SessionRespon
     const session = await db.pOSSession.create({
       data: {
         sessionNumber,
-        stationId: data.stationId,
+        terminalId: data.stationId,
         userId: data.userId,
         locationId: data.locationId,
+        organizationId: data.organizationId,
         status: "ACTIVE",
         startTime: new Date(),
         openingBalance: data.openingBalance,
@@ -166,7 +177,8 @@ export async function createPOSSession(data: SessionData): Promise<SessionRespon
         transactionCount: 0,
         cashTotal: 0,
         cardTotal: 0,
-        digitalTotal: 0,
+        mobileMoneyTotal: 0,
+        bankTransferTotal: 0,
       },
     })
 
@@ -175,7 +187,7 @@ export async function createPOSSession(data: SessionData): Promise<SessionRespon
     // Handle cash drawer setup
     let cashDrawer = await db.cashDrawer.findFirst({
       where: {
-        stationId: data.stationId,
+        terminalId: data.stationId,
         locationId: data.locationId,
       },
     })
@@ -184,7 +196,7 @@ export async function createPOSSession(data: SessionData): Promise<SessionRespon
       console.log("[Session] Creating new cash drawer")
       cashDrawer = await db.cashDrawer.create({
         data: {
-          stationId: data.stationId,
+          terminalId: data.stationId,
           locationId: data.locationId,
           name: `Drawer-${data.stationId}`,
           drawerNumber: "1",
@@ -267,7 +279,7 @@ export async function closePOSSession(data: CloseSessionData): Promise<SessionRe
     }
 
     // Calculate session variance
-    const expectedBalance = currentSession.openingBalance + currentSession.totalSales
+    const expectedBalance = toNumber(currentSession.openingBalance) + toNumber(currentSession.totalSales)
     const variance = data.closingBalance - expectedBalance
 
     // Update session with closing information
@@ -285,7 +297,7 @@ export async function closePOSSession(data: CloseSessionData): Promise<SessionRe
     // Find and close the cash drawer for this station
     const cashDrawer = await db.cashDrawer.findFirst({
       where: {
-        stationId: data.stationId,
+        terminalId: data.stationId,
         isOpen: true,
       },
     })
@@ -315,7 +327,7 @@ export async function closePOSSession(data: CloseSessionData): Promise<SessionRe
           type: "CLOSING_BALANCE",
           amount: data.closingBalance,
           reason: "Session closed",
-          balanceBefore: cashDrawer.currentBalance,
+          balanceBefore: toNumber(cashDrawer.currentBalance),
           balanceAfter: data.closingBalance,
           notes: variance !== 0 ? `Variance: $${variance.toFixed(2)}` : undefined,
         },
@@ -345,13 +357,13 @@ export async function getCurrentSession(stationId: string, organizationId?: stri
     console.log("[Session] Getting current session for station:", stationId)
 
     const whereClause: any = {
-      stationId,
+      terminalId: stationId,
       status: "ACTIVE" as POSSessionStatus,
     }
 
     // Add organization filter if provided
     if (organizationId) {
-      whereClause.Location = {
+      whereClause.location = {
         organizationId
       }
     }
@@ -362,12 +374,11 @@ export async function getCurrentSession(stationId: string, organizationId?: stri
         user: {
           select: {
             id: true,
-            name: true,
             firstName: true,
             lastName: true,
           },
         },
-        Location: {
+        location: {
           select: {
             id: true,
             name: true,
@@ -430,13 +441,13 @@ export async function getSessionHistory(
   try {
     const whereClause: any = {}
 
-    if (filters.stationId) whereClause.stationId = filters.stationId
+    if (filters.stationId) whereClause.terminalId = filters.stationId
     if (filters.userId) whereClause.userId = filters.userId
     if (filters.locationId) whereClause.locationId = filters.locationId
     if (filters.status) whereClause.status = { in: filters.status }
 
     if (filters.organizationId) {
-      whereClause.Location = {
+      whereClause.location = {
         organizationId: filters.organizationId
       }
     }
@@ -454,12 +465,11 @@ export async function getSessionHistory(
           user: {
             select: {
               id: true,
-              name: true,
               firstName: true,
               lastName: true,
             },
           },
-          Location: {
+          location: {
             select: {
               id: true,
               name: true,
@@ -529,7 +539,7 @@ export async function getTerminalsByLocation(locationId: string, organizationId:
         isActive: true
       },
       include: {
-        posSessions: {
+        sessions: {
           where: {
             status: 'ACTIVE'
           },
@@ -537,20 +547,20 @@ export async function getTerminalsByLocation(locationId: string, organizationId:
         }
       },
       orderBy: {
-        stationNumber: 'asc'
+        terminalNumber: 'asc'
       }
     })
 
     return terminals.map(terminal => ({
       id: terminal.id,
-      stationNumber: terminal.stationNumber,
+      stationNumber: terminal.terminalNumber,
       name: terminal.name,
       locationId: terminal.locationId,
       organizationId: terminal.organizationId,
       isActive: terminal.isActive,
       hasCashDrawer: terminal.hasCashDrawer,
-      hasActiveSession: terminal.posSessions.length > 0,
-      currentSessionId: terminal.posSessions[0]?.id || null
+      hasActiveSession: terminal.sessions.length > 0,
+      currentSessionId: terminal.sessions[0]?.id || null
     }))
   } catch (error) {
     console.error("[Session] Error fetching terminals:", error)

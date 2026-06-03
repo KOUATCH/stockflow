@@ -6,7 +6,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useCurrentPresenceStatus, useOrganizationPresenceOverview } from '@/hooks/usePresenceQueries';
 import { PRESENCE_STATUS_COLORS, PresenceStatus } from '@/types/presence';
 import { AlertTriangle, Clock, TrendingUp, Users } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { getEmployeePresenceStatuses } from '@/actions/presence/presence-actions';
+import { useClientAuth } from '@/hooks/useClientAuth';
 import { ActiveEmployeesList } from './ActiveEmployeesList';
 import { AttendanceChart } from './AttendanceChart';
 import { ClockInOutPanel } from './ClockInOutPanel';
@@ -27,11 +29,36 @@ export function PresenceDashboard({
   userRole = 'employee'
 }: PresenceDashboardProps) {
   const [selectedTab, setSelectedTab] = useState('overview');
+  const [employeeStatuses, setEmployeeStatuses] = useState<any[]>([]);
+  const [statusesLoading, setStatusesLoading] = useState(true);
 
   const { data: overview, isLoading: overviewLoading } = useOrganizationPresenceOverview(organizationId);
   const { data: currentStatus } = useCurrentPresenceStatus(currentUserId);
 
   const isManager = userRole === 'manager' || userRole === 'admin';
+
+  useEffect(() => {
+    const fetchEmployeeStatuses = async () => {
+      if (!organizationId) return;
+      try {
+        setStatusesLoading(true);
+        const result = await getEmployeePresenceStatuses(organizationId);
+        if (result.success && result.data) {
+          setEmployeeStatuses(result.data);
+        }
+      } catch (error) {
+        console.error('Error fetching employee statuses:', error);
+      } finally {
+        setStatusesLoading(false);
+      }
+    };
+
+    fetchEmployeeStatuses();
+
+    // Refresh every 30 seconds
+    const interval = setInterval(fetchEmployeeStatuses, 30000);
+    return () => clearInterval(interval);
+  }, [organizationId]);
 
   if (overviewLoading) {
     return (
@@ -131,14 +158,62 @@ export function PresenceDashboard({
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
                       <Users className="h-5 w-5" />
-                      Active Sessions
+                      Employee Status
                     </CardTitle>
                     <CardDescription>
-                      Currently active employee sessions
+                      Current employee presence status
                     </CardDescription>
                   </CardHeader>
                   <CardContent>
-                    <ActiveEmployeesList sessions={overview.sessions} />
+                    {statusesLoading ? (
+                      <div className="space-y-3">
+                        {[...Array(3)].map((_, i) => (
+                          <div key={i} className="flex items-center space-x-3">
+                            <div className="w-10 h-10 bg-gray-200 rounded-full animate-pulse"></div>
+                            <div className="flex-1 space-y-2">
+                              <div className="h-4 bg-gray-200 rounded animate-pulse"></div>
+                              <div className="h-3 bg-gray-200 rounded w-3/4 animate-pulse"></div>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : employeeStatuses.length > 0 ? (
+                      <div className="space-y-3">
+                        {employeeStatuses.slice(0, 5).map((employee) => (
+                          <div key={employee.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                            <div className="flex items-center space-x-3">
+                              <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                                <span className="text-sm font-medium text-blue-600">
+                                  {employee.name?.charAt(0) || 'U'}
+                                </span>
+                              </div>
+                              <div>
+                                <p className="font-medium text-sm">{employee.name}</p>
+                                <p className="text-xs text-gray-500">{employee.jobTitle || 'Employee'}</p>
+                              </div>
+                            </div>
+                            <div className="flex items-center space-x-2">
+                              <Badge className={`text-xs ${
+                                employee.status === 'CLOCKED_IN' ? 'bg-green-100 text-green-800' :
+                                employee.status === 'ON_BREAK' ? 'bg-yellow-100 text-yellow-800' :
+                                'bg-gray-100 text-gray-800'
+                              }`}>
+                                {employee.status === 'CLOCKED_IN' ? 'Working' :
+                                 employee.status === 'ON_BREAK' ? 'On Break' : 'Offline'}
+                              </Badge>
+                              <span className="text-xs text-gray-500">
+                                {employee.totalHoursToday.toFixed(1)}h
+                              </span>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-center py-4">
+                        <Users className="h-12 w-12 text-gray-400 mx-auto mb-2" />
+                        <p className="text-sm text-gray-500">No employee data available</p>
+                      </div>
+                    )}
                   </CardContent>
                 </Card>
               </div>
@@ -199,11 +274,61 @@ export function PresenceDashboard({
                   </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  {overview && (
-                    <ActiveEmployeesList
-                      sessions={overview.sessions}
-                      showDetails={true}
-                    />
+                  {statusesLoading ? (
+                    <div className="space-y-3">
+                      {[...Array(5)].map((_, i) => (
+                        <div key={i} className="flex items-center space-x-3">
+                          <div className="w-10 h-10 bg-gray-200 rounded-full animate-pulse"></div>
+                          <div className="flex-1 space-y-2">
+                            <div className="h-4 bg-gray-200 rounded animate-pulse"></div>
+                            <div className="h-3 bg-gray-200 rounded w-3/4 animate-pulse"></div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : employeeStatuses.length > 0 ? (
+                    <div className="space-y-3">
+                      {employeeStatuses.map((employee) => (
+                        <div key={employee.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
+                          <div className="flex items-center space-x-3">
+                            <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
+                              <span className="text-sm font-medium text-blue-600">
+                                {employee.name?.charAt(0) || 'U'}
+                              </span>
+                            </div>
+                            <div>
+                              <p className="font-medium text-sm">{employee.name}</p>
+                              <p className="text-xs text-gray-500">{employee.jobTitle || 'Employee'}</p>
+                              <div className="flex items-center space-x-4 text-xs text-gray-500">
+                                <span>Hours: {employee.totalHoursToday.toFixed(1)}h</span>
+                                {employee.isLate && <span className="text-red-500">Late</span>}
+                                {employee.location && <span>@{employee.location}</span>}
+                              </div>
+                            </div>
+                          </div>
+                          <div className="flex flex-col items-end space-y-1">
+                            <Badge className={`text-xs ${
+                              employee.status === 'CLOCKED_IN' ? 'bg-green-100 text-green-800' :
+                              employee.status === 'ON_BREAK' ? 'bg-yellow-100 text-yellow-800' :
+                              'bg-gray-100 text-gray-800'
+                            }`}>
+                              {employee.status === 'CLOCKED_IN' ? 'Working' :
+                               employee.status === 'ON_BREAK' ? 'On Break' : 'Offline'}
+                            </Badge>
+                            {employee.clockInTime && (
+                              <span className="text-xs text-gray-500">
+                                Since {new Date(employee.clockInTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-4">
+                      <Users className="h-12 w-12 text-gray-400 mx-auto mb-2" />
+                      <p className="text-sm text-gray-500">No employee data available</p>
+                    </div>
                   )}
                 </CardContent>
               </Card>

@@ -15,6 +15,7 @@ import {
   type StockAdjustmentResponse,
   type UpdateInventoryLevelData,
 } from "@/types/inventory"
+import { randomUUID } from "crypto"
 import { revalidatePath } from "next/cache"
 
 // Inventory Stats interface
@@ -31,6 +32,20 @@ export interface InventoryStatsResponse {
   success: boolean
   data?: InventoryStats
   error?: string | null
+}
+
+const toNumber = (value: unknown): number => {
+  if (value === null || value === undefined) return 0
+  if (typeof value === "number") return value
+  if (typeof value === "object" && "toNumber" in value && typeof value.toNumber === "function") {
+    return value.toNumber()
+  }
+  return Number(value)
+}
+
+const userName = (user: { firstName?: string | null; lastName?: string | null; email?: string | null } | null | undefined) => {
+  const fullName = [user?.firstName, user?.lastName].filter(Boolean).join(" ").trim()
+  return fullName || user?.email || null
 }
 
 /**
@@ -77,7 +92,7 @@ export async function getInventoryLevels(
         item: {
           select: {
             id: true,
-            name: true,
+            nameEn: true,
             sku: true,
             slug: true,
             costPrice: true,
@@ -106,14 +121,14 @@ export async function getInventoryLevels(
       id: level.id,
       itemId: level.itemId,
       locationId: level.locationId,
-      quantityOnHand: level.quantityOnHand,
-      quantityReserved: level.quantityReserved,
-      quantityAvailable: level.quantityAvailable,
-      quantityInTransit: level.quantityInTransit,
-      quantityOnOrder: level.quantityOnOrder,
-      averageCost: level.averageCost,
-      totalValue: level.totalValue,
-      reorderPoint: level.reorderPoint,
+      quantityOnHand: toNumber(level.quantityOnHand),
+      quantityReserved: toNumber(level.quantityReserved),
+      quantityAvailable: toNumber(level.quantityAvailable),
+      quantityInTransit: toNumber(level.quantityInTransit),
+      quantityOnOrder: toNumber(level.quantityOnOrder),
+      averageCost: toNumber(level.averageCost),
+      totalValue: toNumber(level.totalValue),
+      reorderPoint: toNumber(level.reorderPoint),
       lastCountDate: level.lastCountDate,
       lastTransactionAt: level.lastTransactionAt,
       createdAt: level.createdAt,
@@ -121,11 +136,11 @@ export async function getInventoryLevels(
       item: level.item
         ? {
             id: level.item.id,
-            name: level.item.name,
+            name: level.item.nameEn,
             sku: level.item.sku,
             slug: level.item.slug,
-            costPrice: level.item.costPrice,
-            sellingPrice: level.item.sellingPrice,
+            costPrice: toNumber(level.item.costPrice),
+            sellingPrice: toNumber(level.item.sellingPrice),
             imageUrls: level.item.imageUrls,
             thumbnail: level.item.thumbnail,
           }
@@ -214,7 +229,7 @@ export async function getInventoryStats(organizationId?: string): Promise<Invent
       include: {
         item: {
           select: {
-            name: true,
+            nameEn: true,
             sku: true,
           },
         },
@@ -226,7 +241,9 @@ export async function getInventoryStats(organizationId?: string): Promise<Invent
         },
         createdBy: {
           select: {
-            name: true,
+            firstName: true,
+            lastName: true,
+            email: true,
           },
         },
       },
@@ -235,9 +252,9 @@ export async function getInventoryStats(organizationId?: string): Promise<Invent
     const recentTransactions: InventoryTransaction[] = recentTransactionsData.map((txn) => ({
       id: txn.id,
       type: txn.type as TransactionType,
-      quantity: txn.quantity,
-      unitCost: txn.unitCost,
-      totalCost: txn.totalCost,
+      quantity: toNumber(txn.quantity),
+      unitCost: toNumber(txn.unitCost),
+      totalCost: toNumber(txn.totalCost),
       notes: txn.notes,
       itemId: txn.itemId,
       locationId: txn.locationId,
@@ -249,11 +266,11 @@ export async function getInventoryStats(organizationId?: string): Promise<Invent
       batchNumber: txn.batchNumber,
       serialNumbers: Array.isArray(txn.serialNumbers) ? txn.serialNumbers : [],
       expiryDate: txn.expiryDate,
-      balanceAfter: txn.balanceAfter,
+      balanceAfter: toNumber(txn.balanceAfter),
       createdAt: txn.createdAt,
       item: txn.item
         ? {
-            name: txn.item.name,
+            name: txn.item.nameEn,
             sku: txn.item.sku,
           }
         : undefined,
@@ -265,7 +282,7 @@ export async function getInventoryStats(organizationId?: string): Promise<Invent
         : undefined,
       createdBy: txn.createdBy
         ? {
-            name: txn.createdBy.name,
+            name: userName(txn.createdBy),
           }
         : undefined,
     }))
@@ -362,7 +379,7 @@ export async function getInventoryTransactions(
       include: {
         item: {
           select: {
-            name: true,
+            nameEn: true,
             sku: true,
           },
         },
@@ -374,7 +391,9 @@ export async function getInventoryTransactions(
         },
         createdBy: {
           select: {
-            name: true,
+            firstName: true,
+            lastName: true,
+            email: true,
           },
         },
       },
@@ -385,9 +404,9 @@ export async function getInventoryTransactions(
     const mappedTransactions: InventoryTransaction[] = transactions.map((txn) => ({
       id: txn.id,
       type: txn.type as TransactionType,
-      quantity: txn.quantity,
-      unitCost: txn.unitCost,
-      totalCost: txn.totalCost,
+      quantity: toNumber(txn.quantity),
+      unitCost: toNumber(txn.unitCost),
+      totalCost: toNumber(txn.totalCost),
       notes: txn.notes,
       itemId: txn.itemId,
       locationId: txn.locationId,
@@ -399,11 +418,11 @@ export async function getInventoryTransactions(
       batchNumber: txn.batchNumber,
       serialNumbers: Array.isArray(txn.serialNumbers) ? txn.serialNumbers : [],
       expiryDate: txn.expiryDate,
-      balanceAfter: txn.balanceAfter,
+      balanceAfter: toNumber(txn.balanceAfter),
       createdAt: txn.createdAt,
       item: txn.item
         ? {
-            name: txn.item.name,
+            name: txn.item.nameEn,
             sku: txn.item.sku,
           }
         : undefined,
@@ -415,7 +434,7 @@ export async function getInventoryTransactions(
         : undefined,
       createdBy: txn.createdBy
         ? {
-            name: txn.createdBy.name,
+            name: userName(txn.createdBy),
           }
         : undefined,
     }))
@@ -484,13 +503,13 @@ export async function updateInventoryLevel(
       const calculatedUpdates: any = { ...updates }
 
       if (updates.quantityOnHand !== undefined) {
-        const newQuantityReserved = updates.quantityReserved ?? currentLevel.quantityReserved
+        const newQuantityReserved = updates.quantityReserved ?? toNumber(currentLevel.quantityReserved)
         calculatedUpdates.quantityAvailable = updates.quantityOnHand - newQuantityReserved
-        calculatedUpdates.totalValue = updates.quantityOnHand * (updates.averageCost ?? currentLevel.averageCost)
+        calculatedUpdates.totalValue = updates.quantityOnHand * (updates.averageCost ?? toNumber(currentLevel.averageCost))
       }
 
       if (updates.quantityReserved !== undefined && updates.quantityOnHand === undefined) {
-        calculatedUpdates.quantityAvailable = currentLevel.quantityOnHand - updates.quantityReserved
+        calculatedUpdates.quantityAvailable = toNumber(currentLevel.quantityOnHand) - updates.quantityReserved
       }
 
       calculatedUpdates.lastTransactionAt = new Date()
@@ -502,7 +521,7 @@ export async function updateInventoryLevel(
           item: {
             select: {
               id: true,
-              name: true,
+              nameEn: true,
               sku: true,
               slug: true,
               costPrice: true,
@@ -527,14 +546,14 @@ export async function updateInventoryLevel(
       id: result.id,
       itemId: result.itemId,
       locationId: result.locationId,
-      quantityOnHand: result.quantityOnHand,
-      quantityReserved: result.quantityReserved,
-      quantityAvailable: result.quantityAvailable,
-      quantityInTransit: result.quantityInTransit,
-      quantityOnOrder: result.quantityOnOrder,
-      averageCost: result.averageCost,
-      totalValue: result.totalValue,
-      reorderPoint: result.reorderPoint,
+      quantityOnHand: toNumber(result.quantityOnHand),
+      quantityReserved: toNumber(result.quantityReserved),
+      quantityAvailable: toNumber(result.quantityAvailable),
+      quantityInTransit: toNumber(result.quantityInTransit),
+      quantityOnOrder: toNumber(result.quantityOnOrder),
+      averageCost: toNumber(result.averageCost),
+      totalValue: toNumber(result.totalValue),
+      reorderPoint: toNumber(result.reorderPoint),
       lastCountDate: result.lastCountDate,
       lastTransactionAt: result.lastTransactionAt,
       createdAt: result.createdAt,
@@ -542,11 +561,11 @@ export async function updateInventoryLevel(
       item: result.item
         ? {
             id: result.item.id,
-            name: result.item.name,
+            name: result.item.nameEn,
             sku: result.item.sku,
             slug: result.item.slug,
-            costPrice: result.item.costPrice,
-            sellingPrice: result.item.sellingPrice,
+            costPrice: toNumber(result.item.costPrice),
+            sellingPrice: toNumber(result.item.sellingPrice),
             imageUrls: result.item.imageUrls,
             thumbnail: result.item.thumbnail,
           }
@@ -650,7 +669,7 @@ export async function createInventoryTransaction(data: {
         throw new Error("Inventory level not found for this item and location")
       }
 
-      const balanceAfter = inventoryLevel.quantityOnHand + data.quantity
+      const balanceAfter = toNumber(inventoryLevel.quantityOnHand) + data.quantity
 
       const location = await tx.location.findUnique({
         where: { id: data.locationId },
@@ -666,6 +685,7 @@ export async function createInventoryTransaction(data: {
       // Create transaction
       const transaction = await tx.inventoryTransaction.create({
         data: {
+          id: randomUUID(),
           type: data.type,
           quantity: data.quantity,
           unitCost: data.unitCost,
@@ -686,7 +706,7 @@ export async function createInventoryTransaction(data: {
         include: {
           item: {
             select: {
-              name: true,
+              nameEn: true,
               sku: true,
             },
           },
@@ -698,7 +718,9 @@ export async function createInventoryTransaction(data: {
           },
           createdBy: {
             select: {
-              name: true,
+              firstName: true,
+              lastName: true,
+              email: true,
             },
           },
         },
@@ -709,9 +731,9 @@ export async function createInventoryTransaction(data: {
         where: { id: inventoryLevel.id },
         data: {
           quantityOnHand: balanceAfter,
-          quantityAvailable: balanceAfter - inventoryLevel.quantityReserved,
+          quantityAvailable: balanceAfter - toNumber(inventoryLevel.quantityReserved),
           lastTransactionAt: new Date(),
-          totalValue: balanceAfter * inventoryLevel.averageCost,
+          totalValue: balanceAfter * toNumber(inventoryLevel.averageCost),
         },
       })
 
@@ -721,9 +743,9 @@ export async function createInventoryTransaction(data: {
     const mappedTransaction: InventoryTransaction = {
       id: result.id,
       type: result.type as TransactionType,
-      quantity: result.quantity,
-      unitCost: result.unitCost,
-      totalCost: result.totalCost,
+      quantity: toNumber(result.quantity),
+      unitCost: toNumber(result.unitCost),
+      totalCost: toNumber(result.totalCost),
       notes: result.notes,
       itemId: result.itemId,
       locationId: result.locationId,
@@ -735,11 +757,11 @@ export async function createInventoryTransaction(data: {
       batchNumber: result.batchNumber,
       serialNumbers: Array.isArray(result.serialNumbers) ? result.serialNumbers : [],
       expiryDate: result.expiryDate,
-      balanceAfter: result.balanceAfter,
+      balanceAfter: toNumber(result.balanceAfter),
       createdAt: result.createdAt,
       item: result.item
         ? {
-            name: result.item.name,
+            name: result.item.nameEn,
             sku: result.item.sku,
           }
         : undefined,
@@ -751,7 +773,7 @@ export async function createInventoryTransaction(data: {
         : undefined,
       createdBy: result.createdBy
         ? {
-            name: result.createdBy.name,
+            name: userName(result.createdBy),
           }
         : undefined,
     }
@@ -854,7 +876,7 @@ export async function getInventoryAlerts(organizationId?: string): Promise<{
     const outOfStock = inventoryLevels.filter((level) => level.quantityAvailable <= 0)
 
     const overStock = inventoryLevels.filter(
-      (level) => level.maxStockLevel > 0 && level.quantityAvailable > level.maxStockLevel,
+      (level) => (level.maxStockLevel ?? 0) > 0 && level.quantityAvailable > (level.maxStockLevel ?? 0),
     )
 
     return {
@@ -1063,23 +1085,25 @@ export async function createInventoryLevel(data: CreateInventoryLevelData): Prom
 
     const inventoryLevel = await db.inventoryLevel.create({
       data: {
+        id: randomUUID(),
         itemId: data.itemId,
         locationId: data.locationId,
         quantityOnHand: data.quantityOnHand,
         quantityReserved,
         quantityAvailable: data.quantityOnHand - quantityReserved,
-        quantityInTransit: 0,
-        quantityOnOrder: 0,
+        quantityInTransit: data.quantityInTransit ?? 0,
+        quantityOnOrder: data.quantityOnOrder ?? 0,
         averageCost,
         totalValue: data.quantityOnHand * averageCost,
         reorderPoint,
         lastTransactionAt: new Date(),
+        updatedAt: new Date(),
       },
       include: {
         item: {
           select: {
             id: true,
-            name: true,
+            nameEn: true,
             sku: true,
             slug: true,
             costPrice: true,
@@ -1103,14 +1127,14 @@ export async function createInventoryLevel(data: CreateInventoryLevelData): Prom
       id: inventoryLevel.id,
       itemId: inventoryLevel.itemId,
       locationId: inventoryLevel.locationId,
-      quantityOnHand: inventoryLevel.quantityOnHand,
-      quantityReserved: inventoryLevel.quantityReserved,
-      quantityAvailable: inventoryLevel.quantityAvailable,
-      quantityInTransit: inventoryLevel.quantityInTransit,
-      quantityOnOrder: inventoryLevel.quantityOnOrder,
-      averageCost: inventoryLevel.averageCost,
-      totalValue: inventoryLevel.totalValue,
-      reorderPoint: inventoryLevel.reorderPoint,
+      quantityOnHand: toNumber(inventoryLevel.quantityOnHand),
+      quantityReserved: toNumber(inventoryLevel.quantityReserved),
+      quantityAvailable: toNumber(inventoryLevel.quantityAvailable),
+      quantityInTransit: toNumber(inventoryLevel.quantityInTransit),
+      quantityOnOrder: toNumber(inventoryLevel.quantityOnOrder),
+      averageCost: toNumber(inventoryLevel.averageCost),
+      totalValue: toNumber(inventoryLevel.totalValue),
+      reorderPoint: toNumber(inventoryLevel.reorderPoint),
       lastCountDate: inventoryLevel.lastCountDate,
       lastTransactionAt: inventoryLevel.lastTransactionAt,
       createdAt: inventoryLevel.createdAt,
@@ -1118,11 +1142,11 @@ export async function createInventoryLevel(data: CreateInventoryLevelData): Prom
       item: inventoryLevel.item
         ? {
             id: inventoryLevel.item.id,
-            name: inventoryLevel.item.name,
+            name: inventoryLevel.item.nameEn,
             sku: inventoryLevel.item.sku,
             slug: inventoryLevel.item.slug,
-            costPrice: inventoryLevel.item.costPrice,
-            sellingPrice: inventoryLevel.item.sellingPrice,
+            costPrice: toNumber(inventoryLevel.item.costPrice),
+            sellingPrice: toNumber(inventoryLevel.item.sellingPrice),
             imageUrls: inventoryLevel.item.imageUrls,
             thumbnail: inventoryLevel.item.thumbnail,
           }

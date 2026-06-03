@@ -17,16 +17,14 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Separator } from "@/components/ui/separator"
 import { Textarea } from "@/components/ui/textarea"
-// import {
-//   useAddCashToDrawer,
-//   useCashDrawersByLocation,
-//   useCloseCashDrawer,
-//   useOpenCashDrawer,
-//   useRemoveCashFromDrawer,
-// } from "@/hooks/cashDrawer/useCashDrawerHooks"
-// import {
-
-// } from "@/hooks/cash-drawer/use-cash-drawer"
+import {
+  addCashToDrawer,
+  closeCashDrawer,
+  getCashDrawersByLocation,
+  openCashDrawer,
+  removeCashFromDrawer,
+} from "@/actions/cash-drawer/cashDrawerActions"
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
 import { format } from "date-fns"
 import {
   BarChart3,
@@ -44,6 +42,16 @@ import {
 } from "lucide-react"
 import { useState } from "react"
 
+type DecimalLike = { toNumber?: () => number; toString: () => string } | number | string | null | undefined
+
+function toNumber(value: DecimalLike) {
+  if (value == null) return 0
+  if (typeof value === "number") return value
+  if (typeof value === "string") return Number(value) || 0
+  if (typeof value.toNumber === "function") return value.toNumber()
+  return Number(value.toString()) || 0
+}
+
 interface CashDrawerDashboardProps {
   locationId: string
   userId: string
@@ -51,6 +59,7 @@ interface CashDrawerDashboardProps {
 }
 
 export function CashDrawerDashboard({ locationId, userId, sessionId }: CashDrawerDashboardProps) {
+  const queryClient = useQueryClient()
   const [selectedDrawerId, setSelectedDrawerId] = useState<string>("")
   const [isOpenDialogOpen, setIsOpenDialogOpen] = useState(false)
   const [isCloseDialogOpen, setIsCloseDialogOpen] = useState(false)
@@ -63,13 +72,28 @@ export function CashDrawerDashboard({ locationId, userId, sessionId }: CashDrawe
   const [notes, setNotes] = useState("")
 
   // Hooks
-  const { data: drawersResult } = useCashDrawersByLocation(locationId)
-  const openDrawerMutation = useOpenCashDrawer()
-  const closeDrawerMutation = useCloseCashDrawer()
-  const addCashMutation = useAddCashToDrawer()
-  const removeCashMutation = useRemoveCashFromDrawer()
+  const drawersQueryKey = ["cashDrawersByLocation", locationId] as const
+  const { data: drawersResult } = useQuery({
+    queryKey: drawersQueryKey,
+    queryFn: () => getCashDrawersByLocation(locationId),
+    enabled: !!locationId,
+  })
+  const invalidateDrawers = () => queryClient.invalidateQueries({ queryKey: drawersQueryKey })
+  const openDrawerMutation = useMutation({ mutationFn: openCashDrawer, onSuccess: invalidateDrawers })
+  const closeDrawerMutation = useMutation({ mutationFn: closeCashDrawer, onSuccess: invalidateDrawers })
+  const addCashMutation = useMutation({ mutationFn: addCashToDrawer, onSuccess: invalidateDrawers })
+  const removeCashMutation = useMutation({ mutationFn: removeCashFromDrawer, onSuccess: invalidateDrawers })
 
-  const drawers = drawersResult?.success && Array.isArray(drawersResult.data) ? drawersResult.data : []
+  const drawers = drawersResult?.success && Array.isArray(drawersResult.data)
+    ? drawersResult.data.map((drawer) => ({
+      ...drawer,
+      currentBalance: toNumber(drawer.currentBalance),
+      events: drawer.transactions?.map((event) => ({
+        ...event,
+        amount: toNumber(event.amount),
+      })) ?? [],
+    }))
+    : []
 
   const handleOpenDrawer = async () => {
     if (!selectedDrawerId || !openingBalance) return

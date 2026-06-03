@@ -1,6 +1,5 @@
+import { notify } from "@/lib/notifications/notify"
 import { QueryKey, useMutation, useQueryClient } from "@tanstack/react-query";
-import { toast } from "sonner";
-
 type MutationContext<T> = {
   previousDetail?: T;
   previousList?: T[];
@@ -40,7 +39,7 @@ function useEntityMutation<T extends { id: string; organizationId?: string }>(
     },
 
     onError: (error, variables, context) => {
-      toast.error(errorMessage, {
+      notify.error(errorMessage, {
         description: error.message || "Unknown error occurred",
       });
 
@@ -53,7 +52,7 @@ function useEntityMutation<T extends { id: string; organizationId?: string }>(
     },
 
     onSuccess: (updatedItem, variables) => {
-      toast.success(successMessage);
+      notify.success(successMessage);
 
       if (!updatedItem) return;
 

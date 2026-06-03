@@ -1,4 +1,6 @@
 "use client";
+
+import { notify } from "@/lib/notifications/notify"
 import { Button } from "@/components/ui/button";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import * as XLSX from "xlsx";
@@ -24,8 +26,6 @@ import {
   Options,
   SelectValue,
 } from "react-tailwindcss-select/dist/components/type";
-import { toast } from "sonner";
-
 // Model configuration for download paths
 const MODEL_EXCEL_PATHS = {
   category: "/Categories.xlsx",
@@ -133,11 +133,11 @@ export default function TableHeaderRefactored({
             
             setLoading(false);
             setUploadSuccess(true);
-            // toast.success("All Data Synced Successfully with No errors 👍");
+            // notify.success("All Data Synced Successfully with No errors 👍");
           } catch (error) {
             setUploadSuccess(false);
             setLoading(false);
-            toast.error("Something went wrong, Please Try again 😢");
+            notify.error("Something went wrong, Please Try again 😢");
             console.log(error);
           }
         }

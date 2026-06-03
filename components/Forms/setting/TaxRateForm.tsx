@@ -1,9 +1,10 @@
 "use client"
 
+import { notify } from "@/lib/notifications/notify"
 import { type Column, ConfirmationDialog, DataTable, EntityForm, TableActions } from "@/components/ui/data-table"
 import { FormControl, FormDescription, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form"
 import { Input } from "@/components/ui/input"
-import { useCreateATaxRate, useDeleteATaxRate } from "@/hooks/taxRateHooks"
+import { useCreateTaxRate, useDeleteTaxRate } from "@/hooks/taxRateHooks"
 import { useOrgTaxRates, useUpdateATaxRate } from "@/hooks/useAllTaxRateQueries"
 import { BriefTaxRatePayload } from "@/types/taxRates"
 // import { useCreateATaxRate, useDeleteATaxRate } from "@/hooks/TaxRateHooks"
@@ -14,7 +15,6 @@ import { format } from "date-fns"
 import { Scale } from "lucide-react"
 import { useCallback, useEffect, useMemo, useState } from "react"
 import { useForm } from "react-hook-form"
-import { toast } from "sonner"
 import * as XLSX from "xlsx"
 import { z } from "zod"
 
@@ -45,9 +45,9 @@ const TaxRateForm = ({ title, organizationId, editingId, initialData }: TaxRateP
 
   // Hooks
   const { refetch } = useOrgTaxRates(organizationId)
-  const createTaxRateMutation = useCreateATaxRate()
+  const createTaxRateMutation = useCreateTaxRate()
   const updateTaxRateMutation = useUpdateATaxRate()
-  const deleteTaxRateMutation = useDeleteATaxRate()
+  const deleteTaxRateMutation = useDeleteTaxRate()
 
   // Local state
   const [formDialogOpen, setFormDialogOpen] = useState(false)
@@ -87,7 +87,7 @@ const TaxRateForm = ({ title, organizationId, editingId, initialData }: TaxRateP
       const formData = {
         id: TaxRate.id,
         taxRateName: TaxRate.taxRateName || "",
-        rate: TaxRate.rate || 0,
+        rate: Number(TaxRate.rate) || 0,
       };
 
       form.reset(formData);
@@ -177,11 +177,11 @@ const TaxRateForm = ({ title, organizationId, editingId, initialData }: TaxRateP
         // Export to file
         XLSX.writeFile(workbook, fileName)
 
-        toast.success("Export successful", {
+        notify.success("Export successful", {
           description: `TaxRates exported to ${fileName}`,
         })
       } catch (error) {
-        toast.error("Export failed", {
+        notify.error("Export failed", {
           description: error instanceof Error ? error.message : "Unknown error occurred",
         })
       }
@@ -233,13 +233,13 @@ const TaxRateForm = ({ title, organizationId, editingId, initialData }: TaxRateP
 
         createTaxRateMutation.mutate(newTaxRateData, {
           onSuccess: async () => {
-            toast.success("TaxRate added successfully")
+            notify.success("TaxRate added successfully")
             setFormDialogOpen(false)
             resetFormToDefaults()
             await refetch()
           },
           onError: (error: any) => {
-            toast.error("Failed to add TaxRate", {
+            notify.error("Failed to add TaxRate", {
               description: error?.message || "Unknown error occurred",
             })
           },
@@ -262,13 +262,13 @@ const TaxRateForm = ({ title, organizationId, editingId, initialData }: TaxRateP
           },
           {
             onSuccess: async () => {
-              toast.success("TaxRate updated successfully")
+              notify.success("TaxRate updated successfully")
               setFormDialogOpen(false)
               resetFormToDefaults()
               await refetch()
             },
             onError: (error: any) => {
-              toast.error("Failed to update TaxRate", {
+              notify.error("Failed to update TaxRate", {
                 description: error?.message || "Unknown error occurred",
               })
             },
@@ -276,7 +276,7 @@ const TaxRateForm = ({ title, organizationId, editingId, initialData }: TaxRateP
         )
       }
     } catch (error) {
-      toast.error("An unexpected error occurred", {
+      notify.error("An unexpected error occurred", {
         description: error instanceof Error ? error.message : "Unknown error",
       })
     }
@@ -324,11 +324,11 @@ const TaxRateForm = ({ title, organizationId, editingId, initialData }: TaxRateP
     if (TaxRateToDelete) {
       deleteTaxRateMutation.mutate(TaxRateToDelete.id, {
         onSuccess: () => {
-          toast.success("TaxRate deleted successfully")
+          notify.success("TaxRate deleted successfully")
           refetch()
         },
         onError: (error: any) => {
-          toast.error("Failed to delete TaxRate", {
+          notify.error("Failed to delete TaxRate", {
             description: error?.message || "Unknown error occurred",
           })
         },

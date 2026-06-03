@@ -7,11 +7,13 @@ import { Input } from "@/components/ui/input"
 import { Switch } from "@/components/ui/switch"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
+import { getLocaleFromPathname, localizePath } from "@/i18n/routing"
+import { DEFAULT_LOCALE } from "@/types/bilingual"
 import type { Customer } from "@/types/customerTypes"
 import { customerEditSchema, type CustomerEditFormData } from "@/validations/customer"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { Clock, CreditCard, DollarSign, Edit, FileText, Loader2, Mail, Phone, Save, User, X } from "lucide-react"
-import { useRouter } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 import { useForm } from "react-hook-form"
 
 interface CustomerFormEditProps {
@@ -22,6 +24,9 @@ interface CustomerFormEditProps {
 
 export function CustomerFormEdit({ customer, onSubmit, isLoading = false }: CustomerFormEditProps) {
   const router = useRouter()
+  const pathname = usePathname()
+  const locale = getLocaleFromPathname(pathname) ?? DEFAULT_LOCALE
+  const localizedHref = (href: string) => localizePath(href, locale)
   const { formSuccess, formError, operationStart } = useNotifications()
 
   const form = useForm<CustomerEditFormData>({
@@ -68,7 +73,7 @@ export function CustomerFormEdit({ customer, onSubmit, isLoading = false }: Cust
             <Button
               variant="outline"
               size="sm"
-              onClick={() => router.push(`/dashboard/customers/${customer.id}`)}
+              onClick={() => router.push(localizedHref(`/dashboard/customers/${customer.id}`))}
               className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm border-slate-200 dark:border-slate-700"
             >
               <X className="h-4 w-4 mr-2" />
@@ -83,7 +88,7 @@ export function CustomerFormEdit({ customer, onSubmit, isLoading = false }: Cust
                   Edit Customer
                 </h1>
                 <p className="text-sm text-slate-600 dark:text-slate-400 mt-1">
-                  Update {customer.name}'s information and settings
+                  Update {customer.name}&apos;s information and settings
                 </p>
               </div>
             </div>
@@ -333,7 +338,7 @@ export function CustomerFormEdit({ customer, onSubmit, isLoading = false }: Cust
                       <Button
                         type="button"
                         variant="outline"
-                        onClick={() => router.push(`/dashboard/customers/${customer.id}`)}
+                        onClick={() => router.push(localizedHref(`/dashboard/customers/${customer.id}`))}
                         disabled={form.formState.isSubmitting || isLoading}
                         className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-sm border-slate-200 dark:border-slate-700"
                       >

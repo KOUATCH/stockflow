@@ -1,11 +1,11 @@
 "use client"
+
+import { notify } from "@/lib/notifications/notify"
 import { keepPreviousData, useQuery } from "@tanstack/react-query";
 // Import Server Actions from a "use server" module
 import { getSuppliersByOrgId } from "@/actions/suppliers/getSuppliersByOrgId";
 import { SupplierKeys } from "@/types/queryKeys";
 import type { SupplierResponse, SupplierWithRelations } from "@/types/supplier";
-import { toast } from "sonner";
-
 /**
  * Hook to fetch suppliers with optional filters
  * Handles undefined filters gracefully by disabling the query
@@ -25,7 +25,7 @@ const useGetOrgSuppliersHook = (organizationId: string, options?: { enabled?: bo
         return result
       } catch (error) {
         console.error("Failed to fetch organization suppliers:", error)
-        toast.error("Failed to load suppliers. Please try again.")
+        notify.error("Failed to load suppliers. Please try again.")
         throw error // Re-throw to let React Query handle it
       }
     },

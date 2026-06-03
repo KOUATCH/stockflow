@@ -1,0 +1,55 @@
+import type { Prisma } from "@prisma/client";
+
+export const standardInclude = {
+  supplier: {
+    select: {
+      id: true,
+      name: true,
+      code: true,
+      email: true,
+      phone: true,
+      contactPerson: true,
+      organizationId: true,
+      createdAt: true,
+      updatedAt: true,
+      address: true,
+      isActive: true,
+      taxId: true,
+      paymentTerms: true,
+      notes: true,
+    },
+  },
+  location: { select: { id: true, name: true, address: true } },
+  createdBy: { select: { id: true, firstName: true, lastName: true, email: true } },
+  approvedBy: { select: { id: true, firstName: true, lastName: true, email: true } },
+  lines: {
+    select: {
+      id: true,
+      itemId: true,
+      orderedQuantity: true,
+      receivedQuantity: true,
+      unitCost: true,
+      discount: true,
+      taxRate: true,
+      taxAmount: true,
+      lineTotal: true,
+      notes: true,
+      item: {
+        select: {
+          id: true,
+          nameEn: true,
+          nameFr: true,
+          sku: true,
+          descriptionEn: true,
+          descriptionFr: true,
+          costPrice: true,
+          trackSerialNumbers: true,
+          trackBatches: true,
+          trackExpiry: true,
+        },
+      },
+    },
+    orderBy: { createdAt: "asc" },
+  },
+  organization: { select: { id: true, name: true } },
+} satisfies Prisma.PurchaseOrderInclude;

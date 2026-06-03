@@ -1,5 +1,6 @@
 "use client";
 
+import { notify } from "@/lib/notifications/notify"
 import {
   Card,
   CardContent,
@@ -18,8 +19,7 @@ import TextInput from "@/components/FormInputs/TextInput";
 import createBrand from "@/actions/brands/createBrands";
 import { BrandCreateDTO, UpdateBrandPayload } from "@/types/brand";
 import { Brand } from "@prisma/client";
-import { toast } from "sonner";
-
+type BrandFormValues = BrandCreateDTO & { slug?: string };
 export type SelectOptionProps = {
   label: string;
   value: string;
@@ -40,38 +40,43 @@ const NewBrandForm = ({
     handleSubmit,
     reset,
     formState: { errors },
-  } = useForm<BrandCreateDTO>({
+  } = useForm<BrandFormValues>({
     defaultValues: {
-      brandName: initialData?.brandName,
+      brandName: initialData?.brandName || initialData?.nameEn || "",
+      nameEn: initialData?.nameEn || initialData?.brandName || "",
       slug: initialData?.slug || "",
-      organizationId: initialData?.organizationId || "",
+      organizationId: initialData?.organizationId || organizationId,
     },
   });
 
   const [loading, setLoading] = useState(false);
 
-  async function saveBrands(data: BrandCreateDTO) {
+  async function saveBrands(data: BrandFormValues) {
     try {
       setLoading(true);
+      const brandName = data.brandName || data.nameEn || "";
+      const payload: BrandCreateDTO = {
+        brandName,
+        nameEn: brandName,
+        organizationId: data.organizationId ?? organizationId,
+      };
 
       if (editingId) {
         const updatePayload: UpdateBrandPayload = {
           id: editingId,
-          brandName: data.brandName,
+          ...payload,
           slug: data.slug,
-          organizationId: data.organizationId ?? "",
-          createdAt: initialData?.createdAt || new Date(),
         };
         await updateBrandById(editingId, updatePayload);
         setLoading(false);
-        toast.success("Updated Successfully!", { description: " Brand Updated successfully" });
+        notify.success("Updated Successfully!", { description: " Brand Updated successfully" });
         window.location.reload();
         reset()
       } else {
-        await createBrand(data);
+        await createBrand(payload);
         setLoading(false);
         // Toast
-        toast.success("Successfully Created!", { description: " Brand Created successfully" });
+        notify.success("Successfully Created!", { description: " Brand Created successfully" });
         window.location.reload();
         reset()
       }

@@ -1,4 +1,4 @@
-import { ApiResponse } from "./item";
+import { ApiResponse } from "./itemTypes";
 
 export interface BriefUnitData {
   data: BriefUnitDTO[];
@@ -26,11 +26,15 @@ export type BriefUnitResponse = ApiResponse<BriefUnitPayload[]>;
 export type UnitResponse = ApiResponse<UnitDTO[]>;
 
 export type UnitCreateDTO = {
-  id: string;
-  organizationId: string | null;
-  createdAt: Date;
-  name: string;
+  id?: string;
+  organizationId: string;
+  createdAt?: Date;
+  nameEn: string;
+  nameFr?: string | null;
   symbol: string;
+  type?: string;
+  baseUnit?: string;
+  conversionRate?: number;
 }
 // types/Unit.ts
 export interface Unit {
@@ -51,20 +55,27 @@ export type UnitPayload = {
 };
 
 export type UpdateUnitPayload = {
-  id: string;
-  symbol: string;
-  name:string;
-  createdAt: Date;
+  id?: string;
+  symbol?: string;
+  nameEn?: string;
+  nameFr?: string | null;
+  createdAt?: Date;
 };
 
 export type UnitDTO = {
-
   id: string;
   organizationId: string | null;
   createdAt: Date;
   updatedAt: Date;
-  name: string;
+  nameEn: string;
+  nameFr?: string | null;
   symbol: string;
+  type?: string | null;
+  baseUnit?: string | null;
+  conversionRate?: string | null;
+  isActive: boolean;
+  // Helper for backwards compatibility
+  name?: string; // computed from nameEn
 };
 
 export type BriefUnitDTO = {

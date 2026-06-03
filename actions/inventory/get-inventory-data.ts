@@ -4,6 +4,70 @@ import { getAuthenticatedUser } from "@/lib/auth-server";
 import { db } from "@/prisma/db";
 import { InventoryLevelResponse, InventoryTransactionResponse } from "@/types/inventory";
 
+function toNumber(value: any): number {
+  if (value === null || value === undefined) return 0;
+  if (typeof value === "number") return value;
+  if (typeof value === "string") return Number(value) || 0;
+  if (typeof value.toNumber === "function") return value.toNumber();
+  return Number(value) || 0;
+}
+
+function mapInventoryLevel(level: any) {
+  return {
+    ...level,
+    quantityOnHand: toNumber(level.quantityOnHand),
+    quantityReserved: toNumber(level.quantityReserved),
+    quantityAvailable: toNumber(level.quantityAvailable),
+    quantityInTransit: toNumber(level.quantityInTransit),
+    quantityOnOrder: toNumber(level.quantityOnOrder),
+    averageCost: toNumber(level.averageCost),
+    totalValue: toNumber(level.totalValue),
+    reorderPoint: toNumber(level.reorderPoint),
+    unitCost: toNumber(level.averageCost),
+    maxStockLevel: toNumber(level.item?.maxStockLevel),
+    item: level.item
+      ? {
+          ...level.item,
+          name: level.item.nameEn ?? level.item.nameFr ?? "",
+          costPrice: toNumber(level.item.costPrice),
+          sellingPrice: toNumber(level.item.sellingPrice),
+        }
+      : undefined,
+  };
+}
+
+function mapInventoryTransaction(transaction: any) {
+  return {
+    ...transaction,
+    type: transaction.type as any,
+    quantity: toNumber(transaction.quantity),
+    unitCost: toNumber(transaction.unitCost),
+    totalCost: toNumber(transaction.totalCost),
+    balanceAfter: toNumber(transaction.balanceAfter),
+    referenceType: transaction.referenceType as any,
+    item: transaction.item
+      ? {
+          name: transaction.item.nameEn ?? transaction.item.nameFr ?? "",
+          sku: transaction.item.sku ?? "",
+        }
+      : undefined,
+    location: transaction.location
+      ? {
+          name: transaction.location.name ?? "",
+          code: transaction.location.code ?? "",
+        }
+      : undefined,
+    createdBy: transaction.createdBy
+      ? {
+          name:
+            [transaction.createdBy.firstName, transaction.createdBy.lastName].filter(Boolean).join(" ") ||
+            transaction.createdBy.email ||
+            null,
+        }
+      : undefined,
+  };
+}
+
 export async function getInventoryLevels(locationId?: string): Promise<InventoryLevelResponse> {
   try {
     const user = await getAuthenticatedUser();
@@ -23,13 +87,15 @@ export async function getInventoryLevels(locationId?: string): Promise<Inventory
         item: {
           select: {
             id: true,
-            name: true,
+            nameEn: true,
+            nameFr: true,
             sku: true,
             slug: true,
             imageUrls: true,
             costPrice: true,
             sellingPrice: true,
             thumbnail: true,
+            maxStockLevel: true,
             organizationId: true,
             createdAt: true,
           },
@@ -44,14 +110,14 @@ export async function getInventoryLevels(locationId?: string): Promise<Inventory
         },
       },
       orderBy: [
-        { item: { name: 'asc' } },
+        { item: { nameEn: 'asc' } },
         { location: { name: 'asc' } },
       ],
     });
 
     return {
       success: true,
-      data: levels,
+      data: levels.map(mapInventoryLevel),
       error: null,
     };
   } catch (error) {
@@ -85,18 +151,22 @@ export async function getInventoryTransactions(
       include: {
         item: {
           select: {
-            name: true,
+            nameEn: true,
+            nameFr: true,
             sku: true,
           },
         },
         location: {
           select: {
             name: true,
+            code: true,
           },
         },
         createdBy: {
           select: {
-            name: true,
+            firstName: true,
+            lastName: true,
+            email: true,
           },
         },
       },
@@ -108,7 +178,7 @@ export async function getInventoryTransactions(
 
     return {
       success: true,
-      data: transactions,
+      data: transactions.map(mapInventoryTransaction),
       error: null,
     };
   } catch (error) {
@@ -142,11 +212,13 @@ export async function getLowStockItems(threshold: number = 10) {
         item: {
           select: {
             id: true,
-            name: true,
+            nameEn: true,
+            nameFr: true,
             sku: true,
             slug: true,
             imageUrls: true,
             minStockLevel: true,
+            maxStockLevel: true,
             thumbnail: true,
             organizationId: true,
             createdAt: true,
@@ -168,7 +240,7 @@ export async function getLowStockItems(threshold: number = 10) {
 
     return {
       success: true,
-      data: lowStockItems,
+      data: lowStockItems.map(mapInventoryLevel),
       error: null,
     };
   } catch (error) {

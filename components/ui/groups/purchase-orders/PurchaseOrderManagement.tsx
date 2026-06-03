@@ -1,7 +1,7 @@
 "use client"
 
+import { notify } from "@/lib/notifications/notify"
 import { memo, useCallback, useMemo, useState } from "react"
-import { toast } from "sonner"
 import * as XLSX from "xlsx"
 
 // Import TanStack Table components
@@ -60,7 +60,6 @@ import {
   Calendar,
   CheckCircle,
   ChevronDownIcon,
-  Clock,
   DollarSign,
   Download,
   Edit,
@@ -68,7 +67,6 @@ import {
   FileText,
   MoreHorizontal,
   Package,
-  PlayCircle,
   Plus,
   RefreshCw,
   Search,
@@ -76,8 +74,10 @@ import {
   Truck,
   XCircle
 } from "lucide-react"
+import { getLocaleFromPathname, localizePath } from "@/i18n/routing"
+import { DEFAULT_LOCALE } from "@/types/bilingual"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 
 // Import real hooks and types
 import {
@@ -105,30 +105,6 @@ interface LocationData {
   address?: string | null
 }
 
-// Status color mapping
-const getStatusVariant = (status: PurchaseOrderData['status']) => {
-  switch (status) {
-    case 'DRAFT':
-      return { color: 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300', icon: Clock }
-    case 'SUBMITTED':
-      return { color: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300', icon: PlayCircle }
-    case 'APPROVED':
-      return { color: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300', icon: CheckCircle }
-    // case 'ORDERED':
-    //   return { color: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300', icon: ShoppingCart }
-    case 'PARTIALLY_RECEIVED':
-      return { color: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300', icon: Package }
-    case 'RECEIVED':
-      return { color: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300', icon: CheckCircle }
-    case 'COMPLETED':
-      return { color: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300', icon: CheckCircle }
-    case 'CANCELLED':
-      return { color: 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300', icon: XCircle }
-    default:
-      return { color: 'bg-slate-100 text-slate-700 dark:bg-slate-800 dark:text-slate-300', icon: AlertTriangle }
-  }
-}
-
 // Action button colors based on action type
 const getActionButtonVariant = (action: string, status: PurchaseOrderData['status']) => {
   switch (action) {
@@ -139,11 +115,11 @@ const getActionButtonVariant = (action: string, status: PurchaseOrderData['statu
         'bg-emerald-50 text-emerald-600 hover:bg-emerald-100 dark:bg-emerald-900/20 dark:text-emerald-400 dark:hover:bg-emerald-900/40' :
         'bg-slate-50 text-slate-400 cursor-not-allowed dark:bg-slate-800 dark:text-slate-600'
     case 'approve':
-      return 'bg-green-50 text-green-600 hover:bg-green-100 dark:bg-green-900/20 dark:text-green-400 dark:hover:bg-green-900/40'
+      return 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 dark:bg-emerald-950/35 dark:text-emerald-300 dark:hover:bg-emerald-950/50'
     case 'receive':
-      return 'bg-purple-50 text-purple-600 hover:bg-purple-100 dark:bg-purple-900/20 dark:text-purple-400 dark:hover:bg-purple-900/40'
+      return 'bg-blue-50 text-blue-700 hover:bg-blue-100 dark:bg-blue-950/35 dark:text-blue-300 dark:hover:bg-blue-950/50'
     case 'cancel':
-      return 'bg-red-50 text-red-600 hover:bg-red-100 dark:bg-red-900/20 dark:text-red-400 dark:hover:bg-red-900/40'
+      return 'bg-rose-50 text-rose-700 hover:bg-rose-100 dark:bg-rose-950/35 dark:text-rose-300 dark:hover:bg-rose-950/50'
     default:
       return 'bg-slate-50 text-slate-600 hover:bg-slate-100 dark:bg-slate-800 dark:text-slate-400 dark:hover:bg-slate-700'
   }
@@ -173,7 +149,8 @@ const getColumns = (
   handleReceiveClick: (po: PurchaseOrderData) => void,
   handleCancelClick: (po: PurchaseOrderData) => void,
   handleDeleteClick: (po: PurchaseOrderData) => void,
-  handleDownloadPDF: (po: PurchaseOrderData) => void
+  handleDownloadPDF: (po: PurchaseOrderData) => void,
+  localizedHref: (href: string) => string
 ): ColumnDef<PurchaseOrderData>[] => [
     {
       id: "select",
@@ -292,10 +269,10 @@ const getColumns = (
         const isOverdue = deliveryDate < now && !['RECEIVED', 'COMPLETED', 'CANCELLED'].includes(row.original.status)
 
         return (
-          <div className={`text-sm flex items-center gap-1 ${isOverdue ? 'text-red-600 dark:text-red-400' : ''}`}>
+          <div className={`text-sm flex items-center gap-1 ${isOverdue ? 'text-rose-700 dark:text-rose-300' : ''}`}>
             <Truck className="w-3 h-3 text-slate-400" />
             {formatDate(date)}
-            {isOverdue && <AlertTriangle className="w-3 h-3 text-red-500" />}
+            {isOverdue && <AlertTriangle className="w-3 h-3 text-rose-500" />}
           </div>
         )
       },
@@ -347,7 +324,7 @@ const getColumns = (
         return (
           <div className="flex items-center gap-1">
             {/* View Action - Always available */}
-            <Link href={`/dashboard/purchase-orders/${po.id}`}>
+            <Link href={localizedHref(`/dashboard/purchase-orders/${po.id}`)}>
               <Button
                 variant="ghost"
                 size="sm"
@@ -359,7 +336,7 @@ const getColumns = (
               </Button>
             </Link>
             {/* Edit Action - Only for DRAFT status */}
-            <Link href={`/dashboard/purchase-orders/${po.id}/edit`}>
+            <Link href={localizedHref(`/dashboard/purchase-orders/${po.id}/edit`)}>
               <Button
                 variant="ghost"
                 size="sm"
@@ -387,7 +364,7 @@ const getColumns = (
                 {status === 'SUBMITTED' && (
                   <DropdownMenuItem
                     onClick={() => handleApproveClick(po)}
-                    className="text-green-600 focus:text-green-600"
+                    className="text-emerald-700 focus:text-emerald-700 dark:text-emerald-300 dark:focus:text-emerald-300"
                   >
                     <CheckCircle className="mr-2 h-4 w-4" />
                     Approve Order
@@ -398,7 +375,7 @@ const getColumns = (
                 {(['APPROVED', 'ORDERED', 'PARTIALLY_RECEIVED'].includes(status)) && (
                   <DropdownMenuItem
                     onClick={() => handleReceiveClick(po)}
-                    className="text-purple-600 focus:text-purple-600"
+                    className="text-blue-700 focus:text-blue-700 dark:text-blue-300 dark:focus:text-blue-300"
                   >
                     <Package className="mr-2 h-4 w-4" />
                     Receive Items
@@ -409,7 +386,7 @@ const getColumns = (
                 {!['RECEIVED', 'COMPLETED', 'CANCELLED'].includes(status) && (
                   <DropdownMenuItem
                     onClick={() => handleCancelClick(po)}
-                    className="text-red-600 focus:text-red-600"
+                    className="text-rose-700 focus:text-rose-700 dark:text-rose-300 dark:focus:text-rose-300"
                   >
                     <XCircle className="mr-2 h-4 w-4" />
                     Cancel Order
@@ -420,7 +397,7 @@ const getColumns = (
                 {status === 'DRAFT' && (
                   <DropdownMenuItem
                     onClick={() => handleDeleteClick(po)}
-                    className="text-red-600 focus:text-red-600"
+                    className="text-rose-700 focus:text-rose-700 dark:text-rose-300 dark:focus:text-rose-300"
                   >
                     <XCircle className="mr-2 h-4 w-4" />
                     Delete Order
@@ -450,6 +427,7 @@ const ModernPurchaseOrderTable = ({
   onExport,
   title,
   subtitle,
+  localizedHref,
 }: {
   data: PurchaseOrderData[]
   columns: ColumnDef<PurchaseOrderData>[]
@@ -459,6 +437,7 @@ const ModernPurchaseOrderTable = ({
   onExport: (data: PurchaseOrderData[]) => void
   title: string
   subtitle: string
+  localizedHref: (href: string) => string
 }) => {
   const [sorting, setSorting] = useState<SortingState>([])
   const [columnFilters, setColumnFilters] = useState<ColumnFiltersState>([])
@@ -516,19 +495,19 @@ const ModernPurchaseOrderTable = ({
   }
 
   return (
-    <div className="space-y-4">
+    <div className="min-w-0 space-y-5 text-[var(--dash-text)]">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="space-y-1">
-          <h2 className="text-2xl font-semibold text-slate-900 dark:text-white">{title}</h2>
-          <p className="text-sm text-slate-600 dark:text-slate-400">{subtitle}</p>
+      <div className="flex min-w-0 flex-col justify-between gap-4 lg:flex-row lg:items-center">
+        <div className="min-w-0 space-y-1">
+          <h2 className="text-2xl font-semibold text-[var(--dash-text)]">{title}</h2>
+          <p className="break-words text-sm text-[var(--dash-text-soft)]">{subtitle}</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="grid w-full grid-cols-2 gap-2 sm:w-auto sm:flex sm:flex-wrap sm:items-center">
           <Button
             variant="outline"
             size="sm"
             onClick={onRefresh}
-            className="bg-white/80 hover:bg-white dark:bg-slate-800/80 dark:hover:bg-slate-800"
+            className="dashboard-button-secondary h-9 justify-center rounded-lg"
           >
             <RefreshCw className="w-4 h-4 mr-2" />
             Refresh
@@ -537,15 +516,15 @@ const ModernPurchaseOrderTable = ({
             variant="outline"
             size="sm"
             onClick={() => onExport(table.getFilteredRowModel().rows.map(row => row.original))}
-            className="bg-white/80 hover:bg-white dark:bg-slate-800/80 dark:hover:bg-slate-800"
+            className="dashboard-button-secondary h-9 justify-center rounded-lg"
           >
             <Download className="w-4 h-4 mr-2" />
             Export
           </Button>
-          <Link href="/dashboard/purchase-orders/new">
+          <Link href={localizedHref("/dashboard/purchase-orders/new")}>
             <Button
               size="sm"
-              className="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700"
+              className="dashboard-button-primary h-9 w-full justify-center rounded-lg sm:w-auto"
             >
               <Plus className="w-4 h-4 mr-2" />
               Create PO
@@ -555,25 +534,25 @@ const ModernPurchaseOrderTable = ({
       </div>
 
       {/* Filters */}
-      <div className="flex items-center space-x-4">
-        <div className="relative flex-1 max-w-sm">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-400 w-4 h-4" />
+      <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center">
+        <div className="relative min-w-0 flex-1 sm:max-w-sm">
+          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--dash-text-faint)]" />
           <Input
             placeholder="Search purchase orders..."
             value={globalFilter ?? ""}
             onChange={(event) => setGlobalFilter(event.target.value)}
-            className="pl-10 bg-white/80 dark:bg-slate-800/80"
+            className="dashboard-control h-10 w-full rounded-lg pl-10"
           />
         </div>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
-            <Button variant="outline" size="sm" className="bg-white/80 hover:bg-white dark:bg-slate-800/80 dark:hover:bg-slate-800">
+            <Button variant="outline" size="sm" className="dashboard-button-secondary h-10 justify-center rounded-lg">
               <SlidersHorizontal className="w-4 h-4 mr-2" />
               View
               <ChevronDownIcon className="ml-2 h-4 w-4" />
             </Button>
           </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-48">
+          <DropdownMenuContent align="end" className="w-48 border-[var(--dash-border-subtle)] bg-[var(--dash-surface-raised)] text-[var(--dash-text)]">
             <DropdownMenuLabel>Toggle columns</DropdownMenuLabel>
             <DropdownMenuSeparator />
             {table
@@ -597,22 +576,22 @@ const ModernPurchaseOrderTable = ({
 
       {/* Selected rows info */}
       {Object.keys(rowSelection).length > 0 && (
-        <div className="flex items-center gap-2 text-sm text-slate-600 dark:text-slate-400 bg-blue-50 dark:bg-blue-900/20 p-2 rounded-lg">
+        <div className="dashboard-filter-chip flex items-center gap-2 rounded-lg p-2 text-sm">
           <span>{Object.keys(rowSelection).length} of {table.getFilteredRowModel().rows.length} row(s) selected</span>
         </div>
       )}
 
       {/* Table */}
-      <div className="rounded-xl border border-slate-200/60 dark:border-slate-700/60 bg-white/50 dark:bg-slate-800/50 backdrop-blur-sm overflow-hidden">
+      <div className="dashboard-table-shell dashboard-data-table min-w-0 overflow-x-auto rounded-lg">
         <Table>
-          <TableHeader className="bg-slate-50/80 dark:bg-slate-800/80">
+          <TableHeader>
             {table.getHeaderGroups().map((headerGroup) => (
-              <TableRow key={headerGroup.id} className="border-slate-200/60 dark:border-slate-700/60">
+              <TableRow key={headerGroup.id} className="border-[var(--dash-border-subtle)]">
                 {headerGroup.headers.map((header) => {
                   return (
                     <TableHead
                       key={header.id}
-                      className="font-semibold text-slate-700 dark:text-slate-300"
+                      className="font-semibold text-[var(--dash-text-soft)]"
                     >
                       {header.isPlaceholder
                         ? null
@@ -632,12 +611,12 @@ const ModernPurchaseOrderTable = ({
                 <TableRow
                   key={row.id}
                   data-state={row.getIsSelected() && "selected"}
-                  className="border-slate-200/40 dark:border-slate-700/40 hover:bg-slate-50/80 dark:hover:bg-slate-800/50 transition-colors"
+                  className="border-[var(--dash-border-subtle)] transition-colors hover:bg-[rgba(73,198,229,0.1)] data-[state=selected]:bg-[rgba(73,198,229,0.14)]"
                 >
                   {row.getVisibleCells().map((cell) => (
                     <TableCell
                       key={cell.id}
-                      className="py-4"
+                      className="py-4 text-[var(--dash-text-muted)]"
                     >
                       {flexRender(
                         cell.column.columnDef.cell,
@@ -651,7 +630,7 @@ const ModernPurchaseOrderTable = ({
               <TableRow>
                 <TableCell
                   colSpan={columns.length}
-                  className="h-24 text-center text-slate-500 dark:text-slate-400"
+                  className="h-24 text-center text-[var(--dash-text-soft)]"
                 >
                   No purchase orders found.
                 </TableCell>
@@ -662,8 +641,8 @@ const ModernPurchaseOrderTable = ({
       </div>
 
       {/* Pagination */}
-      <div className="flex items-center justify-between space-x-2 py-4">
-        <div className="flex-1 text-sm text-slate-600 dark:text-slate-400">
+      <div className="flex flex-col gap-3 py-1 sm:flex-row sm:items-center sm:justify-between">
+        <div className="min-w-0 flex-1 text-sm text-[var(--dash-text-soft)]">
           {Object.keys(rowSelection).length > 0 && (
             <span>{Object.keys(rowSelection).length} of {table.getFilteredRowModel().rows.length} row(s) selected. </span>
           )}
@@ -680,7 +659,7 @@ const ModernPurchaseOrderTable = ({
             size="sm"
             onClick={() => table.previousPage()}
             disabled={!table.getCanPreviousPage()}
-            className="bg-white/80 hover:bg-white dark:bg-slate-800/80 dark:hover:bg-slate-800"
+            className="dashboard-button-secondary h-9 rounded-lg disabled:opacity-50"
           >
             Previous
           </Button>
@@ -689,7 +668,7 @@ const ModernPurchaseOrderTable = ({
             size="sm"
             onClick={() => table.nextPage()}
             disabled={!table.getCanNextPage()}
-            className="bg-white/80 hover:bg-white dark:bg-slate-800/80 dark:hover:bg-slate-800"
+            className="dashboard-button-secondary h-9 rounded-lg disabled:opacity-50"
           >
             Next
           </Button>
@@ -715,6 +694,9 @@ const PurchaseOrderManagement = memo(function PurchaseOrderManagement({
   initialLocationData
 }: PurchaseOrderManagementProps) {
   const router = useRouter()
+  const pathname = usePathname()
+  const locale = getLocaleFromPathname(pathname) ?? DEFAULT_LOCALE
+  const localizedHref = useCallback((href: string) => localizePath(href, locale), [locale])
 
   // Use real data hooks
   const { data: purchaseOrdersResponse, isLoading, error, refetch } = usePurchaseOrders(organizationId)
@@ -807,19 +789,19 @@ const PurchaseOrderManagement = memo(function PurchaseOrderManagement({
   // Action handlers with real mutations
   const handleViewClick = useCallback((po: PurchaseOrderData) => {
     // Navigate to view page
-    router.push(`/dashboard/purchase-orders/${po.id}`)
-  }, [router])
+    router.push(localizedHref(`/dashboard/purchase-orders/${po.id}`))
+  }, [localizedHref, router])
 
   const handleEditClick = useCallback((po: PurchaseOrderData) => {
     if (po.status !== 'DRAFT') {
-      toast.error("Cannot edit", {
+      notify.error("Cannot edit", {
         description: "Only draft purchase orders can be edited"
       })
       return
     }
     // Navigate to edit page
-    router.push(`/dashboard/purchase-orders/${po.id}/edit`)
-  }, [router])
+    router.push(localizedHref(`/dashboard/purchase-orders/${po.id}/edit`))
+  }, [localizedHref, router])
 
   const handleApproveClick = useCallback((po: PurchaseOrderData) => {
     openConfirmationDialog(
@@ -834,11 +816,11 @@ const PurchaseOrderManagement = memo(function PurchaseOrderManagement({
 
   const handleReceiveClick = useCallback((po: PurchaseOrderData) => {
     // Navigate to purchase order detail page where receive functionality exists
-    router.push(`/dashboard/purchase-orders/${po.id}?tab=receive`)
-    toast.info("Receive Items", {
+    router.push(localizedHref(`/dashboard/purchase-orders/${po.id}?tab=receive`))
+    notify.info("Receive Items", {
       description: `Opening receive dialog for ${po.orderNumber}`
     })
-  }, [router])
+  }, [localizedHref, router])
 
   const handleCancelClick = useCallback((po: PurchaseOrderData) => {
     openConfirmationDialog(
@@ -853,7 +835,7 @@ const PurchaseOrderManagement = memo(function PurchaseOrderManagement({
 
   const handleDeleteClick = useCallback((po: PurchaseOrderData) => {
     if (po.status !== 'DRAFT') {
-      toast.error("Cannot delete", {
+      notify.error("Cannot delete", {
         description: "Only draft purchase orders can be deleted"
       })
       return
@@ -872,14 +854,14 @@ const PurchaseOrderManagement = memo(function PurchaseOrderManagement({
   const handleDownloadPDF = useCallback((po: PurchaseOrderData) => {
     // Navigate to PDF download or API endpoint
     window.open(`/api/purchase-orders/${po.id}/pdf?organizationId=${organizationId}`, '_blank')
-    toast.success("PDF Download", {
+    notify.success("PDF Download", {
       description: `Download initiated for ${po.orderNumber}`
     })
   }, [organizationId])
 
   const handleRefresh = useCallback(async () => {
     await refetch()
-    toast.success("Data refreshed", {
+    notify.success("Data refreshed", {
       description: "Purchase orders have been updated"
     })
   }, [refetch])
@@ -907,11 +889,11 @@ const PurchaseOrderManagement = memo(function PurchaseOrderManagement({
       XLSX.utils.book_append_sheet(wb, ws, "Purchase Orders")
       XLSX.writeFile(wb, `purchase-orders-${format(new Date(), 'yyyy-MM-dd')}.xlsx`)
 
-      toast.success("Export successful", {
+      notify.success("Export successful", {
         description: `Exported ${data.length} purchase orders`
       })
     } catch (error) {
-      toast.error("Export failed", {
+      notify.error("Export failed", {
         description: "Failed to export purchase orders"
       })
     }
@@ -942,7 +924,8 @@ const PurchaseOrderManagement = memo(function PurchaseOrderManagement({
       handleReceiveClick,
       handleCancelClick,
       handleDeleteClick,
-      handleDownloadPDF
+      handleDownloadPDF,
+      localizedHref
     ),
     [
       formatCurrencyValue,
@@ -953,7 +936,8 @@ const PurchaseOrderManagement = memo(function PurchaseOrderManagement({
       handleReceiveClick,
       handleCancelClick,
       handleDeleteClick,
-      handleDownloadPDF
+      handleDownloadPDF,
+      localizedHref
     ]
   )
 
@@ -969,12 +953,13 @@ const PurchaseOrderManagement = memo(function PurchaseOrderManagement({
       <ModernPurchaseOrderTable
         data={purchaseOrdersArray}
         columns={columns}
-        isLoading={isLoading}
+        isLoading={isLoading && purchaseOrdersArray.length === 0}
         onRefresh={handleRefresh}
         onAdd={handleAdd}
         onExport={handleExport}
         title={title}
         subtitle={subtitle}
+        localizedHref={localizedHref}
       />
 
       {/* Confirmation Dialog */}
@@ -985,9 +970,9 @@ const PurchaseOrderManagement = memo(function PurchaseOrderManagement({
         <DialogContent>
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
-              {confirmationDialog.type === 'delete' && <XCircle className="h-5 w-5 text-red-500" />}
-              {confirmationDialog.type === 'cancel' && <XCircle className="h-5 w-5 text-orange-500" />}
-              {confirmationDialog.type === 'approve' && <CheckCircle className="h-5 w-5 text-green-500" />}
+              {confirmationDialog.type === 'delete' && <XCircle className="h-5 w-5 text-rose-500" />}
+              {confirmationDialog.type === 'cancel' && <XCircle className="h-5 w-5 text-amber-500" />}
+              {confirmationDialog.type === 'approve' && <CheckCircle className="h-5 w-5 text-emerald-500" />}
               {confirmationDialog.title}
             </DialogTitle>
             <DialogDescription>

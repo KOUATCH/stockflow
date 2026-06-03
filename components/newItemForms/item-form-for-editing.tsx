@@ -1,5 +1,6 @@
 "use client"
 
+import { notify } from "@/lib/notifications/notify"
 import ImageUploadButton from "@/components/FormInputs/ImageUploadButton"
 import { Badge } from "@/components/ui/badge"
 import { Button } from "@/components/ui/button"
@@ -31,14 +32,15 @@ import { type UnitDTO } from "@/types/unit"
 import { Barcode, Calendar, DollarSign, Hash, Package, Ruler, Scale, Settings, Tag, Warehouse } from 'lucide-react'
 import { useEffect, useMemo, useState } from "react"
 import { useForm } from "react-hook-form"
-import { toast } from "sonner"
 import { z } from "zod"
 import { zodResolver } from "@hookform/resolvers/zod"
 
 // -------- Schemas (align to Prisma Item model) --------
 const basicInfoSchema = z.object({
-  name: z.string().min(1, "Name is required"),
-  description: z.string().optional(),
+  nameEn: z.string().min(1, "English name is required"),
+  nameFr: z.string().optional(),
+  descriptionEn: z.string().optional(),
+  descriptionFr: z.string().optional(),
   imageUrls: z.string().optional(),
   thumbnail: z.string().optional(),
 })
@@ -156,8 +158,10 @@ export default function ItemFormForEditing({
   const basicInfoForm = useForm<BasicInfoFormValues>({
     resolver: zodResolver(basicInfoSchema),
     defaultValues: {
-      name: "",
-      description: "",
+      nameEn: "",
+      nameFr: "",
+      descriptionEn: "",
+      descriptionFr: "",
       imageUrls: "",
       thumbnail: "",
     },
@@ -228,8 +232,10 @@ export default function ItemFormForEditing({
     if (!open || !itemData) return
 
     basicInfoForm.reset({
-      name: getItemValue("name", ""),
-      description: getItemValue("description", ""),
+      nameEn: getItemValue("nameEn", ""),
+      nameFr: getItemValue("nameFr", ""),
+      descriptionEn: getItemValue("descriptionEn", ""),
+      descriptionFr: getItemValue("descriptionFr", ""),
       imageUrls: String(getItemValue("imageUrls", "")),
       thumbnail: getItemValue("thumbnail", ""),
     })
@@ -283,7 +289,7 @@ export default function ItemFormForEditing({
   // ------------ Submit Handlers ------------
   const guardItem = () => {
     if (!itemData?.id) {
-      toast.error("Item data is missing. Cannot update item.")
+      notify.error("Item data is missing. Cannot update item.")
       return false
     }
     return true
@@ -294,16 +300,18 @@ export default function ItemFormForEditing({
     setIsSubmitting(true)
     try {
       const updateData = {
-        name: data.name,
-        description: data.description,
+        nameEn: data.nameEn,
+        nameFr: data.nameFr ?? "",
+        descriptionEn: data.descriptionEn ?? "",
+        descriptionFr: data.descriptionFr ?? "",
         imageUrls: data.imageUrls ?? "",
         thumbnail: data.thumbnail ?? "",
       }
       await updateItemMutation.mutateAsync({ id: itemData!.id, data: updateData })
-      toast.success("Basic information updated")
+      notify.success("Basic information updated")
       onSuccess?.()
     } catch (err: any) {
-      toast.error("Failed to update basic information", { description: err?.message || "Unknown error" })
+      notify.error("Failed to update basic information", { description: err?.message || "Unknown error" })
     } finally {
       setIsSubmitting(false)
     }
@@ -320,10 +328,10 @@ export default function ItemFormForEditing({
         weight: data.weight ?? 0,
       }
       await updateItemDetailsMutation.mutateAsync({ id: itemData!.id, data: updateData })
-      toast.success("Item details updated")
+      notify.success("Item details updated")
       onSuccess?.()
     } catch (err: any) {
-      toast.error("Failed to update item details", { description: err?.message || "Unknown error" })
+      notify.error("Failed to update item details", { description: err?.message || "Unknown error" })
     } finally {
       setIsSubmitting(false)
     }
@@ -341,10 +349,10 @@ export default function ItemFormForEditing({
         reorderQuantity: data.reorderQuantity ?? 0,
       }
       await updateItemStockMutation.mutateAsync({ id: itemData!.id, data: updateData })
-      toast.success("Inventory settings updated")
+      notify.success("Inventory settings updated")
       onSuccess?.()
     } catch (err: any) {
-      toast.error("Failed to update inventory settings", { description: err?.message || "Unknown error" })
+      notify.error("Failed to update inventory settings", { description: err?.message || "Unknown error" })
     } finally {
       setIsSubmitting(false)
     }
@@ -352,8 +360,8 @@ export default function ItemFormForEditing({
 
   const handleItemCodesSubmit = async (_data: ItemCodesFormValues) => {
     // Optional: Implement codes update if your backend stores these on Item
-    // Kept as a no-op with success toast for now
-    toast.success("Item codes updated")
+    // Kept as a no-op with success notification for now
+    notify.success("Item codes updated")
     onSuccess?.()
   }
 
@@ -366,10 +374,10 @@ export default function ItemFormForEditing({
         sellingPrice: data.sellingPrice,
       }
       await updateItemPricingMutation.mutateAsync({ id: itemData!.id, data: updateData })
-      toast.success("Pricing updated")
+      notify.success("Pricing updated")
       onSuccess?.()
     } catch (err: any) {
-      toast.error("Failed to update pricing", { description: err?.message || "Unknown error" })
+      notify.error("Failed to update pricing", { description: err?.message || "Unknown error" })
     } finally {
       setIsSubmitting(false)
     }
@@ -386,10 +394,10 @@ export default function ItemFormForEditing({
         taxRateId: data.taxRateId || null,
       }
       await updateItemRelationsMutation.mutateAsync({ id: itemData!.id, data: updateData })
-      toast.success("Relations updated")
+      notify.success("Relations updated")
       onSuccess?.()
     } catch (err: any) {
-      toast.error("Failed to update relations", { description: err?.message || "Unknown error" })
+      notify.error("Failed to update relations", { description: err?.message || "Unknown error" })
     } finally {
       setIsSubmitting(false)
     }
@@ -408,10 +416,10 @@ export default function ItemFormForEditing({
         slug: data.slug ?? "",
       }
       await updateItemMutation.mutateAsync({ id: itemData!.id, data: updateData })
-      toast.success("Tracking updated")
+      notify.success("Tracking updated")
       onSuccess?.()
     } catch (err: any) {
-      toast.error("Failed to update tracking", { description: err?.message || "Unknown error" })
+      notify.error("Failed to update tracking", { description: err?.message || "Unknown error" })
     } finally {
       setIsSubmitting(false)
     }
@@ -429,7 +437,7 @@ export default function ItemFormForEditing({
       <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-2xl">
-            Edit Item: {String(getItemValue("name", "Unknown Item"))}
+            Edit Item: {String(getItemValue("nameEn", "Unknown Item"))}
           </DialogTitle>
         </DialogHeader>
 
@@ -466,10 +474,10 @@ export default function ItemFormForEditing({
                     <form onSubmit={basicInfoForm.handleSubmit(handleBasicInfoSubmit)} className="space-y-4">
                       <FormField
                         control={basicInfoForm.control}
-                        name="name"
+                        name="nameEn"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Item Name *</FormLabel>
+                            <FormLabel>English Item Name *</FormLabel>
                             <FormControl>
                               <Input placeholder="Enter item name" {...field} />
                             </FormControl>
@@ -480,12 +488,40 @@ export default function ItemFormForEditing({
 
                       <FormField
                         control={basicInfoForm.control}
-                        name="description"
+                        name="nameFr"
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Description</FormLabel>
+                            <FormLabel>French Item Name</FormLabel>
+                            <FormControl>
+                              <Input placeholder="Enter French item name" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={basicInfoForm.control}
+                        name="descriptionEn"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>English Description</FormLabel>
                             <FormControl>
                               <Textarea placeholder="Enter item description" className="min-h-[100px]" {...field} />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={basicInfoForm.control}
+                        name="descriptionFr"
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>French Description</FormLabel>
+                            <FormControl>
+                              <Textarea placeholder="Enter French item description" className="min-h-[100px]" {...field} />
                             </FormControl>
                             <FormMessage />
                           </FormItem>
@@ -882,7 +918,7 @@ export default function ItemFormForEditing({
                             <FormControl>
                               <Input placeholder="Manufacturer Part Number" {...field} />
                             </FormControl>
-                            <FormDescription>Manufacturer's part number</FormDescription>
+                              <FormDescription>Manufacturer&apos;s part number</FormDescription>
                             <FormMessage />
                           </FormItem>
                         )}

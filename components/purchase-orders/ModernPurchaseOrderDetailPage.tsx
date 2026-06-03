@@ -10,7 +10,9 @@ import { Skeleton } from "@/components/ui/skeleton"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Textarea } from "@/components/ui/textarea"
+import { getLocaleFromPathname, localizePath } from "@/i18n/routing"
 import { formatCurrency } from "@/lib/formatCurrency"
+import { DEFAULT_LOCALE } from "@/types/bilingual"
 import { format, formatDate } from "date-fns"
 import {
   Activity,
@@ -41,7 +43,7 @@ import {
 } from "lucide-react"
 import { useSession } from "next-auth/react"
 import Link from "next/link"
-import { useRouter } from "next/navigation"
+import { usePathname, useRouter } from "next/navigation"
 import { useCallback, useMemo, useState } from "react"
 import { ModernStatusBadge } from "./ModernStatusBadge"
 
@@ -119,8 +121,8 @@ const getStatusConfig = (status: string) => {
 
 // Loading skeleton
 const LoadingSkeleton = () => (
-  <div className="min-h-screen bg-gradient-to-br from-slate-50 via-emerald-50 to-teal-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-800 transition-colors duration-300">
-    <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-8">
+  <div className="dashboard-landing-theme dark min-h-screen overflow-x-hidden">
+    <div className="dashboard-landing-content mx-auto w-full max-w-[88rem] px-4 py-6 sm:px-6 sm:py-8">
       <div className="space-y-6">
         {/* Header Skeleton */}
         <div className="flex items-center justify-between">
@@ -158,12 +160,33 @@ const LoadingSkeleton = () => (
   </div>
 )
 
+type NumericLike = number | string | { toNumber?: () => number; toString: () => string } | null | undefined
+
+type ReceiveItemDraft = {
+  quantity: number
+  received: number
+  batchNumber?: string
+  expiryDate?: string
+}
+
+const toNumber = (value: NumericLike): number => {
+  if (value == null) return 0
+  if (typeof value === "number") return value
+  if (typeof value === "string") return Number(value) || 0
+  if (typeof value.toNumber === "function") return value.toNumber()
+  return Number(value.toString()) || 0
+}
+
 export default function ModernPurchaseOrderDetailPage({
   id,
   organizationId
 }: ModernPurchaseOrderDetailPageProps) {
   const router = useRouter()
+  const pathname = usePathname()
+  const locale = getLocaleFromPathname(pathname) ?? DEFAULT_LOCALE
+  const localizedHref = useCallback((href: string) => localizePath(href, locale), [locale])
   const { data: session } = useSession()
+  const currentUserId = session?.user?.id ?? ""
   const { success, error: notifyError, info, warning } = useNotifications()
   const [activeTab, setActiveTab] = useState("overview")
   const [showApproveDialog, setShowApproveDialog] = useState(false)
@@ -172,7 +195,7 @@ export default function ModernPurchaseOrderDetailPage({
   const [showReceiveDialog, setShowReceiveDialog] = useState(false)
   const [showCompleteDialog, setShowCompleteDialog] = useState(false)
   const [cancelReason, setCancelReason] = useState("")
-  const [receiveItems, setReceiveItems] = useState<Record<string, { quantity: number; received: number }>>({})
+  const [receiveItems, setReceiveItems] = useState<Record<string, ReceiveItemDraft>>({})
 
   // Hooks for data and mutations
   const { data: purchaseOrder, isLoading, error, refetch } = usePurchaseOrderById(id, organizationId)
@@ -192,7 +215,7 @@ export default function ModernPurchaseOrderDetailPage({
       await approveMutation.mutateAsync({
         id: purchaseOrder.id,
         organizationId,
-        approvedBy: session?.user?.id || null
+        approvedBy: currentUserId || null
       })
       setShowApproveDialog(false)
       success(
@@ -207,7 +230,7 @@ export default function ModernPurchaseOrderDetailPage({
         { duration: 6000, sound: true }
       )
     }
-  }, [purchaseOrder, organizationId, approveMutation])
+  }, [approveMutation, currentUserId, notifyError, organizationId, purchaseOrder, success])
 
   const handleCancel = useCallback(async () => {
     if (!purchaseOrder || !organizationId) return
@@ -232,7 +255,7 @@ export default function ModernPurchaseOrderDetailPage({
         { duration: 6000, sound: true }
       )
     }
-  }, [purchaseOrder, organizationId, cancelMutation, cancelReason])
+  }, [cancelMutation, cancelReason, notifyError, organizationId, purchaseOrder, warning])
 
   const handleDownloadPDF = useCallback(() => {
     if (!purchaseOrder) return
@@ -242,7 +265,7 @@ export default function ModernPurchaseOrderDetailPage({
       "PDF download has been initiated",
       { duration: 3000, sound: false }
     )
-  }, [purchaseOrder, organizationId])
+  }, [info, organizationId, purchaseOrder])
 
   const handleSubmit = useCallback(async () => {
     if (!purchaseOrder || !organizationId) return
@@ -265,14 +288,14 @@ export default function ModernPurchaseOrderDetailPage({
         { duration: 6000, sound: true }
       )
     }
-  }, [purchaseOrder, organizationId, submitMutation])
+  }, [notifyError, organizationId, purchaseOrder, submitMutation, success])
 
   // Calculate receiving totals
   const receivingTotals = useMemo(() => {
     const totalUnits = Object.values(receiveItems).reduce((sum, item) => sum + item.received, 0)
     const totalValue = Object.entries(receiveItems).reduce((sum, [lineId, data]) => {
       const line = purchaseOrder?.lines?.find(l => l.id === lineId)
-      return sum + (line?.unitCost || 0) * data.received
+      return sum + toNumber(line?.unitCost) * data.received
     }, 0)
     const linesWithItems = Object.values(receiveItems).filter(item => item.received > 0).length
 
@@ -287,16 +310,27 @@ export default function ModernPurchaseOrderDetailPage({
     if (!purchaseOrder || !organizationId) return
 
     try {
-      const itemsToReceive = Object.entries(receiveItems).map(([lineId, data]) => ({
-        lineId,
-        receivedQuantity: data.received
-      }))
+      const itemsToReceive = Object.entries(receiveItems)
+        .filter(([, data]) => data.received > 0)
+        .map(([lineId, data]) => ({
+          lineId,
+          receivedQuantity: data.received,
+          batchNumber: data.batchNumber?.trim() || undefined,
+          expiryDate: data.expiryDate || undefined,
+        }))
+
+      if (!itemsToReceive.length) {
+        warning("No Quantities Entered", "Enter at least one received quantity before submitting.", {
+          duration: 4000,
+          sound: false,
+        })
+        return
+      }
 
       await receiveItemsMutation.mutateAsync({
         id: purchaseOrder.id,
         organizationId,
-        receivedBy: session?.user?.id || null,
-        receivedById: session?.user?.id || 'system', // Fallback to system if no user
+        receivedBy: currentUserId,
         notes: 'Items received via workflow',
         items: itemsToReceive
       })
@@ -310,11 +344,11 @@ export default function ModernPurchaseOrderDetailPage({
     } catch (error) {
       notifyError(
         "Receiving Failed",
-        "Failed to receive items. Please verify quantities and try again.",
+        error instanceof Error ? error.message : "Failed to receive items. Please verify quantities and try again.",
         { duration: 6000, sound: true }
       )
     }
-  }, [purchaseOrder, organizationId, receiveItemsMutation, receiveItems])
+  }, [currentUserId, notifyError, organizationId, purchaseOrder, receiveItems, receiveItemsMutation, success, warning])
 
   const handleComplete = useCallback(async () => {
     if (!purchaseOrder || !organizationId) return
@@ -337,17 +371,17 @@ export default function ModernPurchaseOrderDetailPage({
         { duration: 6000, sound: true }
       )
     }
-  }, [purchaseOrder, organizationId, completeMutation])
+  }, [completeMutation, notifyError, organizationId, purchaseOrder, success])
 
   const handleClone = useCallback(() => {
     if (!purchaseOrder) return
-    router.push(`/dashboard/purchase-orders/new?clone=${purchaseOrder.id}`)
+    router.push(localizedHref(`/dashboard/purchase-orders/new?clone=${purchaseOrder.id}`))
     info(
       "Cloning Order",
       "Redirecting to create a new order based on this one",
       { duration: 3000, sound: false }
     )
-  }, [purchaseOrder, router])
+  }, [info, localizedHref, purchaseOrder, router])
 
   if (isLoading) {
     return <LoadingSkeleton />
@@ -355,17 +389,17 @@ export default function ModernPurchaseOrderDetailPage({
 
   if (error || !purchaseOrder) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-emerald-50 to-teal-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-800 transition-colors duration-300">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-8">
-          <Card className="max-w-md mx-auto text-center p-8">
-            <div className="w-20 h-20 bg-red-100 dark:bg-red-900/30 rounded-full flex items-center justify-center mx-auto mb-6">
-              <XCircle className="w-10 h-10 text-red-600 dark:text-red-400" />
+      <div className="dashboard-landing-theme dark min-h-screen overflow-x-hidden">
+        <div className="dashboard-landing-content mx-auto w-full max-w-[88rem] px-4 py-6 sm:px-6 sm:py-8">
+          <Card className="dashboard-glass-panel mx-auto max-w-md rounded-lg p-8 text-center text-[var(--dash-text)]">
+            <div className="mx-auto mb-6 flex h-20 w-20 items-center justify-center rounded-full bg-[var(--dash-danger-soft)]">
+              <XCircle className="h-10 w-10 text-[var(--dash-danger)]" />
             </div>
-            <h3 className="text-xl font-semibold text-slate-900 dark:text-white mb-3">Purchase Order Not Found</h3>
-            <p className="text-slate-600 dark:text-slate-400 mb-6">
-              The purchase order you're looking for could not be found or may have been deleted.
+            <h3 className="mb-3 text-xl font-semibold text-[var(--dash-text)]">Purchase Order Not Found</h3>
+            <p className="mb-6 text-[var(--dash-text-soft)]">
+              The purchase order you&apos;re looking for could not be found or may have been deleted.
             </p>
-            <Button onClick={() => router.back()} variant="outline">
+            <Button onClick={() => router.back()} variant="outline" className="dashboard-button-secondary rounded-lg">
               <ArrowLeft className="mr-2 h-4 w-4" />
               Go Back
             </Button>
@@ -381,34 +415,33 @@ export default function ModernPurchaseOrderDetailPage({
     !['RECEIVED', 'COMPLETED', 'CANCELLED'].includes(purchaseOrder.status)
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-emerald-50 to-teal-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-800 p-6 space-y-6 transition-colors duration-300">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 sm:py-8">
-        {/* Enhanced Header with POSTerminal styling */}
-        <div className="flex items-center justify-between bg-gradient-to-r from-emerald-50 via-teal-50 to-cyan-50 dark:from-slate-800 dark:via-slate-700 dark:to-slate-800 p-6 rounded-2xl shadow-xl border border-emerald-200/60 dark:border-slate-600/60 backdrop-blur-sm mb-6 sm:mb-8">
+    <div className="dashboard-landing-theme dark min-h-screen overflow-x-hidden">
+      <div className="dashboard-landing-content mx-auto w-full max-w-[88rem] space-y-6 px-4 py-6 text-[var(--dash-text)] sm:px-6 sm:py-8">
+        <div className="dashboard-glass-panel mb-6 rounded-lg p-5 sm:mb-8 sm:p-6">
           <div className="flex items-center justify-between flex-wrap gap-4 w-full">
             <div className="flex items-center gap-4">
               <Button
                 variant="outline"
                 size="sm"
                 onClick={() => router.back()}
-                className="bg-white/80 backdrop-blur-sm shadow-sm hover:shadow-md transition-all"
+                className="dashboard-button-secondary rounded-lg"
               >
                 <ArrowLeft className="w-4 h-4 mr-2" />
                 Back
               </Button>
               <div>
                 <div className="flex items-center gap-3">
-                  <div className={`p-2 rounded-lg bg-gradient-to-br ${statusConfig.gradient} shadow-lg`}>
-                    <ShoppingCart className="w-5 h-5 text-white" />
+                  <div className="rounded-lg border border-[var(--dash-border-subtle)] bg-[var(--dash-brand-soft)] p-2 text-[var(--dash-brand-strong)] shadow-[0_16px_34px_rgba(47,125,246,0.18)]">
+                    <ShoppingCart className="w-5 h-5" />
                   </div>
                   <div>
-                    <h1 className="text-2xl sm:text-3xl font-bold bg-gradient-to-r from-emerald-600 to-teal-600 bg-clip-text text-transparent">
+                    <h1 className="text-2xl font-semibold tracking-tight text-[var(--dash-text)] sm:text-3xl">
                       {purchaseOrder.orderNumber}
                     </h1>
                     <div className="flex items-center gap-4 mt-1">
                       <ModernStatusBadge status={purchaseOrder.status} />
                       {isOverdue && (
-                        <Badge className="bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300 border-red-200 dark:border-red-700">
+                        <Badge className="rounded-lg border border-[var(--dash-danger)]/35 bg-[var(--dash-danger-soft)] text-[var(--dash-text)]">
                           <AlertTriangle className="w-3 h-3 mr-1" />
                           Overdue
                         </Badge>
@@ -425,7 +458,7 @@ export default function ModernPurchaseOrderDetailPage({
                 variant="outline"
                 size="sm"
                 onClick={handleDownloadPDF}
-                className="bg-white/80 backdrop-blur-sm shadow-sm hover:shadow-md transition-all"
+                className="dashboard-button-secondary rounded-lg"
               >
                 <Download className="w-4 h-4 mr-2" />
                 PDF
@@ -435,17 +468,17 @@ export default function ModernPurchaseOrderDetailPage({
                 variant="outline"
                 size="sm"
                 onClick={handleClone}
-                className="bg-white/80 backdrop-blur-sm shadow-sm hover:shadow-md transition-all"
+                className="dashboard-button-secondary rounded-lg"
               >
                 <Copy className="w-4 h-4 mr-2" />
                 Clone
               </Button>
 
               {purchaseOrder.status === 'DRAFT' && (
-                <Link href={`/dashboard/purchase-orders/${purchaseOrder.id}/edit`}>
+                <Link href={localizedHref(`/dashboard/purchase-orders/${purchaseOrder.id}/edit`)}>
                   <Button
                     size="sm"
-                    className="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700"
+                    className="dashboard-button-primary rounded-lg"
                   >
                     <Edit className="w-4 h-4 mr-2" />
                     Edit
@@ -458,13 +491,13 @@ export default function ModernPurchaseOrderDetailPage({
                   <DialogTrigger asChild>
                     <Button
                       size="sm"
-                      className="bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700"
+                      className="dashboard-button-primary rounded-lg"
                     >
                       <CheckCircle className="w-4 h-4 mr-2" />
                       Approve
                     </Button>
                   </DialogTrigger>
-                  <DialogContent>
+                  <DialogContent className="dashboard-glass-panel rounded-lg border-[var(--dash-border-subtle)] text-[var(--dash-text)]">
                     <DialogHeader>
                       <DialogTitle>Approve Purchase Order</DialogTitle>
                       <DialogDescription>
@@ -473,13 +506,13 @@ export default function ModernPurchaseOrderDetailPage({
                       </DialogDescription>
                     </DialogHeader>
                     <div className="flex justify-end gap-2 mt-4">
-                      <Button variant="outline" onClick={() => setShowApproveDialog(false)}>
+                      <Button variant="outline" onClick={() => setShowApproveDialog(false)} className="dashboard-button-secondary rounded-lg">
                         Cancel
                       </Button>
                       <Button
                         onClick={handleApprove}
                         disabled={approveMutation.isPending}
-                        className="bg-green-600 hover:bg-green-700"
+                        className="dashboard-button-primary rounded-lg"
                       >
                         {approveMutation.isPending ? "Approving..." : "Approve"}
                       </Button>
@@ -494,13 +527,13 @@ export default function ModernPurchaseOrderDetailPage({
                   <DialogTrigger asChild>
                     <Button
                       size="sm"
-                      className="bg-gradient-to-r from-blue-600 to-cyan-600 hover:from-blue-700 hover:to-cyan-700"
+                      className="dashboard-button-primary rounded-lg"
                     >
                       <Send className="w-4 h-4 mr-2" />
                       Submit
                     </Button>
                   </DialogTrigger>
-                  <DialogContent>
+                  <DialogContent className="dashboard-glass-panel rounded-lg border-[var(--dash-border-subtle)] text-[var(--dash-text)]">
                     <DialogHeader>
                       <DialogTitle>Submit Purchase Order</DialogTitle>
                       <DialogDescription>
@@ -509,13 +542,13 @@ export default function ModernPurchaseOrderDetailPage({
                       </DialogDescription>
                     </DialogHeader>
                     <div className="flex justify-end gap-2 mt-4">
-                      <Button variant="outline" onClick={() => setShowSubmitDialog(false)}>
+                      <Button variant="outline" onClick={() => setShowSubmitDialog(false)} className="dashboard-button-secondary rounded-lg">
                         Cancel
                       </Button>
                       <Button
                         onClick={handleSubmit}
                         disabled={submitMutation.isPending}
-                        className="bg-blue-600 hover:bg-blue-700"
+                        className="dashboard-button-primary rounded-lg"
                       >
                         {submitMutation.isPending ? "Submitting..." : "Submit Order"}
                       </Button>
@@ -530,29 +563,32 @@ export default function ModernPurchaseOrderDetailPage({
                   <DialogTrigger asChild>
                     <Button
                       size="sm"
-                      className="bg-gradient-to-r from-orange-600 to-amber-600 hover:from-orange-700 hover:to-amber-700"
+                      className="dashboard-button-primary rounded-lg"
                     >
                       <Package className="w-4 h-4 mr-2" />
                       Receive Items
                     </Button>
                   </DialogTrigger>
-                  <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+                  <DialogContent className="dashboard-glass-panel max-h-[82vh] max-w-5xl overflow-y-auto rounded-lg border-[var(--dash-border-subtle)] text-[var(--dash-text)]">
                     <DialogHeader>
-                      <DialogTitle>Receive Items - {purchaseOrder.orderNumber}</DialogTitle>
-                      <DialogDescription>
+                      <DialogTitle className="text-[var(--dash-text)]">Receive Items - {purchaseOrder.orderNumber}</DialogTitle>
+                      <DialogDescription className="text-[var(--dash-text-soft)]">
                         Enter the quantity received for each item. You can receive items partially.
                       </DialogDescription>
                       {/* Bulk Actions */}
                       <div className="flex gap-2 pt-2">
-                        <button
+                        <Button
                           type="button"
+                          size="sm"
                           onClick={() => {
-                            const newReceiveItems: Record<string, { quantity: number; received: number }> = {}
+                            const newReceiveItems: Record<string, ReceiveItemDraft> = {}
                             purchaseOrder.lines?.forEach(line => {
-                              const maxAllowed = line.orderedQuantity - (line.receivedQuantity || 0)
+                              const orderedQuantity = toNumber(line.orderedQuantity)
+                              const maxAllowed = orderedQuantity - toNumber(line.receivedQuantity)
                               if (maxAllowed > 0) {
                                 newReceiveItems[line.id] = {
-                                  quantity: line.orderedQuantity,
+                                  ...receiveItems[line.id],
+                                  quantity: orderedQuantity,
                                   received: maxAllowed
                                 }
                               }
@@ -564,12 +600,14 @@ export default function ModernPurchaseOrderDetailPage({
                               { duration: 3000, sound: false }
                             )
                           }}
-                          className="text-sm px-3 py-1 bg-orange-600 text-white rounded hover:bg-orange-700 transition-colors"
+                          className="dashboard-button-primary h-9 rounded-lg"
                         >
                           Receive All Available
-                        </button>
-                        <button
+                        </Button>
+                        <Button
                           type="button"
+                          size="sm"
+                          variant="outline"
                           onClick={() => {
                             setReceiveItems({})
                             info(
@@ -578,16 +616,17 @@ export default function ModernPurchaseOrderDetailPage({
                               { duration: 3000, sound: false }
                             )
                           }}
-                          className="text-sm px-3 py-1 bg-gray-500 text-white rounded hover:bg-gray-600 transition-colors"
+                          className="dashboard-button-secondary h-9 rounded-lg"
                         >
                           Clear All
-                        </button>
+                        </Button>
                       </div>
                     </DialogHeader>
                     <div className="space-y-4 mt-4">
                       {purchaseOrder.lines && purchaseOrder.lines.length > 0 ? (
                         <>
                           {/* Items Table */}
+                          <div className="dashboard-table-shell dashboard-data-table overflow-x-auto rounded-lg">
                           <Table>
                             <TableHeader>
                               <TableRow>
@@ -612,23 +651,24 @@ export default function ModernPurchaseOrderDetailPage({
                                       </div>
                                     )}
                                   </TableCell>
-                                  <TableCell className="font-medium">{line.orderedQuantity}</TableCell>
-                                  <TableCell className="text-muted-foreground">{line.receivedQuantity || 0}</TableCell>
+                                  <TableCell className="font-medium">{toNumber(line.orderedQuantity)}</TableCell>
+                                  <TableCell className="text-muted-foreground">{toNumber(line.receivedQuantity)}</TableCell>
                                   <TableCell>
                                     <div className="space-y-1">
                                       <div className="relative">
                                         <input
                                           type="number"
                                           min="0"
-                                          max={line.orderedQuantity - (line.receivedQuantity || 0)}
-                                          className={`w-20 px-2 py-1 border rounded focus:ring-2 focus:ring-orange-500 ${receiveItems[line.id]?.received > (line.orderedQuantity - (line.receivedQuantity || 0))
-                                              ? 'border-red-500 bg-red-50'
-                                              : 'border-gray-300'
+                                          max={toNumber(line.orderedQuantity) - toNumber(line.receivedQuantity)}
+                                          className={`dashboard-control h-9 w-20 rounded-lg px-2 py-1 text-center ${receiveItems[line.id]?.received > (toNumber(line.orderedQuantity) - toNumber(line.receivedQuantity))
+                                              ? 'border-[var(--dash-danger)]'
+                                              : ''
                                             }`}
                                           value={receiveItems[line.id]?.received || 0}
                                           onChange={(e) => {
                                             const inputValue = parseInt(e.target.value) || 0
-                                            const maxAllowed = line.orderedQuantity - (line.receivedQuantity || 0)
+                                            const orderedQuantity = toNumber(line.orderedQuantity)
+                                            const maxAllowed = orderedQuantity - toNumber(line.receivedQuantity)
 
                                             // Hard limit enforcement
                                             const finalValue = Math.min(Math.max(0, inputValue), maxAllowed)
@@ -645,7 +685,8 @@ export default function ModernPurchaseOrderDetailPage({
                                             setReceiveItems(prev => ({
                                               ...prev,
                                               [line.id]: {
-                                                quantity: line.orderedQuantity,
+                                                ...prev[line.id],
+                                                quantity: orderedQuantity,
                                                 received: finalValue
                                               }
                                             }))
@@ -675,14 +716,16 @@ export default function ModernPurchaseOrderDetailPage({
                                           onBlur={(e) => {
                                             // Additional validation on blur to ensure clean state
                                             const inputValue = parseInt(e.target.value) || 0
-                                            const maxAllowed = line.orderedQuantity - (line.receivedQuantity || 0)
+                                            const orderedQuantity = toNumber(line.orderedQuantity)
+                                            const maxAllowed = orderedQuantity - toNumber(line.receivedQuantity)
                                             const finalValue = Math.min(Math.max(0, inputValue), maxAllowed)
 
                                             if (inputValue !== finalValue) {
                                               setReceiveItems(prev => ({
                                                 ...prev,
                                                 [line.id]: {
-                                                  quantity: line.orderedQuantity,
+                                                  ...prev[line.id],
+                                                  quantity: orderedQuantity,
                                                   received: finalValue
                                                 }
                                               }))
@@ -690,65 +733,124 @@ export default function ModernPurchaseOrderDetailPage({
                                           }}
                                         />
                                         {/* Max quantity indicator */}
-                                        <div className="absolute -right-16 top-0 text-xs text-muted-foreground whitespace-nowrap">
-                                          max: {line.orderedQuantity - (line.receivedQuantity || 0)}
+                                        <div className="absolute -right-16 top-1 text-xs text-[var(--dash-text-faint)] whitespace-nowrap">
+                                          max: {toNumber(line.orderedQuantity) - toNumber(line.receivedQuantity)}
                                         </div>
                                       </div>
                                       {/* Quick action buttons */}
                                       <div className="flex gap-1 mt-1">
-                                        <button
+                                        <Button
                                           type="button"
+                                          size="sm"
+                                          variant="outline"
                                           onClick={() => {
-                                            const maxAllowed = line.orderedQuantity - (line.receivedQuantity || 0)
+                                            const orderedQuantity = toNumber(line.orderedQuantity)
+                                            const maxAllowed = orderedQuantity - toNumber(line.receivedQuantity)
                                             setReceiveItems(prev => ({
                                               ...prev,
                                               [line.id]: {
-                                                quantity: line.orderedQuantity,
+                                                ...prev[line.id],
+                                                quantity: orderedQuantity,
                                                 received: maxAllowed
                                               }
                                             }))
                                           }}
-                                          className="text-xs px-1 py-0.5 bg-orange-100 text-orange-700 rounded hover:bg-orange-200 transition-colors"
-                                          disabled={(line.orderedQuantity - (line.receivedQuantity || 0)) === 0}
+                                          className="dashboard-button-secondary h-7 rounded-md px-2 text-xs"
+                                          disabled={(toNumber(line.orderedQuantity) - toNumber(line.receivedQuantity)) === 0}
                                         >
                                           All
-                                        </button>
-                                        <button
+                                        </Button>
+                                        <Button
                                           type="button"
+                                          size="sm"
+                                          variant="outline"
                                           onClick={() => {
                                             setReceiveItems(prev => ({
                                               ...prev,
                                               [line.id]: {
-                                                quantity: line.orderedQuantity,
+                                                ...prev[line.id],
+                                                quantity: toNumber(line.orderedQuantity),
                                                 received: 0
                                               }
                                             }))
                                           }}
-                                          className="text-xs px-1 py-0.5 bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition-colors"
+                                          className="dashboard-button-secondary h-7 rounded-md px-2 text-xs"
                                         >
                                           Clear
-                                        </button>
+                                        </Button>
                                       </div>
                                       {/* Validation message */}
-                                      {receiveItems[line.id]?.received > (line.orderedQuantity - (line.receivedQuantity || 0)) && (
-                                        <div className="text-xs text-red-500">
-                                          Exceeds maximum ({line.orderedQuantity - (line.receivedQuantity || 0)})
+                                      {receiveItems[line.id]?.received > (toNumber(line.orderedQuantity) - toNumber(line.receivedQuantity)) && (
+                                        <div className="text-xs text-[var(--dash-danger)]">
+                                          Exceeds maximum ({toNumber(line.orderedQuantity) - toNumber(line.receivedQuantity)})
+                                        </div>
+                                      )}
+                                      {(line.item?.trackBatches || line.item?.trackExpiry || line.item?.trackSerialNumbers) && (
+                                        <div className="mt-3 space-y-2 rounded-lg border border-[var(--dash-border-subtle)] bg-[rgba(24,38,45,0.58)] p-3">
+                                          {line.item?.trackBatches && (
+                                            <label className="block text-xs font-medium text-[var(--dash-text-soft)]">
+                                              Batch number
+                                              <input
+                                                type="text"
+                                                value={receiveItems[line.id]?.batchNumber || ""}
+                                                onChange={(event) =>
+                                                  setReceiveItems((prev) => ({
+                                                    ...prev,
+                                                    [line.id]: {
+                                                      ...prev[line.id],
+                                                      quantity: toNumber(line.orderedQuantity),
+                                                      received: prev[line.id]?.received || 0,
+                                                      batchNumber: event.target.value,
+                                                    },
+                                                  }))
+                                                }
+                                                className="dashboard-control mt-1 w-full rounded-lg px-2 py-1 text-xs"
+                                                placeholder="Batch / lot number"
+                                              />
+                                            </label>
+                                          )}
+                                          {line.item?.trackExpiry && (
+                                            <label className="block text-xs font-medium text-[var(--dash-text-soft)]">
+                                              Expiry date
+                                              <input
+                                                type="date"
+                                                value={receiveItems[line.id]?.expiryDate || ""}
+                                                onChange={(event) =>
+                                                  setReceiveItems((prev) => ({
+                                                    ...prev,
+                                                    [line.id]: {
+                                                      ...prev[line.id],
+                                                      quantity: toNumber(line.orderedQuantity),
+                                                      received: prev[line.id]?.received || 0,
+                                                      expiryDate: event.target.value,
+                                                    },
+                                                  }))
+                                                }
+                                                className="dashboard-control mt-1 w-full rounded-lg px-2 py-1 text-xs"
+                                              />
+                                            </label>
+                                          )}
+                                          {line.item?.trackSerialNumbers && (
+                                            <div className="rounded-md border border-[var(--dash-info)]/30 bg-[var(--dash-info-soft)] px-3 py-2 text-xs text-[var(--dash-text-muted)]">
+                                              Serial-tracked item. Serial numbers will be generated automatically for the received quantity.
+                                            </div>
+                                          )}
                                         </div>
                                       )}
                                     </div>
                                   </TableCell>
                                   <TableCell>
                                     <div className="font-medium text-green-600">
-                                      {formatCurrency(line.unitCost || 0)}
+                                      {formatCurrency(toNumber(line.unitCost))}
                                     </div>
                                   </TableCell>
                                   <TableCell>
                                     <div className="font-semibold">
-                                      {formatCurrency(line.lineTotal || (line.unitCost * line.orderedQuantity))}
+                                      {formatCurrency(toNumber(line.lineTotal) || (toNumber(line.unitCost) * toNumber(line.orderedQuantity)))}
                                     </div>
                                     {receiveItems[line.id]?.received > 0 && (
                                       <div className="text-sm text-muted-foreground">
-                                        Receiving: {formatCurrency((line.unitCost || 0) * (receiveItems[line.id]?.received || 0))}
+                                        Receiving: {formatCurrency(toNumber(line.unitCost) * (receiveItems[line.id]?.received || 0))}
                                       </div>
                                     )}
                                   </TableCell>
@@ -756,15 +858,16 @@ export default function ModernPurchaseOrderDetailPage({
                               ))}
                             </TableBody>
                           </Table>
+                          </div>
 
                           {/* Summary Section */}
-                          <div className="mt-6 p-4 bg-muted/30 rounded-lg border">
+                          <div className="mt-6 rounded-lg border border-[var(--dash-border-subtle)] bg-[rgba(24,38,45,0.58)] p-4">
                             <h4 className="font-semibold mb-3">Receiving Summary</h4>
                             <div className="grid grid-cols-2 gap-4 text-sm">
                               <div>
                                 <div className="flex justify-between">
                                   <span>Total Order Value:</span>
-                                  <span className="font-medium">{formatCurrency(purchaseOrder.total || 0)}</span>
+                                  <span className="font-medium">{formatCurrency(toNumber(purchaseOrder.total))}</span>
                                 </div>
                                 <div className="flex justify-between">
                                   <span>Items to Receive:</span>
@@ -776,7 +879,7 @@ export default function ModernPurchaseOrderDetailPage({
                               <div>
                                 <div className="flex justify-between">
                                   <span>Value Receiving:</span>
-                                  <span className="font-semibold text-orange-600">
+                                  <span className="font-semibold text-[var(--dash-warning)]">
                                     {formatCurrency(receivingTotals.totalValue)}
                                   </span>
                                 </div>
@@ -799,12 +902,12 @@ export default function ModernPurchaseOrderDetailPage({
                     </div>
                     <div className="space-y-2 mt-4">
                       {Object.values(receiveItems).every(item => item.received === 0) && (
-                        <p className="text-sm text-muted-foreground text-center">
+                        <p className="text-center text-sm text-[var(--dash-text-soft)]">
                           Enter quantities above to enable receiving
                         </p>
                       )}
                       <div className="flex justify-end gap-2">
-                        <Button variant="outline" onClick={() => setShowReceiveDialog(false)}>
+                        <Button variant="outline" onClick={() => setShowReceiveDialog(false)} className="dashboard-button-secondary rounded-lg">
                           Cancel
                         </Button>
                         <Button
@@ -813,7 +916,7 @@ export default function ModernPurchaseOrderDetailPage({
                             receiveItemsMutation.isPending ||
                             Object.values(receiveItems).every(item => item.received === 0)
                           }
-                          className="bg-orange-600 hover:bg-orange-700 disabled:opacity-50"
+                          className="dashboard-button-primary rounded-lg disabled:opacity-50"
                         >
                           {receiveItemsMutation.isPending ? "Receiving..." : "Receive Items"}
                         </Button>
@@ -830,13 +933,13 @@ export default function ModernPurchaseOrderDetailPage({
                     <Button
                       size="sm"
                       variant="outline"
-                      className="border-amber-600 text-amber-700 hover:bg-amber-50"
+                      className="dashboard-button-secondary rounded-lg text-[var(--dash-warning)]"
                     >
                       <CheckCircle className="w-4 h-4 mr-2" />
                       Force Complete
                     </Button>
                   </DialogTrigger>
-                  <DialogContent>
+                  <DialogContent className="dashboard-glass-panel rounded-lg border-[var(--dash-border-subtle)] text-[var(--dash-text)]">
                     <DialogHeader>
                       <DialogTitle>Force Complete Purchase Order</DialogTitle>
                       <DialogDescription>
@@ -845,13 +948,13 @@ export default function ModernPurchaseOrderDetailPage({
                       </DialogDescription>
                     </DialogHeader>
                     <div className="flex justify-end gap-2 mt-4">
-                      <Button variant="outline" onClick={() => setShowCompleteDialog(false)}>
+                      <Button variant="outline" onClick={() => setShowCompleteDialog(false)} className="dashboard-button-secondary rounded-lg">
                         Cancel
                       </Button>
                       <Button
                         onClick={handleComplete}
                         disabled={completeMutation.isPending}
-                        className="bg-amber-600 hover:bg-amber-700"
+                        className="dashboard-button-primary rounded-lg"
                       >
                         {completeMutation.isPending ? "Completing..." : "Force Complete"}
                       </Button>
@@ -866,13 +969,13 @@ export default function ModernPurchaseOrderDetailPage({
                   <DialogTrigger asChild>
                     <Button
                       size="sm"
-                      className="bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700"
+                      className="dashboard-button-primary rounded-lg"
                     >
                       <CheckCircle className="w-4 h-4 mr-2" />
                       Complete Order
                     </Button>
                   </DialogTrigger>
-                  <DialogContent>
+                  <DialogContent className="dashboard-glass-panel rounded-lg border-[var(--dash-border-subtle)] text-[var(--dash-text)]">
                     <DialogHeader>
                       <DialogTitle>Complete Purchase Order</DialogTitle>
                       <DialogDescription>
@@ -881,13 +984,13 @@ export default function ModernPurchaseOrderDetailPage({
                       </DialogDescription>
                     </DialogHeader>
                     <div className="flex justify-end gap-2 mt-4">
-                      <Button variant="outline" onClick={() => setShowCompleteDialog(false)}>
+                      <Button variant="outline" onClick={() => setShowCompleteDialog(false)} className="dashboard-button-secondary rounded-lg">
                         Cancel
                       </Button>
                       <Button
                         onClick={handleComplete}
                         disabled={completeMutation.isPending}
-                        className="bg-emerald-600 hover:bg-emerald-700"
+                        className="dashboard-button-primary rounded-lg"
                       >
                         {completeMutation.isPending ? "Completing..." : "Complete Order"}
                       </Button>
@@ -902,13 +1005,13 @@ export default function ModernPurchaseOrderDetailPage({
                     <Button
                       variant="outline"
                       size="sm"
-                      className="text-red-600 hover:text-red-700 border-red-200 hover:border-red-300"
+                      className="dashboard-button-secondary rounded-lg text-[var(--dash-danger)]"
                     >
                       <XCircle className="w-4 h-4 mr-2" />
                       Cancel
                     </Button>
                   </DialogTrigger>
-                  <DialogContent>
+                  <DialogContent className="dashboard-glass-panel rounded-lg border-[var(--dash-border-subtle)] text-[var(--dash-text)]">
                     <DialogHeader>
                       <DialogTitle>Cancel Purchase Order</DialogTitle>
                       <DialogDescription>
@@ -918,22 +1021,22 @@ export default function ModernPurchaseOrderDetailPage({
                     </DialogHeader>
                     <div className="space-y-4 mt-4">
                       <div>
-                        <label className="text-sm font-medium">Reason for cancellation (optional)</label>
+                        <label className="text-sm font-medium text-[var(--dash-text-muted)]">Reason for cancellation (optional)</label>
                         <Textarea
                           value={cancelReason}
                           onChange={(e) => setCancelReason(e.target.value)}
                           placeholder="Enter reason for cancellation..."
-                          className="mt-1"
+                          className="dashboard-control mt-1 min-h-24 rounded-lg"
                         />
                       </div>
                       <div className="flex justify-end gap-2">
-                        <Button variant="outline" onClick={() => setShowCancelDialog(false)}>
+                        <Button variant="outline" onClick={() => setShowCancelDialog(false)} className="dashboard-button-secondary rounded-lg">
                           Keep Order
                         </Button>
                         <Button
                           onClick={handleCancel}
                           disabled={cancelMutation.isPending}
-                          className="bg-red-600 hover:bg-red-700"
+                          className="rounded-lg bg-[var(--dash-danger)] text-white hover:bg-[var(--dash-danger)]/90"
                         >
                           {cancelMutation.isPending ? "Cancelling..." : "Cancel Order"}
                         </Button>
@@ -948,7 +1051,7 @@ export default function ModernPurchaseOrderDetailPage({
 
         {/* Stats Overview */}
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 sm:gap-4 mb-6 sm:mb-8">
-          <Card className="group relative overflow-hidden bg-white/80 dark:bg-slate-800/80 backdrop-blur-xl border-white/20 shadow-2xl hover:shadow-3xl transition-all duration-300 hover:-translate-y-2 hover:scale-105">
+          <Card className="dashboard-stat-card group relative overflow-hidden rounded-lg">
             <div className="absolute inset-0 bg-gradient-to-br from-blue-500/10 to-cyan-500/10 dark:from-blue-400/20 dark:to-cyan-400/20"></div>
             <div className="absolute top-3 right-3 p-2 rounded-full bg-blue-500/10 group-hover:bg-blue-500/20 transition-colors">
               <DollarSign className="w-4 h-4 text-blue-600 dark:text-blue-400" />
@@ -960,7 +1063,7 @@ export default function ModernPurchaseOrderDetailPage({
             </CardHeader>
             <CardContent>
               <div className="text-2xl font-bold text-slate-900 dark:text-white mb-1">
-                {formatCurrency(purchaseOrder.total)}
+                {formatCurrency(toNumber(purchaseOrder.total))}
               </div>
               <div className="flex items-center gap-1">
                 <Activity className="w-3 h-3 text-blue-500" />
@@ -969,7 +1072,7 @@ export default function ModernPurchaseOrderDetailPage({
             </CardContent>
           </Card>
 
-          <Card className="group relative overflow-hidden bg-white/80 dark:bg-slate-800/80 backdrop-blur-xl border-white/20 shadow-2xl hover:shadow-3xl transition-all duration-300 hover:-translate-y-2 hover:scale-105">
+          <Card className="dashboard-stat-card group relative overflow-hidden rounded-lg">
             <div className="absolute inset-0 bg-gradient-to-br from-purple-500/10 to-violet-500/10 dark:from-purple-400/20 dark:to-violet-400/20"></div>
             <div className="absolute top-3 right-3 p-2 rounded-full bg-purple-500/10 group-hover:bg-purple-500/20 transition-colors">
               <Package className="w-4 h-4 text-purple-600 dark:text-purple-400" />
@@ -990,7 +1093,7 @@ export default function ModernPurchaseOrderDetailPage({
             </CardContent>
           </Card>
 
-          <Card className="group relative overflow-hidden bg-white/80 dark:bg-slate-800/80 backdrop-blur-xl border-white/20 shadow-2xl hover:shadow-3xl transition-all duration-300 hover:-translate-y-2 hover:scale-105">
+          <Card className="dashboard-stat-card group relative overflow-hidden rounded-lg">
             <div className="absolute inset-0 bg-gradient-to-br from-emerald-500/10 to-teal-500/10 dark:from-emerald-400/20 dark:to-teal-400/20"></div>
             <div className="absolute top-3 right-3 p-2 rounded-full bg-emerald-500/10 group-hover:bg-emerald-500/20 transition-colors">
               <Truck className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
@@ -1023,7 +1126,7 @@ export default function ModernPurchaseOrderDetailPage({
             </CardContent>
           </Card>
 
-          <Card className="group relative overflow-hidden bg-white/80 dark:bg-slate-800/80 backdrop-blur-xl border-white/20 shadow-2xl hover:shadow-3xl transition-all duration-300 hover:-translate-y-2 hover:scale-105">
+          <Card className="dashboard-stat-card group relative overflow-hidden rounded-lg">
             <div className="absolute inset-0 bg-gradient-to-br from-amber-500/10 to-orange-500/10 dark:from-amber-400/20 dark:to-orange-400/20"></div>
             <div className="absolute top-3 right-3 p-2 rounded-full bg-amber-500/10 group-hover:bg-amber-500/20 transition-colors">
               <Calendar className="w-4 h-4 text-amber-600 dark:text-amber-400" />
@@ -1046,17 +1149,17 @@ export default function ModernPurchaseOrderDetailPage({
         </div>
 
         {/* Enhanced Main Content with POSTerminal styling */}
-        <Card className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-xl border-white/20 shadow-2xl rounded-2xl overflow-hidden hover:shadow-3xl transition-all duration-300">
-          <div className="bg-gradient-to-r from-emerald-50 via-teal-50 to-cyan-50 dark:from-slate-800 dark:to-slate-700 px-6 py-5 border-b border-emerald-200/60 dark:border-slate-700/60 backdrop-blur-sm">
+        <Card className="dashboard-glass-panel overflow-hidden rounded-lg text-[var(--dash-text)]">
+          <div className="border-b border-[var(--dash-border-subtle)] bg-[rgba(12,20,24,0.58)] px-6 py-5">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <div className="p-2 rounded-lg bg-gradient-to-br from-emerald-500 to-teal-600 shadow-sm">
                   <ShoppingCart className="w-5 h-5 text-white" />
                 </div>
                 <div>
-                  <h3 className="text-lg font-semibold text-slate-900 dark:text-white">Purchase Order Details</h3>
+                  <h3 className="text-lg font-semibold text-[var(--dash-text)]">Purchase Order Details</h3>
                   <p className="text-sm text-slate-600 dark:text-slate-400">
-                    {purchaseOrder.orderNumber} • {formatCurrency(purchaseOrder.total || 0)} • {purchaseOrder.lines?.length || 0} items
+                    {purchaseOrder.orderNumber} • {formatCurrency(toNumber(purchaseOrder.total))} • {purchaseOrder.lines?.length || 0} items
                   </p>
                 </div>
               </div>
@@ -1068,35 +1171,35 @@ export default function ModernPurchaseOrderDetailPage({
               <TabsList className="bg-transparent p-0 h-auto">
                 <TabsTrigger
                   value="overview"
-                  className="data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:shadow-sm rounded-lg px-4 py-2 data-[state=active]:text-emerald-600 dark:data-[state=active]:text-emerald-400"
+                  className="rounded-lg px-4 py-2 data-[state=active]:bg-[var(--dash-brand-soft)] data-[state=active]:text-[var(--dash-brand-strong)]"
                 >
                   <Package className="w-4 h-4 mr-2" />
                   Overview
                 </TabsTrigger>
                 <TabsTrigger
                   value="items"
-                  className="data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:shadow-sm rounded-lg px-4 py-2 data-[state=active]:text-emerald-600 dark:data-[state=active]:text-emerald-400"
+                  className="rounded-lg px-4 py-2 data-[state=active]:bg-[var(--dash-brand-soft)] data-[state=active]:text-[var(--dash-brand-strong)]"
                 >
                   <ShoppingCart className="w-4 h-4 mr-2" />
                   Line Items
                 </TabsTrigger>
                 <TabsTrigger
                   value="receipts"
-                  className="data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:shadow-sm rounded-lg px-4 py-2 data-[state=active]:text-emerald-600 dark:data-[state=active]:text-emerald-400"
+                  className="rounded-lg px-4 py-2 data-[state=active]:bg-[var(--dash-brand-soft)] data-[state=active]:text-[var(--dash-brand-strong)]"
                 >
                   <Receipt className="w-4 h-4 mr-2" />
                   Receipts
                 </TabsTrigger>
                 <TabsTrigger
                   value="inventory"
-                  className="data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:shadow-sm rounded-lg px-4 py-2 data-[state=active]:text-emerald-600 dark:data-[state=active]:text-emerald-400"
+                  className="rounded-lg px-4 py-2 data-[state=active]:bg-[var(--dash-brand-soft)] data-[state=active]:text-[var(--dash-brand-strong)]"
                 >
                   <Package className="w-4 h-4 mr-2" />
                   Inventory
                 </TabsTrigger>
                 <TabsTrigger
                   value="history"
-                  className="data-[state=active]:bg-white dark:data-[state=active]:bg-slate-800 data-[state=active]:shadow-sm rounded-lg px-4 py-2 data-[state=active]:text-emerald-600 dark:data-[state=active]:text-emerald-400"
+                  className="rounded-lg px-4 py-2 data-[state=active]:bg-[var(--dash-brand-soft)] data-[state=active]:text-[var(--dash-brand-strong)]"
                 >
                   <History className="w-4 h-4 mr-2" />
                   History
@@ -1111,7 +1214,7 @@ export default function ModernPurchaseOrderDetailPage({
                   {/* Order Details */}
                   <div className="lg:col-span-2 space-y-6">
                     {/* Supplier and Location Info */}
-                    <Card className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-xl border-white/20 shadow-2xl hover:shadow-3xl transition-all duration-300">
+                    <Card className="dashboard-glass-panel rounded-lg text-[var(--dash-text)]">
                       <CardHeader>
                         <CardTitle className="flex items-center gap-2">
                           <Building2 className="w-5 h-5" />
@@ -1165,7 +1268,7 @@ export default function ModernPurchaseOrderDetailPage({
                     </Card>
 
                     {/* Additional Details */}
-                    <Card className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-xl border-white/20 shadow-2xl hover:shadow-3xl transition-all duration-300">
+                    <Card className="dashboard-glass-panel rounded-lg text-[var(--dash-text)]">
                       <CardHeader>
                         <CardTitle className="flex items-center gap-2">
                           <FileText className="w-5 h-5" />
@@ -1200,7 +1303,7 @@ export default function ModernPurchaseOrderDetailPage({
                   {/* Summary Sidebar */}
                   <div className="space-y-6">
                     {/* Financial Summary */}
-                    <Card className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-xl border-white/20 shadow-2xl hover:shadow-3xl transition-all duration-300">
+                    <Card className="dashboard-glass-panel rounded-lg text-[var(--dash-text)]">
                       <CardHeader>
                         <CardTitle className="flex items-center gap-2">
                           <DollarSign className="w-5 h-5" />
@@ -1211,33 +1314,33 @@ export default function ModernPurchaseOrderDetailPage({
                         <div className="space-y-3">
                           <div className="flex justify-between">
                             <span className="text-slate-600 dark:text-slate-400">Subtotal</span>
-                            <span className="font-medium">{formatCurrency(purchaseOrder.subtotal)}</span>
+                            <span className="font-medium">{formatCurrency(toNumber(purchaseOrder.subtotal))}</span>
                           </div>
                           <div className="flex justify-between">
                             <span className="text-slate-600 dark:text-slate-400">Tax</span>
-                            <span className="font-medium">{formatCurrency(purchaseOrder.taxAmount)}</span>
+                            <span className="font-medium">{formatCurrency(toNumber(purchaseOrder.taxAmount))}</span>
                           </div>
                           <div className="flex justify-between">
                             <span className="text-slate-600 dark:text-slate-400">Shipping</span>
-                            <span className="font-medium">{formatCurrency(purchaseOrder.shippingCost)}</span>
+                            <span className="font-medium">{formatCurrency(toNumber(purchaseOrder.shippingCost))}</span>
                           </div>
                           {purchaseOrder.discount > 0 && (
                             <div className="flex justify-between">
                               <span className="text-slate-600 dark:text-slate-400">Discount</span>
-                              <span className="font-medium text-green-600">-{formatCurrency(purchaseOrder.discount)}</span>
+                              <span className="font-medium text-green-600">-{formatCurrency(toNumber(purchaseOrder.discount))}</span>
                             </div>
                           )}
                           <Separator />
                           <div className="flex justify-between text-lg font-semibold">
                             <span>Total</span>
-                            <span>{formatCurrency(purchaseOrder.total)}</span>
+                            <span>{formatCurrency(toNumber(purchaseOrder.total))}</span>
                           </div>
                         </div>
                       </CardContent>
                     </Card>
 
                     {/* Quick Actions */}
-                    <Card className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-xl border-white/20 shadow-2xl hover:shadow-3xl transition-all duration-300">
+                    <Card className="dashboard-glass-panel rounded-lg text-[var(--dash-text)]">
                       <CardHeader>
                         <CardTitle className="flex items-center gap-2">
                           <Zap className="w-5 h-5" />
@@ -1279,7 +1382,7 @@ export default function ModernPurchaseOrderDetailPage({
 
               {/* Line Items Tab */}
               <TabsContent value="items" className="mt-0">
-                <Card className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-xl border-white/20 shadow-2xl hover:shadow-3xl transition-all duration-300">
+                <Card className="dashboard-glass-panel rounded-lg text-[var(--dash-text)]">
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
                       <ShoppingCart className="w-5 h-5" />
@@ -1310,11 +1413,11 @@ export default function ModernPurchaseOrderDetailPage({
                                   </div>
                                 </div>
                               </TableCell>
-                              <TableCell className="font-medium">{line.orderedQuantity}</TableCell>
-                              <TableCell className="font-medium">{line.receivedQuantity || 0}</TableCell>
-                              <TableCell className="font-medium">{formatCurrency(line.unitCost)}</TableCell>
-                              <TableCell className="font-medium">{formatCurrency(line.taxAmount || 0)}</TableCell>
-                              <TableCell className="font-medium text-right">{formatCurrency(line.lineTotal)}</TableCell>
+                              <TableCell className="font-medium">{toNumber(line.orderedQuantity)}</TableCell>
+                              <TableCell className="font-medium">{toNumber(line.receivedQuantity)}</TableCell>
+                              <TableCell className="font-medium">{formatCurrency(toNumber(line.unitCost))}</TableCell>
+                              <TableCell className="font-medium">{formatCurrency(toNumber(line.taxAmount))}</TableCell>
+                              <TableCell className="font-medium text-right">{formatCurrency(toNumber(line.lineTotal))}</TableCell>
                             </TableRow>
                           ))}
                           {(!purchaseOrder.lines || purchaseOrder.lines.length === 0) && (
@@ -1333,7 +1436,7 @@ export default function ModernPurchaseOrderDetailPage({
 
               {/* Receipts Tab */}
               <TabsContent value="receipts" className="mt-0">
-                <Card className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-xl border-white/20 shadow-2xl hover:shadow-3xl transition-all duration-300">
+                <Card className="dashboard-glass-panel rounded-lg text-[var(--dash-text)]">
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
                       <Receipt className="w-5 h-5" />
@@ -1379,10 +1482,10 @@ export default function ModernPurchaseOrderDetailPage({
                                 <div key={line.id} className="flex justify-between items-center py-1 px-3 bg-slate-50 rounded text-sm">
                                   <span className="font-medium">{line.item?.name || `Item ${line.itemId}`}</span>
                                   <span className="text-muted-foreground">
-                                    Qty: {line.receivedQuantity}
-                                    {line.unitCost && (
+                                    Qty: {toNumber(line.receivedQuantity)}
+                                    {toNumber(line.unitCost) > 0 && (
                                       <span className="ml-2">
-                                        @ {formatCurrency(line.unitCost)} = {formatCurrency(line.unitCost * line.receivedQuantity)}
+                                        @ {formatCurrency(toNumber(line.unitCost))} = {formatCurrency(toNumber(line.unitCost) * toNumber(line.receivedQuantity))}
                                       </span>
                                     )}
                                   </span>
@@ -1405,7 +1508,7 @@ export default function ModernPurchaseOrderDetailPage({
 
               {/* Inventory Tab */}
               <TabsContent value="inventory" className="mt-0">
-                <Card className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-xl border-white/20 shadow-2xl hover:shadow-3xl transition-all duration-300">
+                <Card className="dashboard-glass-panel rounded-lg text-[var(--dash-text)]">
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
                       <Package className="w-5 h-5" />
@@ -1427,34 +1530,34 @@ export default function ModernPurchaseOrderDetailPage({
 
                           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                             <div className="text-center p-3 bg-blue-50 rounded">
-                              <div className="font-semibold text-blue-700">{line.orderedQuantity}</div>
+                              <div className="font-semibold text-blue-700">{toNumber(line.orderedQuantity)}</div>
                               <div className="text-blue-600">Ordered</div>
                             </div>
 
                             <div className="text-center p-3 bg-green-50 rounded">
-                              <div className="font-semibold text-green-700">{line.receivedQuantity || 0}</div>
+                              <div className="font-semibold text-green-700">{toNumber(line.receivedQuantity)}</div>
                               <div className="text-green-600">Received</div>
                             </div>
 
                             <div className="text-center p-3 bg-orange-50 rounded">
                               <div className="font-semibold text-orange-700">
-                                {line.orderedQuantity - (line.receivedQuantity || 0)}
+                                {toNumber(line.orderedQuantity) - toNumber(line.receivedQuantity)}
                               </div>
                               <div className="text-orange-600">Pending</div>
                             </div>
 
                             <div className="text-center p-3 bg-slate-50 rounded">
                               <div className="font-semibold text-slate-700">
-                                {formatCurrency(line.unitCost * (line.receivedQuantity || 0))}
+                                {formatCurrency(toNumber(line.unitCost) * toNumber(line.receivedQuantity))}
                               </div>
                               <div className="text-slate-600">Value Received</div>
                             </div>
                           </div>
 
-                          {line.receivedQuantity && line.receivedQuantity > 0 && (
+                          {toNumber(line.receivedQuantity) > 0 && (
                             <div className="mt-3 pt-3 border-t">
                               <p className="text-xs text-muted-foreground">
-                                <strong>Inventory Updated:</strong> Added {line.receivedQuantity} units to inventory at {formatCurrency(line.unitCost)} each
+                                <strong>Inventory Updated:</strong> Added {toNumber(line.receivedQuantity)} units to inventory at {formatCurrency(toNumber(line.unitCost))} each
                               </p>
                             </div>
                           )}
@@ -1466,28 +1569,28 @@ export default function ModernPurchaseOrderDetailPage({
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center">
                           <div className="p-4 bg-blue-50 rounded-lg">
                             <div className="text-2xl font-bold text-blue-700">
-                              {purchaseOrder.lines?.reduce((sum, line) => sum + line.orderedQuantity, 0) || 0}
+                              {purchaseOrder.lines?.reduce((sum, line) => sum + toNumber(line.orderedQuantity), 0) || 0}
                             </div>
                             <div className="text-sm text-blue-600">Total Units Ordered</div>
                           </div>
 
                           <div className="p-4 bg-green-50 rounded-lg">
                             <div className="text-2xl font-bold text-green-700">
-                              {purchaseOrder.lines?.reduce((sum, line) => sum + (line.receivedQuantity || 0), 0) || 0}
+                              {purchaseOrder.lines?.reduce((sum, line) => sum + toNumber(line.receivedQuantity), 0) || 0}
                             </div>
                             <div className="text-sm text-green-600">Total Units Received</div>
                           </div>
 
                           <div className="p-4 bg-orange-50 rounded-lg">
                             <div className="text-2xl font-bold text-orange-700">
-                              {purchaseOrder.lines?.reduce((sum, line) => sum + (line.orderedQuantity - (line.receivedQuantity || 0)), 0) || 0}
+                              {purchaseOrder.lines?.reduce((sum, line) => sum + (toNumber(line.orderedQuantity) - toNumber(line.receivedQuantity)), 0) || 0}
                             </div>
                             <div className="text-sm text-orange-600">Units Pending</div>
                           </div>
 
                           <div className="p-4 bg-slate-50 rounded-lg">
                             <div className="text-2xl font-bold text-slate-700">
-                              {formatCurrency(purchaseOrder.lines?.reduce((sum, line) => sum + (line.unitCost * (line.receivedQuantity || 0)), 0) || 0)}
+                              {formatCurrency(purchaseOrder.lines?.reduce((sum, line) => sum + (toNumber(line.unitCost) * toNumber(line.receivedQuantity)), 0) || 0)}
                             </div>
                             <div className="text-sm text-slate-600">Inventory Value Added</div>
                           </div>
@@ -1500,7 +1603,7 @@ export default function ModernPurchaseOrderDetailPage({
 
               {/* History Tab */}
               <TabsContent value="history" className="mt-0">
-                <Card className="bg-white/80 dark:bg-slate-800/80 backdrop-blur-xl border-white/20 shadow-2xl hover:shadow-3xl transition-all duration-300">
+                <Card className="dashboard-glass-panel rounded-lg text-[var(--dash-text)]">
                   <CardHeader>
                     <CardTitle className="flex items-center gap-2">
                       <History className="w-5 h-5" />

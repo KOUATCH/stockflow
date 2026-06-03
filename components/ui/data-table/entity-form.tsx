@@ -22,13 +22,14 @@ interface EntityFormProps<TFormValues extends FieldValues> {
   title: string;
   description?: string;
   form: UseFormReturn<TFormValues>;
-  onSubmit: (values: TFormValues) => void | Promise<void>;
+  onSubmit?: ((values: TFormValues) => void | Promise<void>) | false;
   children: ReactNode;
   isSubmitting?: boolean;
   submitLabel?: string;
   cancelLabel?: string;
   size?: "sm" | "md" | "lg" | "xl";
   disableWhenSubmitting?: boolean;
+  hideSubmitButton?: boolean;
   className?: string;
   variant?: "default" | "success" | "warning" | "info";
 }
@@ -47,6 +48,7 @@ export default function EntityForm<TFormValues extends FieldValues>({
   size = "sm",
   className = "",
   disableWhenSubmitting = true,
+  hideSubmitButton = false,
   variant = "default",
 }: EntityFormProps<TFormValues>) {
   // Map size string to actual width class
@@ -147,7 +149,14 @@ export default function EntityForm<TFormValues extends FieldValues>({
         {/* Form Content with Enhanced Styling */}
         <div className="bg-gradient-to-b from-white to-gray-50/30 px-6 py-6">
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
+            <form
+              onSubmit={form.handleSubmit((values) => {
+                if (onSubmit) {
+                  return onSubmit(values)
+                }
+              })}
+              className="space-y-6"
+            >
               <div className="space-y-4">
                 {children}
               </div>
@@ -166,28 +175,30 @@ export default function EntityForm<TFormValues extends FieldValues>({
                   </Button>
                 </DialogClose>
 
-                <Button
-                  type="submit"
-                  disabled={isSubmitting && disableWhenSubmitting}
-                  className={`flex items-center gap-2 ${currentVariant.submitBg} border-0 shadow-lg hover:shadow-xl transition-all duration-200 font-medium px-6`}
-                >
-                  {isSubmitting ? (
-                    <>
-                      <Loader2 className="w-4 h-4 animate-spin" />
-                      <span>Saving...</span>
-                      <div className="flex gap-1 ml-1">
-                        <div className="w-1 h-1 bg-white/60 rounded-full animate-bounce"></div>
-                        <div className="w-1 h-1 bg-white/60 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
-                        <div className="w-1 h-1 bg-white/60 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
-                      </div>
-                    </>
-                  ) : (
-                    <>
-                      <Save className="w-4 h-4" />
-                      {submitLabel}
-                    </>
-                  )}
-                </Button>
+                {!hideSubmitButton && (
+                  <Button
+                    type="submit"
+                    disabled={isSubmitting && disableWhenSubmitting}
+                    className={`flex items-center gap-2 ${currentVariant.submitBg} border-0 shadow-lg hover:shadow-xl transition-all duration-200 font-medium px-6`}
+                  >
+                    {isSubmitting ? (
+                      <>
+                        <Loader2 className="w-4 h-4 animate-spin" />
+                        <span>Saving...</span>
+                        <div className="flex gap-1 ml-1">
+                          <div className="w-1 h-1 bg-white/60 rounded-full animate-bounce"></div>
+                          <div className="w-1 h-1 bg-white/60 rounded-full animate-bounce" style={{ animationDelay: '0.1s' }}></div>
+                          <div className="w-1 h-1 bg-white/60 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <Save className="w-4 h-4" />
+                        {submitLabel}
+                      </>
+                    )}
+                  </Button>
+                )}
               </DialogFooter>
             </form>
           </Form>

@@ -4,7 +4,9 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { getLocaleFromPathname, localizePath } from "@/i18n/routing";
 import { cn } from "@/lib/utils";
+import { DEFAULT_LOCALE } from "@/types/bilingual";
 import {
   AlertCircle,
   CheckCircle,
@@ -15,7 +17,7 @@ import {
   Timer
 } from "lucide-react";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import Logo from "../global/Logo";
@@ -34,6 +36,9 @@ export default function EmailVerificationForm() {
 
   const searchParams = useSearchParams();
   const router = useRouter();
+  const pathname = usePathname();
+  const locale = getLocaleFromPathname(pathname) ?? DEFAULT_LOCALE;
+  const localizedHref = (href: string) => localizePath(href, locale);
   const email = searchParams.get("email") || "";
   const userId = searchParams.get("id") || "";
 
@@ -87,7 +92,7 @@ export default function EmailVerificationForm() {
         );
 
         setTimeout(() => {
-          router.push("/login");
+          router.push(localizedHref("/login"));
         }, 2000);
       } else {
         throw new Error("Invalid verification code");
@@ -179,7 +184,7 @@ export default function EmailVerificationForm() {
               <span className="text-gray-600">Redirecting to login...</span>
             </div>
 
-            <Link href="/login">
+            <Link href={localizedHref("/login")}>
               <Button className="w-full h-12 bg-gradient-to-r from-green-600 to-teal-600 hover:from-green-700 hover:to-teal-700">
                 Continue to Login
               </Button>
@@ -337,7 +342,7 @@ export default function EmailVerificationForm() {
             <p className="text-gray-600">
               Wrong email address?{" "}
               <Link
-                href="/register"
+                href={localizedHref("/register")}
                 className="text-emerald-600 hover:text-emerald-500 font-semibold transition-colors"
               >
                 Go Back

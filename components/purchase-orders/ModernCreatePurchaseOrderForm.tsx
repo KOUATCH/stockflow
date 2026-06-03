@@ -44,7 +44,7 @@ import {
   Zap
 } from "lucide-react"
 import { useRouter } from "next/navigation"
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useState } from "react"
 import { useForm } from "react-hook-form"
 import { z } from "zod"
 
@@ -130,11 +130,6 @@ export function ModernCreatePurchaseOrderForm({
   const [isSaving, setIsSaving] = useState(false)
   const [showConfirmDialog, setShowConfirmDialog] = useState(false)
   const { success, error, warning, info, operationStart, operationComplete } = useNotifications()
-
-  // Welcome notification when component mounts
-  useEffect(() => {
-    info("Create Purchase Order", "Complete each step to create your new purchase order. Start with the basic information!")
-  }, [info])
 
   const form = useForm<PurchaseOrderFormData>({
     resolver: zodResolver(purchaseOrderSchema),
@@ -363,11 +358,6 @@ export function ModernCreatePurchaseOrderForm({
           notes: line.notes || "",
         }))
 
-        console.log("Submitting purchase order data:", {
-          ...data,
-          orderLines: orderLinesData
-        })
-
         formData.append('orderLines', JSON.stringify(orderLinesData))
 
         await action(formData)
@@ -380,8 +370,6 @@ export function ModernCreatePurchaseOrderForm({
         success("Purchase Order Created", "Purchase order has been created successfully!")
       }
     } catch (err) {
-      console.error("Form submission error:", err)
-
       // Check if this is a NEXT_REDIRECT (which indicates successful submission + redirect)
       if (err && typeof err === 'object' && 'digest' in err &&
         typeof err.digest === 'string' && err.digest.includes('NEXT_REDIRECT')) {
@@ -422,30 +410,30 @@ export function ModernCreatePurchaseOrderForm({
 
   return (
     <TooltipProvider>
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-emerald-50 to-teal-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-800 p-6 space-y-6 transition-colors duration-300">
-        {/* Enhanced Header with POSTerminal styling */}
-        <div className="flex items-center justify-between bg-gradient-to-r from-emerald-50 via-teal-50 to-cyan-50 dark:from-slate-800 dark:via-slate-700 dark:to-slate-800 p-6 rounded-2xl shadow-xl border border-emerald-200/60 dark:border-slate-600/60 backdrop-blur-sm mb-8 sticky top-6 z-40">
+      <div className="dashboard-landing-theme dark min-h-screen overflow-x-hidden">
+        <div className="dashboard-landing-content mx-auto w-full max-w-[88rem] px-4 py-6 text-[var(--dash-text)] sm:px-6 sm:py-8">
+          <div className="dashboard-glass-panel sticky top-4 z-40 mb-6 flex items-center justify-between rounded-lg p-4">
           <div className="flex items-center gap-4">
-            <div className="p-3 rounded-xl bg-gradient-to-br from-emerald-500 to-emerald-600 text-white shadow-lg">
-              <Plus className="h-8 w-8" />
+            <div className="flex h-10 w-10 items-center justify-center rounded-lg border border-[var(--dash-border-subtle)] bg-[var(--dash-brand-soft)] text-[var(--dash-brand-strong)]">
+              <Plus className="h-5 w-5" />
             </div>
             <div>
-              <h1 className="text-4xl font-heading font-bold bg-gradient-to-r from-emerald-600 to-teal-600 bg-clip-text text-transparent flex items-center gap-3">
+              <h1 className="text-2xl font-semibold tracking-normal">
                 Create Purchase Order
               </h1>
-              <p className="text-muted-foreground text-lg mt-1">
+              <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
                 Create a new purchase order with modern efficiency
               </p>
               <div className="flex items-center gap-4 mt-3">
-                <Badge variant="outline" className="flex items-center gap-2 px-3 py-1 bg-white/80 backdrop-blur-sm">
-                  <Activity className="h-4 w-4 text-emerald-500" />
+                <Badge variant="outline" className="dashboard-filter-chip flex items-center gap-2 rounded-lg px-3 py-1">
+                  <Activity className="h-4 w-4 text-[var(--dash-info)]" />
                   {Math.round(progress)}% Complete
                 </Badge>
-                <Badge variant="secondary" className="px-3 py-1 font-medium bg-white/80 backdrop-blur-sm">
+                <Badge variant="secondary" className="dashboard-filter-chip rounded-lg px-3 py-1 font-medium">
                   {orderLines.length} Items
                 </Badge>
                 {totals.total > 0 && (
-                  <Badge variant="secondary" className="px-3 py-1 font-medium bg-white/80 backdrop-blur-sm">
+                  <Badge variant="secondary" className="dashboard-filter-chip rounded-lg px-3 py-1 font-medium">
                     Total: {formatCurrency(totals.total)}
                   </Badge>
                 )}
@@ -458,7 +446,7 @@ export function ModernCreatePurchaseOrderForm({
               variant="outline"
               size="sm"
               onClick={() => router.back()}
-              className="flex items-center gap-2 bg-white/80 backdrop-blur-sm shadow-sm hover:shadow-md transition-all"
+              className="dashboard-button-secondary flex items-center gap-2 rounded-lg"
             >
               <ArrowLeft className="w-4 h-4" />
               Back
@@ -466,13 +454,13 @@ export function ModernCreatePurchaseOrderForm({
           </div>
         </div>
 
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
+        <div className="mx-auto max-w-7xl py-4 sm:py-6">
           {/* Progress and Steps */}
           <div className="mb-8">
             <div className="mb-6">
               <div className="flex justify-between items-center mb-2">
-                <span className="text-sm font-medium text-slate-700 dark:text-slate-300">Overall Progress</span>
-                <span className="text-sm text-slate-600 dark:text-slate-400">{Math.round(progress)}%</span>
+                <span className="text-sm font-medium text-[var(--dash-text-muted)]">Overall Progress</span>
+                <span className="text-sm text-[var(--dash-text-soft)]">{Math.round(progress)}%</span>
               </div>
               <Progress value={progress} className="h-2" />
             </div>
@@ -490,29 +478,29 @@ export function ModernCreatePurchaseOrderForm({
                     onClick={() => handleStepClick(step.id)}
                     disabled={!isAccessible && !isCompleted}
                     className={cn(
-                      "p-4 rounded-xl border-2 text-left transition-all duration-300 hover:shadow-lg hover:-translate-y-1",
-                      "focus:outline-none focus:ring-2 focus:ring-emerald-500/20 backdrop-blur-sm",
-                      isActive && "border-emerald-500 bg-gradient-to-br from-emerald-50 to-teal-50 dark:bg-emerald-950/50 shadow-lg transform scale-105",
-                      isCompleted && !isActive && "border-emerald-500 bg-gradient-to-br from-emerald-50 to-green-50 dark:bg-emerald-950/50 shadow-md",
-                      !isActive && !isCompleted && isAccessible && "border-slate-200 dark:border-slate-700 hover:border-emerald-300 dark:hover:border-emerald-600 bg-white/80 dark:bg-slate-800/80",
-                      !isAccessible && !isCompleted && "border-slate-100 dark:border-slate-800 opacity-50 cursor-not-allowed bg-white/50 dark:bg-slate-800/50"
+                      "rounded-lg border p-4 text-left transition-colors",
+                      "focus:outline-none focus:ring-2 focus:ring-[var(--dash-brand)]/30",
+                      isActive && "border-[var(--dash-brand)] bg-[var(--dash-brand-soft)] shadow-sm",
+                      isCompleted && !isActive && "border-[var(--dash-success)]/60 bg-[var(--dash-success-soft)]",
+                      !isActive && !isCompleted && isAccessible && "border-[var(--dash-border-subtle)] bg-[rgba(37,57,67,0.74)] hover:border-[var(--dash-border)]",
+                      !isAccessible && !isCompleted && "cursor-not-allowed border-[var(--dash-border-subtle)] bg-[rgba(24,38,45,0.45)] opacity-50"
                     )}
                   >
                     <div className="flex items-center gap-3 mb-2">
                       <div className={cn(
                         "flex items-center justify-center w-8 h-8 rounded-lg shadow-sm",
-                        isActive && "bg-gradient-to-br from-emerald-500 to-emerald-600 text-white",
-                        isCompleted && !isActive && "bg-gradient-to-br from-emerald-500 to-green-500 text-white",
-                        !isActive && !isCompleted && "bg-slate-100 dark:bg-slate-800 text-slate-400"
+                        isActive && "bg-[var(--dash-brand)] text-white",
+                        isCompleted && !isActive && "bg-[var(--dash-success)] text-white",
+                        !isActive && !isCompleted && "bg-[var(--dash-surface-raised)] text-[var(--dash-text-soft)]"
                       )}>
                         {isCompleted ? <CheckCircle className="w-4 h-4" /> : <Icon className="w-4 h-4" />}
                       </div>
                       <div>
                         <h3 className={cn(
                           "font-semibold text-sm",
-                          isActive && "text-emerald-700 dark:text-emerald-300",
-                          isCompleted && !isActive && "text-emerald-700 dark:text-emerald-300",
-                          !isActive && !isCompleted && "text-slate-700 dark:text-slate-300"
+                          isActive && "text-[var(--dash-brand-strong)]",
+                          isCompleted && !isActive && "text-[var(--dash-success)]",
+                          !isActive && !isCompleted && "text-[var(--dash-text-muted)]"
                         )}>
                           {step.title}
                         </h3>
@@ -531,11 +519,11 @@ export function ModernCreatePurchaseOrderForm({
                 <div className="lg:col-span-2">
                   {/* Step Content */}
                   {currentStep === 'basic' && (
-                    <Card className="shadow-2xl border-white/20 bg-white/80 dark:bg-slate-800/80 backdrop-blur-xl hover:shadow-3xl transition-all duration-300">
+                    <Card className="dashboard-glass-panel rounded-lg text-[var(--dash-text)]">
                       <CardContent className="p-6 sm:p-8">
                         <div className="flex items-center gap-3 mb-6">
-                          <div className="p-2 bg-gradient-to-r from-violet-500 to-purple-500 rounded-lg">
-                            <FileText className="h-5 w-5 text-white" />
+                          <div className="rounded-lg border border-[var(--dash-border-subtle)] bg-[var(--dash-brand-soft)] p-2 text-[var(--dash-brand-strong)]">
+                            <FileText className="h-5 w-5" />
                           </div>
                           <div>
                             <CardTitle className="text-xl">Order Information</CardTitle>
@@ -674,11 +662,11 @@ export function ModernCreatePurchaseOrderForm({
                   )}
 
                   {currentStep === 'parties' && (
-                    <Card className="shadow-2xl border-white/20 bg-white/80 dark:bg-slate-800/80 backdrop-blur-xl hover:shadow-3xl transition-all duration-300">
+                    <Card className="dashboard-glass-panel rounded-lg text-[var(--dash-text)]">
                       <CardContent className="p-6 sm:p-8">
                         <div className="flex items-center gap-3 mb-6">
-                          <div className="p-2 bg-gradient-to-r from-blue-500 to-cyan-500 rounded-lg">
-                            <Building2 className="h-5 w-5 text-white" />
+                          <div className="rounded-lg border border-[var(--dash-border-subtle)] bg-[var(--dash-brand-soft)] p-2 text-[var(--dash-brand-strong)]">
+                            <Building2 className="h-5 w-5" />
                           </div>
                           <div>
                             <CardTitle className="text-xl">Parties</CardTitle>
@@ -706,8 +694,8 @@ export function ModernCreatePurchaseOrderForm({
                                     {suppliers.map((supplier) => (
                                       <SelectItem key={supplier.id} value={supplier.id}>
                                         <div className="flex items-center gap-2">
-                                          <div className="w-8 h-8 bg-gradient-to-r from-blue-500 to-purple-500 rounded-full flex items-center justify-center">
-                                            <span className="text-white text-xs font-bold">
+                                          <div className="flex h-8 w-8 items-center justify-center rounded-lg border border-[var(--dash-border-subtle)] bg-[var(--dash-brand-soft)] text-[var(--dash-brand-strong)]">
+                                            <span className="text-xs font-bold">
                                               {supplier.name.charAt(0)}
                                             </span>
                                           </div>
@@ -749,7 +737,7 @@ export function ModernCreatePurchaseOrderForm({
                                     {locations.map((location) => (
                                       <SelectItem key={location.id} value={location.id}>
                                         <div className="flex items-center gap-2">
-                                          <MapPin className="h-4 w-4 text-green-600" />
+                                          <MapPin className="h-4 w-4 text-blue-600" />
                                           <div>
                                             <div className="font-medium">{location.name}</div>
                                             {location.address && (
@@ -774,12 +762,12 @@ export function ModernCreatePurchaseOrderForm({
                   )}
 
                   {currentStep === 'items' && (
-                    <Card className="shadow-2xl border-white/20 bg-white/80 dark:bg-slate-800/80 backdrop-blur-xl hover:shadow-3xl transition-all duration-300">
+                    <Card className="dashboard-glass-panel rounded-lg text-[var(--dash-text)]">
                       <CardContent className="p-6 sm:p-8">
                         <div className="flex items-center justify-between mb-6">
                           <div className="flex items-center gap-3">
-                            <div className="p-2 bg-gradient-to-r from-emerald-500 to-green-500 rounded-lg">
-                              <Package className="h-5 w-5 text-white" />
+                            <div className="rounded-lg border border-[var(--dash-border-subtle)] bg-[var(--dash-spruce-soft)] p-2 text-[var(--dash-spruce)]">
+                              <Package className="h-5 w-5" />
                             </div>
                             <div>
                               <CardTitle className="text-xl">Order Items</CardTitle>
@@ -789,7 +777,7 @@ export function ModernCreatePurchaseOrderForm({
                           <Button
                             type="button"
                             onClick={() => setShowItemSearch(true)}
-                            className="gap-2 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700"
+                            className="dashboard-button-primary gap-2 rounded-lg"
                           >
                             <Plus className="h-4 w-4" />
                             Add Item
@@ -798,24 +786,24 @@ export function ModernCreatePurchaseOrderForm({
 
                         {orderLines.length === 0 ? (
                           <div className="text-center py-12">
-                            <div className="w-20 h-20 bg-slate-100 dark:bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-4">
-                              <Package className="w-10 h-10 text-slate-400" />
+                            <div className="mx-auto mb-4 flex h-20 w-20 items-center justify-center rounded-full bg-[var(--dash-surface-raised)]">
+                              <Package className="w-10 h-10 text-[var(--dash-text-faint)]" />
                             </div>
-                            <h3 className="text-lg font-semibold text-slate-900 dark:text-white mb-2">No items added</h3>
-                            <p className="text-slate-600 dark:text-slate-400 mb-6">
+                            <h3 className="mb-2 text-lg font-semibold text-[var(--dash-text)]">No items added</h3>
+                            <p className="mb-6 text-[var(--dash-text-soft)]">
                               Add items to this purchase order to get started.
                             </p>
                             <Button
                               type="button"
                               onClick={() => setShowItemSearch(true)}
-                              className="gap-2 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700"
+                              className="dashboard-button-primary gap-2 rounded-lg"
                             >
                               <Plus className="h-4 w-4" />
                               Add First Item
                             </Button>
                           </div>
                         ) : (
-                          <div className="border rounded-lg overflow-hidden">
+                          <div className="dashboard-table-shell dashboard-data-table overflow-x-auto rounded-lg">
                             <Table>
                               <TableHeader>
                                 <TableRow>
@@ -920,11 +908,11 @@ export function ModernCreatePurchaseOrderForm({
                   )}
 
                   {currentStep === 'terms' && (
-                    <Card className="shadow-2xl border-white/20 bg-white/80 dark:bg-slate-800/80 backdrop-blur-xl hover:shadow-3xl transition-all duration-300">
+                    <Card className="dashboard-glass-panel rounded-lg text-[var(--dash-text)]">
                       <CardContent className="p-6 sm:p-8">
                         <div className="flex items-center gap-3 mb-6">
-                          <div className="p-2 bg-gradient-to-r from-orange-500 to-red-500 rounded-lg">
-                            <Clock className="h-5 w-5 text-white" />
+                          <div className="rounded-lg border border-[var(--dash-warning)]/30 bg-[var(--dash-warning-soft)] p-2 text-[var(--dash-warning)]">
+                            <Clock className="h-5 w-5" />
                           </div>
                           <div>
                             <CardTitle className="text-xl">Terms & Conditions</CardTitle>
@@ -1014,11 +1002,11 @@ export function ModernCreatePurchaseOrderForm({
                 {/* Summary Sidebar */}
                 <div className="space-y-6">
                   {/* Order Summary */}
-                  <Card className="shadow-2xl border-white/20 bg-white/80 dark:bg-slate-800/80 backdrop-blur-xl sticky top-24 hover:shadow-3xl transition-all duration-300">
+                  <Card className="dashboard-glass-panel sticky top-24 rounded-lg text-[var(--dash-text)]">
                     <CardContent className="p-6">
                       <div className="flex items-center gap-3 mb-4">
-                        <div className="p-2 bg-gradient-to-r from-emerald-500 to-green-500 rounded-lg">
-                          <TrendingUp className="h-4 w-4 text-white" />
+                        <div className="rounded-lg border border-[var(--dash-success)]/30 bg-[var(--dash-success-soft)] p-2 text-[var(--dash-success)]">
+                          <TrendingUp className="h-4 w-4" />
                         </div>
                         <div>
                           <h3 className="font-semibold">Order Summary</h3>
@@ -1042,7 +1030,7 @@ export function ModernCreatePurchaseOrderForm({
                         {totals.totalDiscount > 0 && (
                           <div className="flex justify-between text-sm">
                             <span className="text-muted-foreground">Discount</span>
-                            <span className="font-medium text-red-600">-{formatCurrency(totals.totalDiscount)}</span>
+                            <span className="font-medium text-rose-600">-{formatCurrency(totals.totalDiscount)}</span>
                           </div>
                         )}
                         <div className="border-t pt-3">
@@ -1057,12 +1045,12 @@ export function ModernCreatePurchaseOrderForm({
                           <div className="flex items-center justify-between text-sm">
                             <span className="text-muted-foreground">Form Status:</span>
                             {isFormReadyToSubmit() ? (
-                              <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200">
+                              <Badge variant="outline" className="rounded-lg border-[var(--dash-success)]/35 bg-[var(--dash-success-soft)] text-[var(--dash-text)]">
                                 <CheckCircle className="w-3 h-3 mr-1" />
                                 Ready to Submit
                               </Badge>
                             ) : (
-                              <Badge variant="outline" className="bg-orange-50 text-orange-700 border-orange-200">
+                              <Badge variant="outline" className="rounded-lg border-[var(--dash-warning)]/35 bg-[var(--dash-warning-soft)] text-[var(--dash-text)]">
                                 <AlertTriangle className="w-3 h-3 mr-1" />
                                 Incomplete
                               </Badge>
@@ -1074,7 +1062,7 @@ export function ModernCreatePurchaseOrderForm({
                   </Card>
 
                   {/* Navigation */}
-                  <Card className="shadow-2xl border-white/20 bg-white/80 dark:bg-slate-800/80 backdrop-blur-xl hover:shadow-3xl transition-all duration-300">
+                  <Card className="dashboard-glass-panel rounded-lg text-[var(--dash-text)]">
                     <CardContent className="p-6">
                       <div className="flex gap-3">
                         {currentStep !== 'basic' && (
@@ -1082,7 +1070,7 @@ export function ModernCreatePurchaseOrderForm({
                             type="button"
                             variant="outline"
                             onClick={handlePrevious}
-                            className="flex-1"
+                            className="dashboard-button-secondary flex-1 rounded-lg"
                           >
                             Previous
                           </Button>
@@ -1091,7 +1079,7 @@ export function ModernCreatePurchaseOrderForm({
                           <Button
                             type="button"
                             onClick={handleNext}
-                            className="flex-1 bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700"
+                            className="dashboard-button-primary flex-1 rounded-lg"
                           >
                             Next
                             <ChevronRight className="ml-2 h-4 w-4" />
@@ -1100,7 +1088,7 @@ export function ModernCreatePurchaseOrderForm({
                           <Button
                             type="button"
                             disabled={isSaving || !isFormReadyToSubmit()}
-                            className="flex-1 bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700 disabled:opacity-50"
+                            className="dashboard-button-primary flex-1 rounded-lg disabled:opacity-50"
                             onClick={handleCreateClick}
                           >
                             {isSaving ? (
@@ -1126,24 +1114,24 @@ export function ModernCreatePurchaseOrderForm({
 
           {/* Item Search Dialog */}
           <Dialog open={showItemSearch} onOpenChange={setShowItemSearch}>
-            <DialogContent className="max-w-4xl max-h-[80vh] flex flex-col">
+            <DialogContent className="dashboard-glass-panel flex max-h-[82vh] max-w-4xl flex-col rounded-lg border-[var(--dash-border-subtle)] text-[var(--dash-text)]">
               <DialogHeader>
                 <DialogTitle className="flex items-center gap-2">
                   <Search className="h-5 w-5" />
                   Add Items
                 </DialogTitle>
-                <DialogDescription>
+                <DialogDescription className="text-[var(--dash-text-soft)]">
                   Search and select items to add to your purchase order
                 </DialogDescription>
               </DialogHeader>
               <div className="flex-1 flex flex-col space-y-4 min-h-0">
                 <div className="relative">
-                  <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
+                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-[var(--dash-text-faint)]" />
                   <Input
                     placeholder="Search items by name or SKU..."
                     value={itemSearchTerm}
                     onChange={(e) => setItemSearchTerm(e.target.value)}
-                    className="pl-10"
+                    className="dashboard-control pl-10"
                   />
                 </div>
                 <div className="flex-1 overflow-y-auto space-y-2 min-h-0">
@@ -1159,12 +1147,13 @@ export function ModernCreatePurchaseOrderForm({
                           key={item.id}
                           className={cn(
                             "flex items-center justify-between p-4 border rounded-lg hover:bg-muted/50 transition-colors",
+                            "border-[var(--dash-border-subtle)] bg-[rgba(24,38,45,0.5)] hover:bg-[rgba(73,198,229,0.1)]",
                             isAlreadyAdded && "opacity-50"
                           )}
                         >
                           <div className="flex items-center gap-3 flex-1">
-                            <div className="w-12 h-12 bg-slate-100 dark:bg-slate-800 rounded-lg flex items-center justify-center">
-                              <Package className="w-6 h-6 text-slate-400" />
+                            <div className="flex h-12 w-12 items-center justify-center rounded-lg bg-[var(--dash-spruce-soft)]">
+                              <Package className="w-6 h-6 text-[var(--dash-spruce)]" />
                             </div>
                             <div className="flex-1 min-w-0">
                               <h4 className="font-medium truncate">{item.name}</h4>
@@ -1180,12 +1169,12 @@ export function ModernCreatePurchaseOrderForm({
                           </div>
                           <div className="ml-4">
                             {isAlreadyAdded ? (
-                              <Badge variant="secondary" className="bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-100">
+                              <Badge variant="secondary" className="rounded-md bg-emerald-100 text-emerald-800 dark:bg-emerald-950/40 dark:text-emerald-100">
                                 <CheckCircle className="w-3 h-3 mr-1" />
                                 Added
                               </Badge>
                             ) : (
-                              <Button onClick={() => addOrderLine(item)} size="sm">
+                              <Button onClick={() => addOrderLine(item)} size="sm" className="dashboard-button-primary rounded-lg">
                                 <Plus className="w-3 h-3 mr-1" />
                                 Add
                               </Button>
@@ -1202,34 +1191,34 @@ export function ModernCreatePurchaseOrderForm({
 
           {/* Confirmation Dialog */}
           <Dialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
-            <DialogContent>
+            <DialogContent className="dashboard-glass-panel rounded-lg border-[var(--dash-border-subtle)] text-[var(--dash-text)]">
               <DialogHeader>
                 <DialogTitle className="flex items-center gap-2">
                   <Save className="h-5 w-5" />
                   Create Purchase Order
                 </DialogTitle>
-                <DialogDescription>
+                <DialogDescription className="text-[var(--dash-text-soft)]">
                   Are you sure you want to create this purchase order? Please review the details before proceeding.
                 </DialogDescription>
               </DialogHeader>
 
               <div className="space-y-4">
-                <div className="bg-slate-50 dark:bg-slate-800/50 p-4 rounded-lg">
+                <div className="rounded-lg border border-[var(--dash-border-subtle)] bg-[rgba(24,38,45,0.58)] p-4">
                   <div className="grid grid-cols-2 gap-4 text-sm">
                     <div>
-                      <span className="font-medium text-slate-600 dark:text-slate-400">PO Number:</span>
+                      <span className="font-medium text-[var(--dash-text-soft)]">PO Number:</span>
                       <div className="font-semibold">{form.getValues("poNumber")}</div>
                     </div>
                     <div>
-                      <span className="font-medium text-slate-600 dark:text-slate-400">Total Amount:</span>
-                      <div className="font-semibold text-emerald-600">{formatCurrency(totals.total)}</div>
+                      <span className="font-medium text-[var(--dash-text-soft)]">Total Amount:</span>
+                      <div className="font-semibold text-[var(--dash-success)]">{formatCurrency(totals.total)}</div>
                     </div>
                     <div>
-                      <span className="font-medium text-slate-600 dark:text-slate-400">Items:</span>
+                      <span className="font-medium text-[var(--dash-text-soft)]">Items:</span>
                       <div className="font-semibold">{orderLines.length} item{orderLines.length !== 1 ? 's' : ''}</div>
                     </div>
                     <div>
-                      <span className="font-medium text-slate-600 dark:text-slate-400">Expected Delivery:</span>
+                      <span className="font-medium text-[var(--dash-text-soft)]">Expected Delivery:</span>
                       <div className="font-semibold">
                         {form.getValues("expectedDeliveryDate")
                           ? format(form.getValues("expectedDeliveryDate"), "MMM dd, yyyy")
@@ -1246,6 +1235,7 @@ export function ModernCreatePurchaseOrderForm({
                     variant="outline"
                     onClick={() => setShowConfirmDialog(false)}
                     disabled={isSaving}
+                    className="dashboard-button-secondary rounded-lg"
                   >
                     Cancel
                   </Button>
@@ -1253,7 +1243,7 @@ export function ModernCreatePurchaseOrderForm({
                     type="button"
                     onClick={handleConfirmedSubmit}
                     disabled={isSaving}
-                    className="bg-gradient-to-r from-emerald-600 to-green-600 hover:from-emerald-700 hover:to-green-700"
+                    className="dashboard-button-primary rounded-lg"
                   >
                     {isSaving ? (
                       <>
@@ -1271,6 +1261,7 @@ export function ModernCreatePurchaseOrderForm({
               </div>
             </DialogContent>
           </Dialog>
+          </div>
         </div>
       </div>
     </TooltipProvider>

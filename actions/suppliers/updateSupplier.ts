@@ -69,6 +69,7 @@ export async function updateSupplier(payload: UpdateSupplierDTO): Promise<Suppli
 
     return {
       success: true,
+      error: null,
       message: 'Supplier updated successfully',
       data: updated as SupplierWithRelations,
     }

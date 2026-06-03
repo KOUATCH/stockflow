@@ -3,6 +3,31 @@
 import { db } from "@/prisma/db"
 import { revalidatePath } from "next/cache"
 
+type DecimalLike = { toNumber?: () => number; toString: () => string } | number | string | null | undefined
+type SalePaymentMethod = CreateSaleData["payments"][number]["method"]
+
+function toNumber(value: DecimalLike): number {
+  if (value == null) return 0
+  if (typeof value === "number") return value
+  if (typeof value === "string") return Number(value) || 0
+  if (typeof value.toNumber === "function") return value.toNumber()
+  return Number(value.toString()) || 0
+}
+
+function toPaymentMethod(method: SalePaymentMethod) {
+  switch (method) {
+    case "cash":
+      return "CASH"
+    case "card":
+      return "CARD"
+    case "check":
+      return "CHEQUE"
+    case "gift_card":
+    case "store_credit":
+      return "STORE_CREDIT"
+  }
+}
+
 export interface SaleItem {
   itemId: string
   quantity: number
@@ -91,31 +116,53 @@ export async function createSale(
   try {
     // Generate sale number
     const saleNumber = `SALE-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
-    const receiptNumber = `RCP-${Date.now()}`
+    const receiptNumber = `RCPT-${Date.now()}`
 
     // Calculate change amount
     const totalPaid = saleData.payments.reduce((sum, payment) => sum + payment.amount, 0)
     const changeAmount = Math.max(0, totalPaid - saleData.totalAmount)
 
-    const saleDataObj: any = {
-      orderNumber: saleNumber,
-      sessionId: saleData.sessionId,
-      terminalId: saleData.terminalId,
-      createdById: saleData.userId,
-      locationId: saleData.locationId,
-      organizationId: saleData.organizationId,
-      subtotal: saleData.subtotal,
-      taxAmount: saleData.taxAmount,
-      discount: saleData.discountAmount,
-      total: saleData.totalAmount,
-      notes: saleData.notes,
-    }
-    if (saleData.customerId) {
-      saleDataObj.customerId = saleData.customerId
-    }
+    const providedCustomer = saleData.customerId
+      ? await db.customer.findUnique({
+          where: { id: saleData.customerId },
+          select: { id: true },
+        })
+      : null
+    const customer =
+      providedCustomer ??
+      (await db.customer.upsert({
+        where: {
+          organizationId_code: {
+            organizationId: saleData.organizationId,
+            code: "WALK_IN",
+          },
+        },
+        update: {},
+        create: {
+          organizationId: saleData.organizationId,
+          name: "Walk-In Customer",
+          code: "WALK_IN",
+        },
+        select: { id: true },
+      }))
 
     const sale = await db.salesOrder.create({
-      data: saleDataObj,
+      data: {
+        orderNumber: saleNumber,
+        sessionId: saleData.sessionId,
+        terminalId: saleData.terminalId,
+        customerId: customer.id,
+        createdById: saleData.userId,
+        locationId: saleData.locationId,
+        organizationId: saleData.organizationId,
+        status: "COMPLETED",
+        paymentStatus: totalPaid >= saleData.totalAmount ? "PAID" : "PARTIAL",
+        subtotal: saleData.subtotal,
+        taxAmount: saleData.taxAmount,
+        discount: saleData.discountAmount,
+        total: saleData.totalAmount,
+        notes: saleData.notes,
+      },
     })
 
     // Create sale items and update inventory
@@ -143,11 +190,13 @@ export async function createSale(
       })
 
       if (inventoryLevel) {
+        const quantityOnHand = toNumber(inventoryLevel.quantityOnHand)
+        const quantityAvailable = toNumber(inventoryLevel.quantityAvailable)
         await db.inventoryLevel.update({
           where: { id: inventoryLevel.id },
           data: {
-            quantityOnHand: inventoryLevel.quantityOnHand - item.quantity,
-            quantityAvailable: inventoryLevel.quantityAvailable - item.quantity,
+            quantityOnHand: quantityOnHand - item.quantity,
+            quantityAvailable: quantityAvailable - item.quantity,
             lastTransactionAt: new Date(),
           },
         })
@@ -162,12 +211,13 @@ export async function createSale(
         data: {
           paymentNumber,
           salesOrderId: sale.id,
-          method: payment.method === "cash" ? "CASH" : "CARD",
+          method: toPaymentMethod(payment.method),
           amount: payment.amount,
           cardLast4: payment.cardLastFour,
           cardType: payment.cardType,
           authorizationCode: payment.authorizationCode,
           status: "PAID",
+          organizationId: saleData.organizationId,
         },
       })
 
@@ -190,7 +240,7 @@ export async function createSale(
         })
 
         if (session?.cashDrawerTransactions[0]?.cashDrawer) {
-          const currentBalance = session.cashDrawerTransactions[0].cashDrawer.currentBalance
+          const currentBalance = toNumber(session.cashDrawerTransactions[0].cashDrawer.currentBalance)
           const newBalance = currentBalance + payment.amount - changeAmount
 
           await db.cashDrawer.update({
@@ -236,7 +286,8 @@ export async function getSessionSales(sessionId: string, limit = 50): Promise<Sa
           include: {
             item: {
               select: {
-                name: true,
+                nameEn: true,
+                nameFr: true,
                 sku: true,
               },
             },
@@ -266,32 +317,32 @@ export async function getSessionSales(sessionId: string, limit = 50): Promise<Sa
       locationId: sale.locationId,
       organizationId: sale.organizationId ?? "",
       status: sale.status ?? "COMPLETED",
-      subtotal: sale.subtotal,
-      taxAmount: sale.taxAmount,
-      discountAmount: sale.discount ?? 0,
-      totalAmount: sale.total,
-      amountPaid: sale.payments?.reduce((sum: number, p: any) => sum + (p.amount ?? 0), 0) ?? 0,
+      subtotal: toNumber(sale.subtotal),
+      taxAmount: toNumber(sale.taxAmount),
+      discountAmount: toNumber(sale.discount),
+      totalAmount: toNumber(sale.total),
+      amountPaid: sale.payments?.reduce((sum: number, p: any) => sum + toNumber(p.amount), 0) ?? 0,
       changeAmount: sale.changeAmount ?? 0,
       notes: sale.notes ?? undefined,
-      receiptNumber: sale.receiptNumber ?? undefined,
+      receiptNumber: sale.orderNumber,
       createdAt: sale.createdAt,
       items: sale.lines.map((line: any) => ({
         id: line.id,
         itemId: line.itemId,
-        quantity: line.quantity,
-        unitPrice: line.unitPrice,
-        discountAmount: line.discount ?? 0,
-        taxAmount: line.taxAmount ?? 0,
-        lineTotal: line.lineTotal ?? line.unitPrice * line.quantity - (line.discount ?? 0) + (line.taxAmount ?? 0),
+        quantity: toNumber(line.quantity),
+        unitPrice: toNumber(line.unitPrice),
+        discountAmount: toNumber(line.discount),
+        taxAmount: toNumber(line.taxAmount),
+        lineTotal: toNumber(line.lineTotal) || toNumber(line.unitPrice) * toNumber(line.quantity) - toNumber(line.discount) + toNumber(line.taxAmount),
         item: {
-          name: line.item?.name ?? "",
+          name: line.item?.nameEn ?? line.item?.nameFr ?? "",
           sku: line.item?.sku ?? "",
         },
       })),
       payments: sale.payments.map((payment: any) => ({
         id: payment.id,
         paymentMethod: payment.method,
-        amount: payment.amount,
+        amount: toNumber(payment.amount),
         referenceNumber: payment.referenceNumber ?? undefined,
         cardLastFour: payment.cardLast4 ?? undefined,
         cardType: payment.cardType ?? undefined,
@@ -333,7 +384,7 @@ export async function getSaleById(saleId: string): Promise<Sale | null> {
       },
     })
 
-    return sale as Sale | null
+    return sale as unknown as Sale | null
   } catch (error) {
     console.error("Error getting sale by ID:", error)
     return null
@@ -391,8 +442,8 @@ export async function voidSale(
           await tx.inventoryLevel.update({
             where: { id: inventoryLevel.id },
             data: {
-              quantityOnHand: inventoryLevel.quantityOnHand + item.quantity,
-              quantityAvailable: inventoryLevel.quantityAvailable + item.quantity,
+              quantityOnHand: toNumber(inventoryLevel.quantityOnHand) + toNumber(item.quantity),
+              quantityAvailable: toNumber(inventoryLevel.quantityAvailable) + toNumber(item.quantity),
               lastTransactionAt: new Date(),
             },
           })
@@ -417,11 +468,11 @@ export async function voidSale(
         }
 
         if (session?.cashDrawerTransactions[0]?.cashDrawer) {
-          const totalCashAmount = cashPayments.reduce((sum, p) => sum + p.amount, 0)
-          const currentBalance = session.cashDrawerTransactions[0]?.cashDrawer?.currentBalance ?? 0
+          const totalCashAmount = cashPayments.reduce((sum, p) => sum + toNumber(p.amount), 0)
+          const currentBalance = toNumber(session.cashDrawerTransactions[0]?.cashDrawer?.currentBalance)
           const changeGiven =
             sale?.payments && sale.payments.length > 0 && sale.payments[0]?.changeGiven
-              ? sale.payments[0].changeGiven
+              ? toNumber(sale.payments[0].changeGiven)
               : 0
           const newBalance = currentBalance - totalCashAmount + changeGiven
 

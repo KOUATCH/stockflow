@@ -14,10 +14,13 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import { getLocaleFromPathname, localizePath } from "@/i18n/routing"
+import { DEFAULT_LOCALE } from "@/types/bilingual"
 import type { CustomerWithStats } from "@/types/customerTypes"
 import { formatDistanceToNow } from "date-fns"
 import { ArrowUpDown, Calendar, CreditCard, Edit, Eye, Mail, MoreHorizontal, Phone, Star, Trash2 } from "lucide-react"
 import Link from "next/link"
+import { usePathname } from "next/navigation"
 import { useState } from "react"
 
 interface CustomerTableProps {
@@ -25,6 +28,9 @@ interface CustomerTableProps {
 }
 
 export function CustomerTable({ customers }: CustomerTableProps) {
+  const pathname = usePathname()
+  const locale = getLocaleFromPathname(pathname) ?? DEFAULT_LOCALE
+  const localizedHref = (href: string) => localizePath(href, locale)
   const [sortField, setSortField] = useState<keyof CustomerWithStats>("createdAt")
   const [sortDirection, setSortDirection] = useState<"asc" | "desc">("desc")
   const [deleteDialog, setDeleteDialog] = useState<{ open: boolean; customerId: string; customerName: string }>({
@@ -258,19 +264,19 @@ export function CustomerTable({ customers }: CustomerTableProps) {
                         <DropdownMenuContent align="end" className="w-56">
                           <DropdownMenuLabel className="text-slate-600 dark:text-slate-400">Customer Actions</DropdownMenuLabel>
                           <DropdownMenuItem asChild>
-                            <Link href={`/dashboard/customers/${customer.id}`} className="cursor-pointer">
+                            <Link href={localizedHref(`/dashboard/customers/${customer.id}`)} className="cursor-pointer">
                               <Eye className="mr-2 h-4 w-4" />
                               View Profile
                             </Link>
                           </DropdownMenuItem>
                           <DropdownMenuItem asChild>
-                            <Link href={`/dashboard/customers/${customer.id}/edit`} className="cursor-pointer">
+                            <Link href={localizedHref(`/dashboard/customers/${customer.id}/edit`)} className="cursor-pointer">
                               <Edit className="mr-2 h-4 w-4" />
                               Edit Details
                             </Link>
                           </DropdownMenuItem>
                           <DropdownMenuItem asChild>
-                            <Link href={`/dashboard/customers/${customer.id}/orders`} className="cursor-pointer">
+                            <Link href={localizedHref(`/dashboard/customers/${customer.id}/orders`)} className="cursor-pointer">
                               <CreditCard className="mr-2 h-4 w-4" />
                               View Orders
                             </Link>
