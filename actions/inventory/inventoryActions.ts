@@ -25,8 +25,6 @@ import {
   TransferStatus,
   type UpdateInventoryLevelRequest,
 } from "@/types/inventoryTypes"
-// import { InventoryStatsResponse } from "./AllInventoryActionsOriginal"
-
 export interface InventoryLevel {
   id: string
   itemId: string
